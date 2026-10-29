@@ -15,6 +15,13 @@ public final class ThemeStatusLabelTest {
             for(boolean dark:new boolean[]{true,false}) {
                 for(boolean system:new boolean[]{true,false}) {
                     String label=ThemeStatusLabel.compact(name,dark);
+                    String chip=ThemeStatusLabel.expandedChip(name,dark);
+                    assertTrue(chip.endsWith(dark?" D":" L"),
+                            "expanded theme must show actual light/dark");
+                    assertTrue(chip.length()<=10,
+                            "expanded theme chip too wide");
+                    assertTrue(!chip.startsWith("Unknown"),
+                            "valid theme not identified");
                     String info=ThemeStatusLabel.details(name,dark,system,
                             name+" • app icon estimate");
                     assertTrue(label.startsWith("Theme: "+name+" • "),
@@ -30,6 +37,15 @@ public final class ThemeStatusLabelTest {
                 }
             }
         }
+        assertTrue("Shaded D".equals(
+                ThemeStatusLabel.expandedChip("App Match — Shaded",true)),
+                "shaded chip label");
+        assertTrue("MYou L".equals(
+                ThemeStatusLabel.expandedChip("Material You",false)),
+                "Material You chip label");
+        assertTrue("Clean D".equals(
+                ThemeStatusLabel.expandedChip("Clean Neutral",true)),
+                "Clean Neutral chip label");
         assertTrue("Theme: Unknown • Dark".equals(
                 ThemeStatusLabel.compact(null,true)),"null mode");
         assertTrue("Theme: Unknown • Light".equals(
