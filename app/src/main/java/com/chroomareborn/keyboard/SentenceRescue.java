@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -227,6 +228,50 @@ final class SentenceRescue {
         }
         return selected;
     }
+
+    /**
+     * A two-letter damaged word (e.g. "ut" for "is") normally exceeds
+     * the one-edit budget and disappears from the rescue beam. Add only
+     * short words explicitly supported after the PRIOR decoded word by
+     * the existing offline transition tables. No new text is invented.
+     *
+     * This is candidate recall, not autocorrection. All user text stays
+     * inside the current stack frame and the per-call ephemeral cache.
+     */
+    private static List<Candidate> contextualShortOptions(
+            String previous,String fragment,Map<String,Integer> dictionary,
+            Map<String,List<String>> common,Map<String,List<String>> phrases,
+            List<Candidate> base) {
+        if(previous.isEmpty() || fragment.length()<2 ||
+                fragment.length()>3)return Collections.emptyList();
+        LinkedHashSet<String> supported=new LinkedHashSet<>();
+        List<String> a=common.get(previous),b=phrases.get(previous);
+        Set<String> c=EXTRA_PAIRS.get(previous);
+        if(a!=null)supported.addAll(a);
+        if(b!=null)supported.addAll(b);
+        if(c!=null)supported.addAll(c);
+        ArrayList<Candidate> out=new ArrayList<>();
+        for(String word:supported) {
+            if(out.size()>=5)break;
+            Integer frequency=dictionary.get(word);
+            if(frequency==null || word.length()<2 ||
+                    Math.abs(word.length()-fragment.length())>1)continue;
+            boolean already=false;
+            for(Candidate existing:base)
+                if(existing.word.equals(word)){already=true;break;}
+            if(already)continue;
+            int edits=distance(fragment,word,2);
+            if(edits<1 || edits>2)continue;
+            // A two-edit candidate is permitted only when the preceding
+            // complete word predicts it; ordinary typo correction stays
+            // on its existing stricter pathway.
+            double emission=Math.log(frequency)*.8-4.25*edits-3.65-
+                    (word.length()<=2?.5:0);
+            out.add(new Candidate(word,edits,emission));
+        }
+        return out;
+    }
+
     /**
      * Penalize speculative boundaries that divide a known dictionary word.
      * Supported adjacent words remain free to appear as genuine phrases.
@@ -265,6 +310,7 @@ final class SentenceRescue {
         // before the contextual ranking had a chance to evaluate it.
         int budget=Math.max(2,(int)Math.ceil(n>=15?n*0.42:n/4.0));
         Map<String,List<Candidate>> cache=new HashMap<>();
+        Map<String,List<Candidate>> shortContextCache=new HashMap<>();
         @SuppressWarnings("unchecked") ArrayList<Path>[] beam=new ArrayList[n+1];
         for(int i=0;i<=n;i++)beam[i]=new ArrayList<>();
         beam[0].add(new Path("","",0,0,0,0));
@@ -277,7 +323,23 @@ final class SentenceRescue {
                 if(choices==null) {
                     choices=options(frag,index);cache.put(frag,choices);
                 }
-                for(Path previous:beam[i])for(Candidate candidate:choices) {
+                for(Path previous:beam[i]) {
+                    List<Candidate> available=choices;
+                    if(previous.count>0 && frag.length()>=2 && frag.length()<=3) {
+                        String cacheKey=previous.last+"|"+frag;
+                        List<Candidate> extras=shortContextCache.get(cacheKey);
+                        if(extras==null) {
+                            extras=contextualShortOptions(previous.last,frag,
+                                    dictionary,common,phrases,choices);
+                            shortContextCache.put(cacheKey,extras);
+                        }
+                        if(!extras.isEmpty()) {
+                            available=new ArrayList<>(choices.size()+extras.size());
+                            available.addAll(choices);
+                            available.addAll(extras);
+                        }
+                    }
+                    for(Candidate candidate:available) {
                     int errors=previous.edits+candidate.edits;
                     if(errors>budget)continue;
                     boolean isPair=paired(previous.last,candidate.word,common,phrases);
@@ -296,6 +358,7 @@ final class SentenceRescue {
                     insert(destination,new Path(text,candidate.word,
                             nextScore,previous.count+1,errors,
                             previous.pairs+(isPair?1:0)));
+                    }
                 }
             }
         }
