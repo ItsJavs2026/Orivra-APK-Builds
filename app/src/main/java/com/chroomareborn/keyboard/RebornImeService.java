@@ -1055,7 +1055,7 @@ public final class RebornImeService extends InputMethodService {
         });
         themePanel.addView(paletteBar,new LinearLayout.LayoutParams(-1,dp(28)));
         themePanel.addView(paletteControls,new LinearLayout.LayoutParams(-1,dp(36)));
-        themePanel.setVisibility(View.GONE);
+        ThemePanelLayout.apply(themePanel,false);
         predictionHeader=new LinearLayout(this);
         predictionHeader.setOrientation(LinearLayout.HORIZONTAL);
         predictionHeader.setGravity(Gravity.CENTER_VERTICAL);
@@ -1323,8 +1323,7 @@ public final class RebornImeService extends InputMethodService {
         // The THEME PANEL is either fully present (two separate theme rows)
         // or fully GONE (zero reserved dp). The prediction strip never moves
         // into a combined theme/prediction row.
-        if(themePanel!=null)themePanel.setVisibility(
-                toolbarExpanded?View.VISIBLE:View.GONE);
+        ThemePanelLayout.apply(themePanel,toolbarExpanded);
         if(paletteBar!=null)paletteBar.setVisibility(View.VISIBLE);
         if(paletteControls!=null)paletteControls.setVisibility(View.VISIBLE);
         if(themeExpanderButton!=null) {
