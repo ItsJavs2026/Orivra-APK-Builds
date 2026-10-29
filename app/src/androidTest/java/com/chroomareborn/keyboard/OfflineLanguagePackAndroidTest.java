@@ -29,6 +29,10 @@ public final class OfflineLanguagePackAndroidTest {
         return InstrumentationRegistry.getInstrumentation().getTargetContext();
     }
     private static CompressedLanguagePack.Loaded load()throws Exception {
+        String pkg=ctx().getPackageName();
+        String[] found=ctx().getAssets().list("dictionaries");
+        Log.i(TAG,"targetPackage="+pkg+" assetList="+Arrays.toString(found));
+        assertEquals("com.chroomareborn.keyboard.build300trial",pkg);
         try(InputStream stream=ctx().getAssets().open(CompressedLanguagePack.ASSET_PATH)){
             return CompressedLanguagePack.readVerified(stream);
         }
