@@ -1,0 +1,51 @@
+name: Orivra Candidate APK integrity - internal only
+on:
+  push:
+    branches:
+      - candidate/build292-editor-transaction-20261029
+    paths:
+      - .github/workflows/candidate-editor-apk-integrity.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-internal-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Validate candidate isolation and source privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build292trial' app/build.gradle.kts
+          test -s third_party/swiftfloris/LICENSE
+          test -s third_party/swiftfloris/NOTICE
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+      - name: Install Android SDK 35 tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Assemble TEMPORARY debug test APK (not uploaded)
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Validate package, version, debug signature, permissions and hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)
+          test -n "$apk" && test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 | tee /tmp/orivra-identity.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build292trial' versionCode='292'" /tmp/orivra-identity.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | tee /tmp/orivra-permissions.txt
+          if grep -Fq 'android.permission.INTERNET' /tmp/orivra-permissions.txt; then exit 1; fi
+          sha256sum "$apk"
+          echo "Internal qualification only; no GitHub artifact upload, release or Samsung install."
