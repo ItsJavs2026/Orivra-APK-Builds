@@ -113,8 +113,9 @@ public final class RebornImeService extends InputMethodService {
     }
     private int hapticStyle() {
         int style=getSharedPreferences("keyboard_feedback", MODE_PRIVATE)
-                .getInt(HAPTIC_STYLE_PREF,2);
-        return style>=1 && style<=3 ? style : 2;
+                .getInt(HAPTIC_STYLE_PREF,KeyboardHapticStyle.STANDARD);
+        return style>=KeyboardHapticStyle.LIGHT && style<=KeyboardHapticStyle.CRISP ?
+                style:KeyboardHapticStyle.STANDARD;
     }
     private void keyHaptic(View view) {
         if(view==null || !hapticsEnabled())return;
@@ -580,7 +581,7 @@ public final class RebornImeService extends InputMethodService {
         GradientDrawable content=rounded(normalColor);
         GradientDrawable mask=new GradientDrawable();
         mask.setColor(Color.WHITE);
-        mask.setCornerRadius(dp(7));
+        mask.setCornerRadius(dp(11));
         return new RippleDrawable(ColorStateList.valueOf(rippleColor),content,mask);
     }
     private String themeSource = "Neutral fallback";
@@ -763,14 +764,13 @@ public final class RebornImeService extends InputMethodService {
         // No additional permission and no intrusive new toolbar button.
         toolbarToggle.setOnLongClickListener(v -> {
             int current=hapticsEnabled()?hapticStyle():0;
-            int next=(current+1)%4;
+            int next=KeyboardHapticStyle.next(current);
             getSharedPreferences("keyboard_feedback", MODE_PRIVATE).edit()
                     .putBoolean(HAPTIC_PREF,next!=0)
                     .putInt(HAPTIC_STYLE_PREF,next==0?2:next).apply();
             if(next!=0)keyHaptic(v);
             android.widget.Toast.makeText(this,
-                    next==0?"Key haptics OFF":next==1?"Key haptics LIGHT":
-                    next==2?"Key haptics STANDARD":"Key haptics CRISP",
+                    "Key haptics "+KeyboardHapticStyle.label(next),
                     android.widget.Toast.LENGTH_SHORT).show();
             return true;
         });
@@ -1075,7 +1075,12 @@ public final class RebornImeService extends InputMethodService {
         predictionsToggle.setText(predictionsExpanded?"⌄":"⌃");
         predictionsToggle.setContentDescription((predictionsExpanded?"Collapse predictions":"Expand predictions")+". Hold to open keyboard controls");
         predictionsToggle.setTextColor(keyTextColor);
-        predictionsToggle.setBackground(feedbackBackground(specialBackground));
+        // Avoid replacing the ripple drawable on every keystroke.
+        if(!(predictionsToggle.getTag() instanceof Integer) ||
+                ((Integer)predictionsToggle.getTag())!=specialBackground) {
+            predictionsToggle.setBackground(feedbackBackground(specialBackground));
+            predictionsToggle.setTag(specialBackground);
+        }
         // Do not restart a panel animation for every incoming prediction.
         if(predictionsExpanded==panelWasVisible && !predictionsExpanded)return;
         // Keep the current touch targets in place while their contents are unchanged.
@@ -1458,7 +1463,8 @@ public final class RebornImeService extends InputMethodService {
         b.setBackground(new InsetDrawable(feedbackBackground(paint),
                 dp(3), dp(6), dp(3), dp(6)));
         b.setStateListAnimator(null);
-        b.setElevation(dp(1));
+        // Flat, softly rounded keycaps rather than elevated buttons.
+        b.setElevation(0f);
         b.setContentDescription(label.equals("⌫")?"Delete":
                 label.equals("⇧")?"Shift":label.equals("🌐")?"Choose keyboard":
                 label.equals("↵")?"Enter":label.equals("space")?"Space":label);
@@ -2013,7 +2019,9 @@ public final class RebornImeService extends InputMethodService {
             String suggestion=options.get(i);
             int childIndex=input.isEmpty()?i*2:i+Math.max(0,i-2);
             TextView option=reuseCells?(TextView)candidates.getChildAt(childIndex):new TextView(this);
-            option.setText(suggestionCase(suggestion));
+            String shownSuggestion=suggestionCase(suggestion);
+            if(!TextUtils.equals(option.getText(),shownSuggestion))
+                option.setText(shownSuggestion);
             option.setTextColor(suggestionTextColor);
             boolean fullSentenceChip=longPhrase && suggestion.indexOf(' ')>=0;
             option.setTextSize(fullSentenceChip?14:(suggestion.length()>25?14:18));
@@ -2056,8 +2064,12 @@ public final class RebornImeService extends InputMethodService {
                     (!input.isEmpty() && i<3 ? Math.max(dp(70),(screenWidth-dp(30))/3) : -2),
                     fullSentenceChip?dp(48):dp(44));
             params.setMargins(dp(2),dp(2),dp(2),dp(2));
-            if(reuseCells)option.setLayoutParams(params);
-            else candidates.addView(option,params);
+            if(reuseCells) {
+                LinearLayout.LayoutParams previous=
+                        (LinearLayout.LayoutParams)option.getLayoutParams();
+                if(previous.width!=params.width || previous.height!=params.height)
+                    option.setLayoutParams(params);
+            } else candidates.addView(option,params);
             final String expected=input;
             option.setOnClickListener(v->acceptSuggestion(v,expected,suggestion));
             if(!reuseCells && i<shownCount-1 && (input.isEmpty() || i>=2)) {
