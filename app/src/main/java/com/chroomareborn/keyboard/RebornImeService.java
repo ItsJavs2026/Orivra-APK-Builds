@@ -223,6 +223,8 @@ public final class RebornImeService extends InputMethodService {
         }
     };
     private boolean deleteHeld = false;
+    // Cancel the initial hold timer when a swipe wins or the editor closes.
+    private Runnable deleteHoldPending;
     private final Runnable deleteRepeat = new Runnable() {
         @Override public void run() {
             if (!deleteHeld || getCurrentInputConnection() == null) {
@@ -235,6 +237,10 @@ public final class RebornImeService extends InputMethodService {
     };
     private void stopDeleteRepeat() {
         deleteHeld = false;
+        if (deleteHoldPending != null) {
+            deleteHandler.removeCallbacks(deleteHoldPending);
+            deleteHoldPending = null;
+        }
         deleteHandler.removeCallbacks(deleteRepeat);
     }
 
@@ -523,47 +529,103 @@ public final class RebornImeService extends InputMethodService {
         }
     }
     private void attachRepeatingBackspace(Button key) {
-        // Accessibility actions still support a normal one-character click.
-        key.setOnClickListener(v -> backspace());
-        key.setOnTouchListener((view, event) -> {
-            switch (event.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
+        // Tap: one character; hold: repeat; slide left: delete whole words.
+        // A tap is committed AFTER release, so a swipe never accidentally
+        // removes the first character before gesture recognition.
+        key.setContentDescription("Delete. Hold to repeat, or slide left to delete words");
+        key.setOnClickListener(v -> backspace()); // accessibility fallback
+        final float[] touchStart={0f,0f};
+        final boolean[] swiping={false}, repeating={false}, cancelled={false};
+        final int[] swipeWords={0};
+        key.setOnTouchListener((view,event)->{
+            switch(event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN: {
                     stopDeleteRepeat();
-                    deleteHeld = true;
+                    touchStart[0]=event.getRawX();
+                    touchStart[1]=event.getRawY();
+                    swiping[0]=false;
+                    repeating[0]=false;
+                    cancelled[0]=false;
+                    swipeWords[0]=0;
+                    deleteHeld=true; // suppress key-view rebuild during gesture
                     key.setPressed(true);
                     animateKeyPress(key,true);
                     keyHaptic(key);
-                    freezeRiseDuringDelete = true;
-                    backspace();
-                    deleteHandler.postDelayed(deleteRepeat, DELETE_HOLD_DELAY_MS);
+                    freezeRiseDuringDelete=true;
+                    Runnable hold=()->{
+                        deleteHoldPending=null;
+                        if(!deleteHeld || cancelled[0] || swiping[0] ||
+                                getCurrentInputConnection()==null)return;
+                        repeating[0]=true;
+                        backspace();
+                        deleteHandler.postDelayed(deleteRepeat,DELETE_REPEAT_MS);
+                    };
+                    deleteHoldPending=hold;
+                    deleteHandler.postDelayed(hold,DELETE_HOLD_DELAY_MS);
                     return true;
-                case MotionEvent.ACTION_MOVE:
-                    // Moving the finger away cancels repeat; it must not delete
-                    // from a different field after an interrupted gesture.
-                    if (event.getX() < -key.getWidth() / 2f
-                            || event.getX() > key.getWidth() * 1.5f
-                            || event.getY() < -key.getHeight() / 2f
-                            || event.getY() > key.getHeight() * 1.5f) {
+                }
+                case MotionEvent.ACTION_MOVE: {
+                    if(cancelled[0] || repeating[0])return true;
+                    float left=touchStart[0]-event.getRawX();
+                    float vertical=event.getRawY()-touchStart[1];
+                    int words=BackspaceSwipePolicy.wordsForSwipe(
+                            left,vertical,dp(34),dp(78));
+                    if(words>0) {
+                        if(!swiping[0]) {
+                            swiping[0]=true;
+                            // Stop hold detection; restore the active gesture flag.
+                            if(deleteHoldPending!=null) {
+                                deleteHandler.removeCallbacks(deleteHoldPending);
+                                deleteHoldPending=null;
+                            }
+                            keyHaptic(key);
+                        }
+                        swipeWords[0]=words;
+                        key.setText("⌫"+words);
+                        key.setContentDescription("Delete "+words+
+                                (words==1?" word":" words")+" on release");
+                    } else if(swiping[0]) {
+                        // Sliding back toward the original key cancels deletion.
+                        swipeWords[0]=0;
+                        key.setText("⌫");
+                    } else if(Math.abs(left)>dp(60) || Math.abs(vertical)>dp(60)) {
+                        cancelled[0]=true;
                         stopDeleteRepeat();
-                        freezeRiseDuringDelete = false;
-                        key.setPressed(false);
-                        animateKeyPress(key,false);
-                        // Never detach or recreate children during touch dispatch.
-                        suggestionHandler.post(() -> { showSuggestions(); refreshView(); });
                     }
                     return true;
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_CANCEL:
+                }
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    cancelled[0]=true;
                     stopDeleteRepeat();
-                    freezeRiseDuringDelete = false;
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL: {
+                    boolean shouldCommit=event.getActionMasked()==MotionEvent.ACTION_UP &&
+                            !cancelled[0];
+                    int words=swiping[0]?swipeWords[0]:0;
+                    boolean tap=shouldCommit && !swiping[0] && !repeating[0];
+                    boolean swipe=shouldCommit && swiping[0] && words>0;
+                    InputConnection editor=getCurrentInputConnection();
+                    stopDeleteRepeat();
+                    freezeRiseDuringDelete=false;
+                    key.setText("⌫");
+                    key.setContentDescription(
+                            "Delete. Hold to repeat, or slide left to delete words");
                     key.setPressed(false);
                     animateKeyPress(key,false);
-                    // Defer view-tree mutation until after ACTION_UP dispatch.
-                    // Android 17 reported a null LinearLayout child while drawing.
-                    suggestionHandler.post(() -> { showSuggestions(); refreshView(); });
+                    // Android 17 Build 287 crash: DO NOT change the view tree
+                    // or editor while the Backspace touch event is dispatching.
+                    suggestionHandler.post(()->{
+                        if(editor!=null && editor==getCurrentInputConnection()) {
+                            if(swipe)deleteSwipeWords(words);
+                            else if(tap)backspace();
+                        }
+                        showSuggestions();
+                        refreshView();
+                    });
                     return true;
-                default:
-                    return true;
+                }
+                default: return true;
             }
         });
     }
@@ -1552,6 +1614,32 @@ public final class RebornImeService extends InputMethodService {
         if(!numericEditor && !capsLock && shiftAtStart!=shift &&
                 !symbolHoldInProgress)
             suggestionHandler.post(this::refreshView);
+    }
+    private void deleteSwipeWords(int words) {
+        InputConnection ic=getCurrentInputConnection();
+        if(ic==null || words<=0)return;
+        invalidateEditingTicket();
+        cancelCursorReleaseSuggestions();
+        // A selected range should be deleted as a selection, not by guessing
+        // text to its left. Never fetch/store the entire editor contents.
+        if(hasSelection()) {
+            currentFinish();
+            ic.commitText("",1);
+        } else {
+            CharSequence before=ic.getTextBeforeCursor(2048,0);
+            int chars=BackspaceSwipePolicy.charsToDelete(before,words);
+            if(chars<=0)return;
+            ic.beginBatchEdit();
+            try {
+                currentFinish();
+                ic.deleteSurroundingText(chars,0);
+            } finally {
+                ic.endBatchEdit();
+            }
+        }
+        editingInMiddle=cursorHasTextAfter() || hasSelection();
+        updateSentenceShift();
+        showSuggestions();
     }
     private void backspace() {
         invalidateEditingTicket();
