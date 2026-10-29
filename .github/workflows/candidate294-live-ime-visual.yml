@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/candidate294-live-ime-visual.yml
       - scripts/qa/capture-real-ime.sh
+      - scripts/qa/inspect_ime_screens.py
       - app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
   workflow_dispatch:
 permissions:
@@ -39,6 +40,8 @@ jobs:
       - name: Make Android emulator acceleration available
         run: |
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - name: Install pinned screenshot-image analyzer for emulator QA (not app)
+        run: python3 -m pip install --disable-pip-version-check Pillow==11.3.0
       - name: Launch REAL installed Orivra IME, capture screens and tap controls
         uses: reactivecircus/android-emulator-runner@v2
         with:
