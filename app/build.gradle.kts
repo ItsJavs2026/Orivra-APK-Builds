@@ -3,16 +3,16 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build288trial"
+        applicationId = "com.chroomareborn.keyboard.build291trial"
         minSdk = 26
         targetSdk = 35
-        versionCode = 288
-        versionName = "1.0.14-build288-backspacefix"
-        manifestPlaceholders["appLabel"] = "Orivra Build 288 Trial"
+        versionCode = 291
+        versionName = "1.0.17-build291-safe-enter"
+        manifestPlaceholders["appLabel"] = "Orivra Build 291 Safe Enter Trial"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Build 288 Trial"
+            manifestPlaceholders["appLabel"] = "Orivra Build 291 Safe Enter Trial"
         }
     }
     compileOptions {
