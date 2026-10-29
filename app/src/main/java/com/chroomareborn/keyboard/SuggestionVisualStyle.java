@@ -33,10 +33,11 @@ public final class SuggestionVisualStyle {
      */
     public static int chipColor(int suggestionBg,int keyBg,boolean dark,
                                 boolean emphasis) {
-        int base=blend(suggestionBg,keyBg,emphasis?.31f:.17f);
-        if(!emphasis)return base;
-        // Subtle contrast lift: 6% darker light chips, 7% lighter dark chips.
-        return blend(base,dark?0xffffffff:0xff000000,dark?.07f:.06f);
+        int neutral=blend(suggestionBg,keyBg,.17f);
+        if(!emphasis)return neutral;
+        // Shift the same neutral tone toward dark/light so emphasis cannot
+        // inadvertently reverse when a theme's key color is very different.
+        return blend(neutral,dark?0xffffffff:0xff000000,dark?.09f:.08f);
     }
 
     public static int textSizeSp(boolean sentence,int codePoints) {
