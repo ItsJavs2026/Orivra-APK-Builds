@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/research301-esdb-exact-only-ab.yml
       - app/src/main/java/com/chroomareborn/keyboard/ExactOnlyLanguagePack.java
+      - app/src/main/java/com/chroomareborn/keyboard/ExactOnlySegmentation.java
       - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
       - app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowPackInjectedAudit.java
   workflow_dispatch:
@@ -76,6 +77,7 @@ jobs:
             )
             if [ "$mode" = experimental ]; then
               files+=(app/src/main/java/com/chroomareborn/keyboard/ExactOnlyLanguagePack.java)
+              files+=(app/src/main/java/com/chroomareborn/keyboard/ExactOnlySegmentation.java)
             fi
             javac -encoding UTF-8 -d "$RUNNER_TEMP/$mode" "${files[@]}"
           done
