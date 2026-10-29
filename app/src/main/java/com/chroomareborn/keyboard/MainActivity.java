@@ -78,6 +78,37 @@ public final class MainActivity extends Activity {
         notes.setTextSize(15);
         root.addView(notes);
 
+        // Build 303 research, default OFF. Explicit opt-in and app-local only.
+        // Never reads notes or keyboard input; changing this preference takes
+        // effect when a text field is reopened and onStartInput runs again.
+        TextView dictionaryResearchInfo=new TextView(this);
+        dictionaryResearchInfo.setText("\nExperimental offline vocabulary: 78,942 extra exact English words. "
+                +"It helps recognize intact words, but does not add new fuzzy typo candidates. "
+                +"Uses about 280 KB APK storage plus runtime memory. "
+                +"Default OFF. Do not enable in production-critical typing.");
+        dictionaryResearchInfo.setTextColor(0xFF303846);
+        dictionaryResearchInfo.setTextSize(14);
+        root.addView(dictionaryResearchInfo);
+        Button offlineExactDictionary=new Button(this);
+        offlineExactDictionary.setAllCaps(false);
+        boolean exactEnabled=getSharedPreferences(
+                OfflineDictionaryActivationPolicy.PREFS,MODE_PRIVATE)
+                .getBoolean(OfflineDictionaryActivationPolicy.KEY,false);
+        offlineExactDictionary.setText("Experimental offline English dictionary: "+
+                (exactEnabled?"ON":"OFF")+" (tap to change)");
+        offlineExactDictionary.setOnClickListener(v->{
+            android.content.SharedPreferences prefs=getSharedPreferences(
+                    OfflineDictionaryActivationPolicy.PREFS,MODE_PRIVATE);
+            boolean enabled=!prefs.getBoolean(OfflineDictionaryActivationPolicy.KEY,false);
+            prefs.edit().putBoolean(OfflineDictionaryActivationPolicy.KEY,enabled).apply();
+            offlineExactDictionary.setText("Experimental offline English dictionary: "+
+                    (enabled?"ON":"OFF")+" (tap to change)");
+            android.widget.Toast.makeText(this,
+                    "Reopen a text field to apply. Password/privacy protection is unchanged.",
+                    android.widget.Toast.LENGTH_LONG).show();
+        });
+        root.addView(offlineExactDictionary);
+
         Button settings = new Button(this);
         settings.setText("1. Enable keyboard in Android settings");
         settings.setOnClickListener(v -> startActivity(new android.content.Intent("android.settings.INPUT_METHOD_SETTINGS")));
