@@ -175,9 +175,10 @@ public final class RebornImeService extends InputMethodService {
         final OfflineLanguagePackWorker loader=new OfflineLanguagePackWorker();
         optionalDictionaryLoader=loader;
         if(!loader.start(this,result->{
+            // A completed old worker must never clear a newer editor's pack.
+            if(optionalDictionaryLoader!=loader)return;
             boolean eligible=OfflineDictionaryActivationPolicy.acceptCallback(
-                    optionalDictionaryEnabled(),sensitive,
-                    optionalDictionaryLoader==loader,
+                    optionalDictionaryEnabled(),sensitive,true,
                     result!=null && result.pack!=null);
             if(eligible){
                 readyOptionalDictionary=result.pack;
@@ -186,9 +187,11 @@ public final class RebornImeService extends InputMethodService {
                 // prediction request safely uses the newly ready pack.
             }else{
                 PredictionLite.setResearchExactOnlyPack(null);
-                // If the editor merely became sensitive before callback,
-                // do not retain the pack there. A later normal input may
-                // retry from the preserved verified asset.
+                // This worker cannot be reused; permit retry on a later
+                // normal field if a private editor interrupted its result.
+                optionalDictionaryLoader=null;
+                optionalDictionaryAttempted=false;
+                loader.close();
             }
         })){
             loader.close();
