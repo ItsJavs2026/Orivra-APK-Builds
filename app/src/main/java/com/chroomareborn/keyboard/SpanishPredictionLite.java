@@ -53,6 +53,10 @@ final class SpanishPredictionLite {
     private static final Map<String,Word> EXACT=new HashMap<>();
     private static final List<Word> WORDS=new ArrayList<>();
     private static final Map<String,Set<String>> NEXT=new HashMap<>();
+    // Surface normalization is DISPLAY-ONLY. It never changes decoder
+    // scores, phrase segmentation, exact user input, or word ranking.
+    private static final Map<String,Map<String,String>> CONTEXT_SURFACE=
+            new HashMap<>();
 
     private static final String FUNCTION_WORDS=
         "a al algo alguien algunos algunas ambos ante antes aquí así aunque "
@@ -150,8 +154,18 @@ final class SpanishPredictionLite {
         }
     }
     private static void next(String left,String... right) {
-        Set<String> out=NEXT.computeIfAbsent(left,k->new HashSet<>());
-        for(String word:right)out.add(fold(word));
+        Set<String> out=NEXT.computeIfAbsent(fold(left),k->new HashSet<>());
+        Map<String,String> surfaces=CONTEXT_SURFACE.computeIfAbsent(
+                fold(left),k->new HashMap<>());
+        for(String word:right) {
+            String compact=fold(word);
+            out.add(compact);
+            // Only an explicitly accented surface overrides an unaccented
+            // variant after a supported preceding word. Do not force
+            // accents when no source evidence exists.
+            if(!compact.equals(word))
+                surfaces.putIfAbsent(compact,word);
+        }
     }
     static {
         addWords(FUNCTION_WORDS,60);
@@ -330,8 +344,15 @@ final class SpanishPredictionLite {
                                         choice.word.normalized);
                         double pair=supported?4.0:prev.words==0?0:-1.8;
                         double score=prev.score+choice.score+pair;
-                        String text=prev.text.isEmpty()?choice.word.display:
-                                prev.text+" "+choice.word.display;
+                        String surface=choice.word.display;
+                        if(prev.words>0) {
+                            String accented=CONTEXT_SURFACE.getOrDefault(
+                                    prev.last,Collections.emptyMap()).get(
+                                            choice.word.normalized);
+                            if(accented!=null)surface=accented;
+                        }
+                        String text=prev.text.isEmpty()?surface:
+                                prev.text+" "+surface;
                         insert(beams[j],new Path(text,choice.word.normalized,
                                 score,prev.words+1,edits));
                     }
