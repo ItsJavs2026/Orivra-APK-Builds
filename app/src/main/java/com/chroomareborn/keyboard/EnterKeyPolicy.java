@@ -19,6 +19,15 @@ public final class EnterKeyPolicy {
                 (imeOptions & IME_FLAG_NO_ENTER_ACTION) == 0;
     }
 
+    /**
+     * Safely insert a newline only in a multiline text editor. Single-line
+     * fields may treat Enter/newline as submit, so a tap fails closed there.
+     * Android InputType TYPE_CLASS_TEXT=1; TYPE_TEXT_FLAG_MULTI_LINE=0x20000.
+     */
+    public static boolean supportsNewline(int inputType) {
+        return (inputType & 0xF) == 1 && (inputType & 0x20000) != 0;
+    }
+
     /** A moved/multifinger gesture fails closed, never sending a message. */
     public static boolean gestureWithinSlop(float deltaX, float deltaY, float slop) {
         return Float.isFinite(deltaX) && Float.isFinite(deltaY) &&
