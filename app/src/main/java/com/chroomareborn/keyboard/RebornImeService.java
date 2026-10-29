@@ -32,11 +32,11 @@ import android.widget.TextView;
 import java.util.List;
 
 public final class RebornImeService extends InputMethodService {
-    private LinearLayout base, keys, candidates, paletteBar;
+    private LinearLayout base, keys, candidates, paletteBar, paletteControls, themePanel;
     private HorizontalScrollView suggestionScroll;
     private TextView swipeDeletePreview;
     private TextView paletteLabel;
-    private Button paletteButton, sizeButton, toolbarToggle, predictionsToggle, animationSpeedButton, splitModeButton, nextWordButton;
+    private Button paletteButton, sizeButton, toolbarToggle, themeExpanderButton, predictionsToggle, animationSpeedButton, splitModeButton, nextWordButton;
     private LinearLayout predictionHeader, expandedSuggestions;
     private boolean predictionsExpanded=false;
     private boolean freezeRiseDuringDelete = false;
@@ -883,11 +883,18 @@ public final class RebornImeService extends InputMethodService {
         candidates.setOrientation(LinearLayout.HORIZONTAL);
         candidates.setGravity(Gravity.CENTER_VERTICAL);
         suggestionScroll.addView(candidates);
-        // Suggestions live immediately below the compact toolbar.
-        // The toolbar itself is inserted before this scroll view below.
+        // Keep the prediction strip as the only always-visible top row.
+        // Theme details and the theme characters/buttons occupy separate
+        // rows in a panel that becomes completely GONE when collapsed.
+        themePanel = new LinearLayout(this);
+        themePanel.setOrientation(LinearLayout.VERTICAL);
+        themePanel.setMotionEventSplittingEnabled(true);
         paletteBar = new LinearLayout(this);
         paletteBar.setGravity(Gravity.CENTER_VERTICAL);
         paletteBar.setMotionEventSplittingEnabled(true);
+        paletteControls = new LinearLayout(this);
+        paletteControls.setGravity(Gravity.CENTER_VERTICAL);
+        paletteControls.setMotionEventSplittingEnabled(true);
         paletteLabel = new TextView(this);
         paletteLabel.setTextColor(secondaryTextColor);
         paletteLabel.setSingleLine(true);
@@ -899,7 +906,7 @@ public final class RebornImeService extends InputMethodService {
                 android.widget.Toast.makeText(this,themeDetails(),
                         android.widget.Toast.LENGTH_LONG).show());
         paletteLabel.setPadding(dp(8), 0, dp(5), 0);
-        paletteBar.addView(paletteLabel, new LinearLayout.LayoutParams(0, dp(32), 1f));
+        paletteBar.addView(paletteLabel, new LinearLayout.LayoutParams(0, dp(28), 1f));
         paletteButton = new Button(this);
         paletteButton.setText("🎨");
         paletteButton.setTextSize(10);
@@ -908,7 +915,7 @@ public final class RebornImeService extends InputMethodService {
         paletteButton.setPadding(0, 0, 0, 0);
         LinearLayout.LayoutParams paletteParams = new LinearLayout.LayoutParams(dp(64), dp(34));
         paletteParams.setMargins(dp(3), 0, dp(4), dp(2));
-        paletteBar.addView(paletteButton, paletteParams);
+        paletteControls.addView(paletteButton, paletteParams);
         paletteButton.setVisibility(View.GONE);
         paletteButton.setContentDescription("Change keyboard color style");
         paletteButton.setOnLongClickListener(v -> {
@@ -933,7 +940,7 @@ public final class RebornImeService extends InputMethodService {
         sizeButton.setPadding(0,0,0,0);
         LinearLayout.LayoutParams sizeParams=new LinearLayout.LayoutParams(dp(44),dp(34));
         sizeParams.setMargins(dp(2),0,dp(3),dp(2));
-        paletteBar.addView(sizeButton,sizeParams);
+        paletteControls.addView(sizeButton,sizeParams);
         sizeButton.setVisibility(View.GONE);
         sizeButton.setOnClickListener(v -> {
             int current=getSharedPreferences(KeyboardSizing.PREFS,MODE_PRIVATE)
@@ -990,7 +997,7 @@ public final class RebornImeService extends InputMethodService {
                     android.widget.Toast.LENGTH_LONG).show();
             return true;
         });
-        paletteBar.addView(animationSpeedButton,
+        paletteControls.addView(animationSpeedButton,
                 new LinearLayout.LayoutParams(dp(66),dp(34)));
         splitModeButton=new Button(this);
         splitModeButton.setAllCaps(false);
@@ -1003,7 +1010,7 @@ public final class RebornImeService extends InputMethodService {
             toggleOfflineNextWordMode();
             return true;
         });
-        paletteBar.addView(splitModeButton,new LinearLayout.LayoutParams(dp(80),dp(34)));
+        paletteControls.addView(splitModeButton,new LinearLayout.LayoutParams(dp(80),dp(34)));
         // Dedicated one-tap control: Android IME toast messages may be hidden,
         // and long-press-only settings provide no obvious state indicator.
         nextWordButton=new Button(this);
@@ -1014,18 +1021,18 @@ public final class RebornImeService extends InputMethodService {
             keyHaptic(v);
             toggleOfflineNextWordMode();
         });
-        paletteBar.addView(nextWordButton,
+        paletteControls.addView(nextWordButton,
                 new LinearLayout.LayoutParams(dp(60),dp(34)));
         // Accessible through a long-press on the existing prediction toggle.
         // This displays only aggregate counts, never learned word pairs.
 
         toolbarToggle = new Button(this);
         toolbarToggle.setAllCaps(false);
-        toolbarToggle.setText("⌄");
+        toolbarToggle.setText("⌃");
         toolbarToggle.setTextSize(18);
         toolbarToggle.setPadding(0,0,0,0);
-        toolbarToggle.setContentDescription("Expand keyboard controls");
-        LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(dp(42),dp(30));
+        toolbarToggle.setContentDescription("Collapse theme information and controls");
+        LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(dp(38),dp(28));
         toggleParams.setMargins(dp(2),0,dp(3),0);
         paletteBar.addView(toolbarToggle,toggleParams);
         // Long press cycles Off -> Light -> Standard -> Crisp -> Off.
@@ -1043,14 +1050,31 @@ public final class RebornImeService extends InputMethodService {
             return true;
         });
         toolbarToggle.setOnClickListener(v -> {
-            toolbarExpanded = !toolbarExpanded;
-            updateToolbar();
+            // Defer changes until after the collapse button's touch dispatch.
+            suggestionHandler.post(() -> setThemePanelExpanded(false));
         });
-        // Hidden controls no longer consume an entire permanent toolbar row.
-        base.addView(paletteBar, new LinearLayout.LayoutParams(-1, dp(34)));
+        themePanel.addView(paletteBar,new LinearLayout.LayoutParams(-1,dp(28)));
+        themePanel.addView(paletteControls,new LinearLayout.LayoutParams(-1,dp(36)));
+        themePanel.setVisibility(View.GONE);
         predictionHeader=new LinearLayout(this);
         predictionHeader.setOrientation(LinearLayout.HORIZONTAL);
         predictionHeader.setGravity(Gravity.CENTER_VERTICAL);
+        // A single icon in the existing prediction row replaces the
+        // permanently reserved theme row in Candidate 293.
+        themeExpanderButton=new Button(this);
+        themeExpanderButton.setText("🎨");
+        themeExpanderButton.setAllCaps(false);
+        themeExpanderButton.setTextSize(15);
+        themeExpanderButton.setPadding(0,0,0,0);
+        themeExpanderButton.setOnClickListener(v -> suggestionHandler.post(
+                () -> setThemePanelExpanded(!toolbarExpanded)));
+        themeExpanderButton.setOnLongClickListener(v -> {
+            android.widget.Toast.makeText(this,themeDetails(),
+                    android.widget.Toast.LENGTH_LONG).show();
+            return true;
+        });
+        predictionHeader.addView(themeExpanderButton,
+                new LinearLayout.LayoutParams(dp(36),dp(44)));
         LinearLayout.LayoutParams stripParams=new LinearLayout.LayoutParams(0,dp(48),1f);
         predictionHeader.addView(suggestionScroll,stripParams);
         // Reuse a dedicated, initially hidden slot in the existing strip.
@@ -1080,8 +1104,7 @@ public final class RebornImeService extends InputMethodService {
         final boolean[] riseLongPressed={false};
         final Runnable riseHold=()->{
             riseLongPressed[0]=true;
-            toolbarExpanded=!toolbarExpanded;
-            updateToolbar();
+            suggestionHandler.post(() -> setThemePanelExpanded(!toolbarExpanded));
         };
         predictionsToggle.setOnTouchListener((v,event)->{
             switch(event.getActionMasked()) {
@@ -1112,6 +1135,9 @@ public final class RebornImeService extends InputMethodService {
         expandedSuggestions.setOrientation(LinearLayout.VERTICAL);
         base.addView(expandedSuggestions,new LinearLayout.LayoutParams(-1,-2));
         base.addView(predictionHeader,new LinearLayout.LayoutParams(-1,dp(48)));
+        // Keep children mounted for the entire input-view lifetime; toggling
+        // uses visibility instead of removeView/addView during input gestures.
+        base.addView(themePanel,new LinearLayout.LayoutParams(-1,-2));
         updateToolbar();
         updatePredictionPanel();
         keys = new LinearLayout(this);
@@ -1263,12 +1289,18 @@ public final class RebornImeService extends InputMethodService {
         if (ic != null) ic.finishComposingText();
         composing = "";
     }
+    private void setThemePanelExpanded(boolean expand) {
+        if(base==null || themePanel==null || backspaceTouchActive ||
+                enterTouchActive || spacebarTouchActive) return;
+        toolbarExpanded=expand;
+        updateToolbar();
+    }
     private void updateToolbar() {
         // Refresh collapsed status and expanded layout on every toggle,
         // including toggles performed without a keyboard-view rebuild.
         if(paletteLabel!=null) {
             updateThemeStatus();
-            paletteLabel.setVisibility(toolbarExpanded?View.GONE:View.VISIBLE);
+            paletteLabel.setVisibility(View.VISIBLE);
         }
         if(splitModeButton!=null) {
             splitModeButton.setVisibility(toolbarExpanded?View.VISIBLE:View.GONE);
@@ -1288,10 +1320,21 @@ public final class RebornImeService extends InputMethodService {
             nextWordButton.setContentDescription(
                     NextWordControlLabels.contentDescription(enabled));
         }
-        // Preserve the compact selected-theme label and expand arrow at all
-        // times; the bar is a stable 34dp, so opening controls cannot shift
-        // the active keyboard touch rows or prediction strip.
+        // The THEME PANEL is either fully present (two separate theme rows)
+        // or fully GONE (zero reserved dp). The prediction strip never moves
+        // into a combined theme/prediction row.
+        if(themePanel!=null)themePanel.setVisibility(
+                toolbarExpanded?View.VISIBLE:View.GONE);
         if(paletteBar!=null)paletteBar.setVisibility(View.VISIBLE);
+        if(paletteControls!=null)paletteControls.setVisibility(View.VISIBLE);
+        if(themeExpanderButton!=null) {
+            themeExpanderButton.setText(toolbarExpanded?"🎨⌃":"🎨");
+            themeExpanderButton.setContentDescription(
+                    (toolbarExpanded?"Collapse":"Expand")+" theme information and controls. "
+                    +themeDetails());
+            themeExpanderButton.setTextColor(keyTextColor);
+            themeExpanderButton.setBackground(feedbackBackground(specialBackground));
+        }
         if (paletteButton != null) {
             paletteButton.setVisibility(toolbarExpanded ? View.VISIBLE : View.GONE);
             int selected=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
@@ -1312,10 +1355,10 @@ public final class RebornImeService extends InputMethodService {
                     "Prediction panel hold "+mode+" milliseconds; no fade animation");
         }
         if (toolbarToggle != null) {
-            toolbarToggle.setText(toolbarExpanded ? "⌃" : "⌄");
+            toolbarToggle.setText("⌃");
             toolbarToggle.setTextColor(keyTextColor);
             toolbarToggle.setBackground(feedbackBackground(specialBackground));
-            toolbarToggle.setContentDescription(toolbarExpanded ? "Collapse keyboard controls" : "Expand keyboard controls");
+            toolbarToggle.setContentDescription("Collapse theme information and controls");
         }
     }
     private void toggleRisePanel() {
@@ -1494,11 +1537,10 @@ public final class RebornImeService extends InputMethodService {
             return;
         base.setBackgroundColor(background);
         if (paletteBar != null) paletteBar.setBackgroundColor(background);
+        if (paletteControls != null) paletteControls.setBackgroundColor(background);
+        if (themePanel != null) themePanel.setBackgroundColor(background);
         updateToolbar();
-        if (paletteLabel != null) {
-            updateThemeStatus();
-            paletteLabel.setVisibility(toolbarExpanded?View.GONE:View.VISIBLE);
-        }
+        if (paletteLabel != null) updateThemeStatus();
         if(paletteButton!=null) {
             paletteButton.setTextColor(keyTextColor);
             paletteButton.setBackground(feedbackBackground(specialBackground));
