@@ -151,7 +151,7 @@ final class SpanishPredictionLite {
     }
     private static void next(String left,String... right) {
         Set<String> out=NEXT.computeIfAbsent(left,k->new HashSet<>());
-        out.addAll(Arrays.asList(right));
+        for(String word:right)out.add(fold(word));
     }
     static {
         addWords(FUNCTION_WORDS,60);
@@ -269,9 +269,10 @@ final class SpanishPredictionLite {
     }
 
     static List<String> suggestions(String typed) {
-        if(!accepted(typed)||Thread.currentThread().isInterrupted())
+        if(typed==null || Thread.currentThread().isInterrupted())
             return Collections.emptyList();
         String cleaned=Normalizer.normalize(typed,Normalizer.Form.NFC);
+        if(!accepted(cleaned))return Collections.emptyList();
         String lower=cleaned.toLowerCase(Locale.ROOT);
         Word known=EXACT.get(lower);
         if(known!=null) {
@@ -337,7 +338,10 @@ final class SpanishPredictionLite {
                 }
             }
             List<Path> finals=beams[n];
-            for(Path path:finals) {
+            // The beam is already descending by score. Prepend its entries
+            // in reverse order to keep the strongest path at index zero.
+            for(int idx=finals.size()-1;idx>=0;idx--) {
+                Path path=finals.get(idx);
                 if(path.words<2||path.words>10)continue;
                 String candidate=casing(typed,path.text);
                 if(!proposed.contains(candidate))proposed.add(0,candidate);
