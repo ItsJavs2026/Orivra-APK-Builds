@@ -38,9 +38,18 @@ public final class BackspaceSwipePolicy {
                                          int words, int maxCodePoints) {
         int chars=charsToDelete(beforeCursor,words);
         if(chars<=0 || maxCodePoints<=0)return "";
-        String fragment=beforeCursor.subSequence(beforeCursor.length()-chars,
-                beforeCursor.length()).toString();
-        // Keep the one-line preview readable without changing editor text.
+        return formatPreviewText(beforeCursor.subSequence(
+                beforeCursor.length()-chars,beforeCursor.length()),maxCodePoints);
+    }
+
+    /**
+     * Display-only abbreviated text. No edits, clipboard calls, or storage.
+     * A selection may span multiple words and must be previewed as a whole.
+     */
+    public static String formatPreviewText(CharSequence target,int maxCodePoints) {
+        if(target==null || maxCodePoints<=0)return "";
+        String fragment=target.toString();
+        // Keep the one-line preview readable without altering input text.
         fragment=fragment.replace("\r\n","↵").replace("\r","↵")
                 .replace("\n","↵").replace("\t","⇥");
         int length=fragment.codePointCount(0,fragment.length());
