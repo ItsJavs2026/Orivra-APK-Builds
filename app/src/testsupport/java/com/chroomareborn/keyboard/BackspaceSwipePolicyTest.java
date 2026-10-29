@@ -61,7 +61,7 @@ public final class BackspaceSwipePolicyTest {
         equalText("…world",BackspaceSwipePolicy.previewForSwipe("hello world",2,5));
         equalText("😊",BackspaceSwipePolicy.previewForSwipe("hey 😊",1,50));
         equalText("…😊",BackspaceSwipePolicy.previewForSwipe("abc😊",1,1));
-        equalText("hello↵world",BackspaceSwipePolicy.previewForSwipe("hello\\nworld",2,50));
+        equalText("hello↵world",BackspaceSwipePolicy.previewForSwipe("hello\nworld",2,50));
         equalText("",BackspaceSwipePolicy.previewForSwipe("hello",0,50));
         equalText("",BackspaceSwipePolicy.previewForSwipe(null,2,50));
 
