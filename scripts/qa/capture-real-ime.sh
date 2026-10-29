@@ -96,6 +96,47 @@ PY
   adb shell input tap $coords
 }
 
+# An underprovisioned GitHub emulator can surface a Pixel Launcher ANR
+# over the TEST app even though Orivra is installed and selected correctly.
+# Recover ONLY this known launcher popup. Orivra ANRs remain a hard failure.
+for pass in 1 2 3 4; do
+  dump_ui "startup-$pass"
+  screenshot "startup-$pass"
+  result="$(python3 - "$OUT/startup-$pass.xml" <<'PY'
+import sys,xml.etree.ElementTree as ET
+nodes=[n.attrib for n in ET.parse(sys.argv[1]).getroot().iter('node')]
+text=' '.join((x.get('content-desc','')+' '+x.get('text','')) for x in nodes)
+if 'Orivra' in text and "isn't responding" in text: print('app-anr')
+elif 'Pixel Launcher' in text and "isn't responding" in text: print('launcher-anr')
+elif 'Expand theme information and controls' in text: print('ready')
+elif 'Orivra emulator keyboard screenshot test editor' in text: print('editor-only')
+else: print('unknown')
+PY
+)"
+  echo "Visual QA startup state [$pass]: $result"
+  if [[ "$result" == "app-anr" ]]; then
+    echo "FAIL: Orivra ANR, do not suppress or ignore"
+    adb logcat -d -v brief -t 220 | grep -E -i 'chroomareborn|RebornImeService|ANR' | tail -n 90 > "$OUT/orivra-anr.txt" || true
+    exit 1
+  fi
+  if [[ "$result" == "ready" ]]; then break; fi
+  if [[ "$result" == "launcher-anr" ]]; then
+    # Close only Android's launcher, not Orivra. The fixture is already
+    # foreground. A new attempt will recheck the actual IME visibility.
+    tap_node "startup-$pass" text "Close app"
+    sleep 2
+  elif [[ "$result" == "editor-only" ]]; then
+    # Focus the visible scratch field to ask Android to show the active IME.
+    tap_node "startup-$pass" content-desc "Orivra emulator keyboard screenshot test editor"
+    sleep 2
+  else
+    adb shell dumpsys input_method > "$OUT/input-method-state-$pass.txt" || true
+    adb shell dumpsys window > "$OUT/window-state-$pass.txt" || true
+    echo "Unexpected screen state; retaining screenshot and retrying"
+    sleep 2
+  fi
+done
+
 dump_ui collapsed
 screenshot collapsed
 python3 - "$OUT/collapsed.xml" <<'PY'
