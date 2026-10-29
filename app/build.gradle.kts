@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build293trial"
+        applicationId = "com.chroomareborn.keyboard.build298trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 293
-        versionName = "1.0.19-build293-acceptance"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 293"
+        versionCode = 298
+        versionName = "1.0.20-build298-prediction-trial"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 298"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 293"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 298"
         }
     }
     compileOptions {
