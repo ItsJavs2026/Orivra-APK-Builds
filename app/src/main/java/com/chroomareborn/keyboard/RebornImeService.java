@@ -83,6 +83,8 @@ public final class RebornImeService extends InputMethodService {
     private String manualCollapseSnapshot="";
     private boolean toolbarExpanded = false;
     private static final String HAPTIC_PREF = "orivra_haptic_enabled";
+    // 1=Light, 2=Standard, 3=Crisp. 0 is handled by the existing on/off preference.
+    private static final String HAPTIC_STYLE_PREF = "orivra_haptic_style";
     private static final String ANIMATION_PREF = "sentenceflow_rise_ms";
     private long lastTypingTime=0L;
     private double averageTypingInterval=0;
@@ -109,8 +111,20 @@ public final class RebornImeService extends InputMethodService {
     private boolean hapticsEnabled() {
         return getSharedPreferences("keyboard_feedback", MODE_PRIVATE).getBoolean(HAPTIC_PREF, true);
     }
+    private int hapticStyle() {
+        int style=getSharedPreferences("keyboard_feedback", MODE_PRIVATE)
+                .getInt(HAPTIC_STYLE_PREF,2);
+        return style>=1 && style<=3 ? style : 2;
+    }
     private void keyHaptic(View view) {
-        if (hapticsEnabled()) view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        if(view==null || !hapticsEnabled())return;
+        // Use Android's system-tuned haptics rather than VIBRATE permission.
+        // Actual strength is device-dependent and respects system settings.
+        final int effect=hapticStyle()==1 ? HapticFeedbackConstants.CLOCK_TICK :
+                hapticStyle()==3 && Build.VERSION.SDK_INT>=30 ?
+                        HapticFeedbackConstants.CONFIRM :
+                        HapticFeedbackConstants.KEYBOARD_TAP;
+        view.performHapticFeedback(effect);
     }
     private int currentRowHeightDp=72;
     private String composing = "";
@@ -495,15 +509,14 @@ public final class RebornImeService extends InputMethodService {
     // Cancel old animations so rapid alternating thumb taps do not queue effects.
     private void animateKeyPress(View view, boolean pressed) {
         view.animate().cancel();
+        // Gboard-inspired restrained feedback: no overshoot or bouncing.
+        // Layout bounds remain unchanged even during rapid multi-touch.
         if (pressed) {
-            view.animate().scaleX(.89f).scaleY(.89f)
-                    .translationZ(-dp(2)).setDuration(55L).start();
+            view.animate().scaleX(.97f).scaleY(.97f)
+                    .translationZ(0f).setDuration(45L).start();
         } else {
-            view.animate().scaleX(1.12f).scaleY(1.12f)
-                    .translationZ(dp(1)).setDuration(85L)
-                    .withEndAction(() -> view.animate().scaleX(1f).scaleY(1f)
-                            .translationZ(0f).setDuration(105L).start())
-                    .start();
+            view.animate().scaleX(1f).scaleY(1f)
+                    .translationZ(0f).setDuration(65L).start();
         }
     }
     private void attachRepeatingBackspace(Button key) {
@@ -553,7 +566,7 @@ public final class RebornImeService extends InputMethodService {
     private GradientDrawable rounded(int color) {
         GradientDrawable d = new GradientDrawable();
         d.setColor(color);
-        d.setCornerRadius(dp(7));
+        d.setCornerRadius(dp(11));
         d.setStroke(Math.max(1,dp(.7f)),borderColor);
         return d;
     }
@@ -742,11 +755,19 @@ public final class RebornImeService extends InputMethodService {
         LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(dp(42),dp(30));
         toggleParams.setMargins(dp(2),0,dp(3),0);
         paletteBar.addView(toolbarToggle,toggleParams);
+        // Long press cycles Off -> Light -> Standard -> Crisp -> Off.
+        // No additional permission and no intrusive new toolbar button.
         toolbarToggle.setOnLongClickListener(v -> {
-            boolean enabled = !hapticsEnabled();
+            int current=hapticsEnabled()?hapticStyle():0;
+            int next=(current+1)%4;
             getSharedPreferences("keyboard_feedback", MODE_PRIVATE).edit()
-                    .putBoolean(HAPTIC_PREF, enabled).apply();
-            android.widget.Toast.makeText(this, enabled ? "Key vibration on" : "Key vibration off", android.widget.Toast.LENGTH_SHORT).show();
+                    .putBoolean(HAPTIC_PREF,next!=0)
+                    .putInt(HAPTIC_STYLE_PREF,next==0?2:next).apply();
+            if(next!=0)keyHaptic(v);
+            android.widget.Toast.makeText(this,
+                    next==0?"Key haptics OFF":next==1?"Key haptics LIGHT":
+                    next==2?"Key haptics STANDARD":"Key haptics CRISP",
+                    android.widget.Toast.LENGTH_SHORT).show();
             return true;
         });
         toolbarToggle.setOnClickListener(v -> {
@@ -1059,20 +1080,11 @@ public final class RebornImeService extends InputMethodService {
         panelWasVisible=predictionsExpanded;
         if(!predictionsExpanded) {
             riseRenderedSignature="";
-            if(wasVisible && expandedSuggestions.getVisibility()==View.VISIBLE) {
-                expandedSuggestions.animate().alpha(0f).translationY(dp(3))
-                        .setDuration(200L)
-                        .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator())
-                        .withEndAction(()->{
-                            if(!predictionsExpanded) {
-                                expandedSuggestions.setVisibility(View.GONE);
-                                expandedSuggestions.removeAllViews();
-                            }
-                        }).start();
-            } else {
-                expandedSuggestions.setVisibility(View.GONE);
-                expandedSuggestions.removeAllViews();
-            }
+            expandedSuggestions.animate().cancel();
+            expandedSuggestions.setAlpha(1f);
+            expandedSuggestions.setTranslationY(0f);
+            expandedSuggestions.setVisibility(View.GONE);
+            expandedSuggestions.removeAllViews();
             return;
         }
         expandedSuggestions.setVisibility(View.VISIBLE);
@@ -1161,17 +1173,10 @@ public final class RebornImeService extends InputMethodService {
                 row.addView(divider,new LinearLayout.LayoutParams(dp(1),dp(22)));
             }
         }
-        if(!wasVisible) {
-            expandedSuggestions.setAlpha(0f);
-            expandedSuggestions.setTranslationY(dp(4));
-            expandedSuggestions.animate().alpha(1f).translationY(0f)
-                    .setDuration(200L)
-                    .setInterpolator(new android.view.animation.PathInterpolator(.18f,.70f,.20f,1f))
-                    .start();
-        } else {
-            expandedSuggestions.setAlpha(1f);
-            expandedSuggestions.setTranslationY(0f);
-        }
+        // Keep expanded candidate labels stable: no alpha/translation effect
+        // on every rapid new result or held-backspace transition.
+        expandedSuggestions.setAlpha(1f);
+        expandedSuggestions.setTranslationY(0f);
     }
     private void refreshView() {
         if (base == null || keys == null || spacebarTouchActive) return;
@@ -1285,13 +1290,17 @@ public final class RebornImeService extends InputMethodService {
         hintLabel.setText(hint);
         hintLabel.setTextColor(secondaryTextColor);
         hintLabel.setTextSize(10);
-        hintLabel.setGravity(Gravity.RIGHT|Gravity.TOP);
-        hintLabel.setPadding(0,dp(3),dp(8),0);
+        hintLabel.setGravity(Gravity.END|Gravity.TOP);
+        // Anchor the hint INSIDE the inset keycap, not above the key row.
+        hintLabel.setPadding(0,0,dp(7),0);
         hintLabel.setIncludeFontPadding(false);
         hintLabel.setClickable(false);
         hintLabel.setFocusable(false);
         hintLabel.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        cell.addView(hintLabel,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        FrameLayout.LayoutParams hintParams=
+                new FrameLayout.LayoutParams(-1,dp(22),Gravity.TOP);
+        hintParams.topMargin=dp(11);
+        cell.addView(hintLabel,hintParams);
         key.setContentDescription(visible+", hold for "+hint);
         final boolean[] triggered={false},cancelled={false};
         final Runnable hold=()->{
@@ -1433,7 +1442,7 @@ public final class RebornImeService extends InputMethodService {
         // Full-size Button owns the complete touch cell. Only its drawable
         // is inset, so visible gaps never become dead touch zones.
         b.setBackground(new InsetDrawable(feedbackBackground(paint),
-                dp(3), dp(8), dp(3), dp(8)));
+                dp(3), dp(6), dp(3), dp(6)));
         b.setStateListAnimator(null);
         b.setElevation(dp(1));
         b.setContentDescription(label.equals("⌫")?"Delete":
@@ -1581,11 +1590,10 @@ public final class RebornImeService extends InputMethodService {
     private void confirmSuggestionTap(View source) {
         if (source == null) return;
         keyHaptic(source);
-        source.animate().cancel();
-        source.setScaleX(0.96f);
-        source.setScaleY(0.96f);
-        source.animate().scaleX(1f).scaleY(1f)
-                .setDuration(140L).start();
+        // Successful acceptance gets a distinct confirmation tick, but
+        // the candidate stays in the same place without scaling.
+        if(Build.VERSION.SDK_INT>=30)
+            source.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
     }
     // Apply a cursor-word correction only after re-reading the live editor text.
     // Cursor movement and the centered original suggestion never change content.
@@ -1838,7 +1846,8 @@ public final class RebornImeService extends InputMethodService {
             return;
         }
         // The background worker does all expensive sentence reconstruction.
-        candidates.setAlpha(.67f);
+        // Do not dim visible predictions while an asynchronous update runs.
+        // The old alpha toggle visibly flashed during fast typing/backspace.
         final long startedAt=CandidateLatencyMetrics.start(getPackageName());
         predictionDispatcher.schedule(snapshot,(id,input,options)->{
             final long computedAt=startedAt==0L?0L:System.nanoTime();
