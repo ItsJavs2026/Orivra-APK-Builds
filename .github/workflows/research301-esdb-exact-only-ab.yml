@@ -9,6 +9,7 @@ on:
       - app/src/main/java/com/chroomareborn/keyboard/ExactOnlySegmentation.java
       - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
       - app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowPackInjectedAudit.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/ExactOnlySegmentationTest.java
   workflow_dispatch:
 permissions:
   contents: read
@@ -78,9 +79,14 @@ jobs:
             if [ "$mode" = experimental ]; then
               files+=(app/src/main/java/com/chroomareborn/keyboard/ExactOnlyLanguagePack.java)
               files+=(app/src/main/java/com/chroomareborn/keyboard/ExactOnlySegmentation.java)
+              files+=(app/src/testsupport/java/com/chroomareborn/keyboard/ExactOnlySegmentationTest.java)
             fi
             javac -encoding UTF-8 -d "$RUNNER_TEMP/$mode" "${files[@]}"
           done
+      - name: Validate segmentation confidence guard
+        run: |
+          java -Xmx512m -ea -cp "$RUNNER_TEMP/experimental" \
+            com.chroomareborn.keyboard.ExactOnlySegmentationTest
       - name: Run 667 locked synthetic cases on both engines
         run: |
           set -euo pipefail
