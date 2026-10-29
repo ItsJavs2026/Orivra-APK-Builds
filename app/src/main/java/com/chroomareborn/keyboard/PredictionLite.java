@@ -1168,7 +1168,12 @@ final class PredictionLite {
                 }
             }
         }
-        return suggestions;
+        // Experimental: prefer an already-generated top-three joined
+        // candidate only with strictly stronger adjacent-word evidence
+        // and no worse compact-string edit distance.
+        // Always explicit one-tap accept; never silently edit the input.
+        return SentenceFlowEvidenceRanker.rerank(
+                input,suggestions,NEXT,RECOVERY_CONTEXT);
     }
     private static String displayRecovered(String plain) {
         String[] words=plain.split(" ");
