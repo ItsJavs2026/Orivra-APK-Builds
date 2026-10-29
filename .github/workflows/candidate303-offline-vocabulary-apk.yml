@@ -88,7 +88,7 @@ jobs:
       - name: Require exact editor, privacy and package parity with Candidate 300
         run: |
           set -euo pipefail
-          for file in EditorSuggestionPrivacyPolicy.java CandidateLatencyMetrics.java; do
+          for file in EditorSuggestionPrivacyPolicy.java; do
             cmp "qualified-candidate-300/app/src/main/java/com/chroomareborn/keyboard/$file" "app/src/main/java/com/chroomareborn/keyboard/$file"
           done
           # Candidate 303 is intentionally side-by-side installed.
@@ -103,6 +103,11 @@ jobs:
                       '1.0.22-build303-offline-language-trial')
           b=b.replace('Orivra Candidate 300','Orivra Candidate 303')
           assert Path('app/build.gradle.kts').read_text()==b, 'Unexpected Gradle identity difference'
+          base=Path('qualified-candidate-300/app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java').read_text()
+          adjusted=base.replace('com.chroomareborn.keyboard.build300trial',
+                                'com.chroomareborn.keyboard.build303trial')
+          actual=Path('app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java').read_text()
+          assert actual==adjusted, 'Unexpected candidate metric source change'
           PY
           cmp qualified-candidate-300/app/src/main/AndroidManifest.xml app/src/main/AndroidManifest.xml
           grep -Fq 'EditorSuggestionPrivacyPolicy.Decision privacy=editorPrivacyDecision(info);' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
