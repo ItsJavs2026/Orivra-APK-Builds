@@ -1,0 +1,109 @@
+name: Orivra 295 - 180-case qualified Spanish A/B
+on:
+  push:
+    branches:
+      - candidate/build295-major-prediction-integration-20261029
+    paths:
+      - .github/workflows/candidate295-major-spanish-quality.yml
+      - app/src/main/java/com/chroomareborn/keyboard/SpanishPredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/BilingualPredictionRouter.java
+      - app/src/main/java/com/chroomareborn/keyboard/SpanishPredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/BilingualPredictionRouter.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SpanishPredictionBenchmark.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-295-spanish
+  cancel-in-progress: true
+jobs:
+  spanish-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 73dc53ad14c7e4f2db4e493a150fb04d07a2b13b
+          path: spanish-baseline
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Protect English engine and prevent premature handset enablement
+        run: |
+          set -euo pipefail
+          cmp spanish-baseline/app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          cmp spanish-baseline/app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+      - name: Compile baseline and refined research engines
+        run: |
+          set -euo pipefail
+          for variant in spanish-baseline .; do
+            folder=baseline
+            if [ "$variant" = . ]; then folder=refined; fi
+            mkdir -p "$RUNNER_TEMP/$folder"
+            javac -encoding UTF-8 -d "$RUNNER_TEMP/$folder" \
+              "$variant/app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java" \
+              "$variant/app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java" \
+              "$variant/app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java" \
+              "$variant/app/src/main/java/com/chroomareborn/keyboard/SpanishPredictionLite.java" \
+              "$variant/app/src/main/java/com/chroomareborn/keyboard/BilingualPredictionRouter.java" \
+              "$variant/app/src/testsupport/java/com/chroomareborn/keyboard/SpanishPredictionBenchmark.java"
+          done
+          javac -encoding UTF-8 -cp "$RUNNER_TEMP/refined" \
+            -d "$RUNNER_TEMP/refined" \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SpanishPredictionResearchTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PredictionSmokeTest.java
+      - name: Test 2500 Spanish fuzz strings and untouched English predictions
+        run: |
+          set -euo pipefail
+          timeout 180s java -Xmx1g -ea -cp "$RUNNER_TEMP/refined" \
+            com.chroomareborn.keyboard.SpanishPredictionResearchTest
+          timeout 120s java -Xmx1g -ea -cp "$RUNNER_TEMP/refined" \
+            com.chroomareborn.keyboard.PredictionSmokeTest
+      - name: Measure 180 cases on exact same machine, baseline and refined
+        run: |
+          set -euo pipefail
+          for variant in baseline refined; do
+            timeout 180s java -Xmx1g -ea -cp "$RUNNER_TEMP/$variant" \
+              com.chroomareborn.keyboard.SpanishPredictionBenchmark \
+              | tee "$RUNNER_TEMP/spanish-$variant.txt"
+          done
+      - name: Reject Spanish prediction accuracy regressions
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import sys,re,os
+          root=sys.argv[1]
+          def metrics(name):
+              groups={}
+              for line in open(os.path.join(root,'spanish-'+name+'.txt'),encoding='utf-8'):
+                  m=re.match(r'^SPANISH\s+([a-zA-Z0-9_]+)\s+n=\s*(\d+)\s+top1=\s*(\d+).*top3=\s*(\d+)',line)
+                  if m:groups[m.group(1)]=tuple(map(int,m.groups()[1:]))
+              return groups
+          before,after=metrics('baseline'),metrics('refined')
+          assert before and before.keys()==after.keys(), 'A/B categories missing'
+          for key,b in before.items():
+              a=after[key]
+              print(f'{key:17s}: n={a[0]:3d} first {b[1]}->{a[1]} ({a[1]-b[1]:+d}), top3 {b[2]}->{a[2]} ({a[2]-b[2]:+d})')
+              assert a[0]==b[0],f'Different fixtures in {key}'
+              assert a[1]>=b[1],f'First-choice accuracy regression: {key}'
+              assert a[2]>=b[2],f'Top-three accuracy regression: {key}'
+          assert after['ALL'][0]==180,'Unexpected coverage change'
+          print('PASS: Spanish 180 synthetic cases have no category-level regression')
+          PY
+      - name: Preserve both reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-295-Spanish-180-Case-A-B-InitialVsIntegrated
+          path: |
+            ${{ runner.temp }}/spanish-baseline.txt
+            ${{ runner.temp }}/spanish-refined.txt
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Scope
+        if: success()
+        run: echo "Spanish research only; original English predictor and Samsung app remain unchanged."
