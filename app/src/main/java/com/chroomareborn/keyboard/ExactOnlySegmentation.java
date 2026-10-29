@@ -49,6 +49,10 @@ final class ExactOnlySegmentation {
         String[] current=baselineTop.trim().split(" +");
         if(current.length<4)return null;
         String baseline=compact(baselineTop);
+        // Preserve a correct letter-exact reading, even if a legal compound
+        // can shorten it: "fresh water" and "freshwater" are both real.
+        // We cannot infer intended spacing from dictionary membership alone.
+        if(baseline.equals(raw))return null;
         // The existing predictor already corrected multiple typos? Keep it.
         // Only explore when top suggestion is exact or one edit away.
         if(editDistanceAtMostOne(raw,baseline)>1)return null;
