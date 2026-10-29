@@ -13,7 +13,7 @@ public final class ExactOnlySegmentationTest {
     }
     public static void main(String[] args)throws Exception{
         ExactOnlyLanguagePack pack=ExactOnlyLanguagePack.fromReader(
-                new StringReader("sunrise\nheadphones\nnotes\npackage\n"));
+                new StringReader("sunrise\nheadphones\nnotes\npackage\nfreshwater\n"));
         Map<String,Integer> core=new HashMap<>();
         for(String word:"the train arrived before sun ride your head phones sound very clear my package earlier today".split(" "))
             core.put(word,24);
@@ -39,6 +39,11 @@ public final class ExactOnlySegmentationTest {
                 "missing pack leaves baseline unchanged");
         expect(ExactOnlySegmentation.propose(joined,old,core,pack)!=null,
                 "candidate only: explicit tap remains required");
+        core.put("garden",24);core.put("needs",24);
+        core.put("fresh",24);core.put("water",24);
+        expect(ExactOnlySegmentation.propose("thegardenneedsfreshwater",
+                "the garden needs fresh water",core,pack)==null,
+                "valid existing two-word reading must not be forced into a compound");
         System.out.println("PASS: ExactOnlySegmentationTest "+assertions+" assertions");
     }
 }
