@@ -15,8 +15,9 @@ public final class EnterKeyPolicy {
     private EnterKeyPolicy() {}
 
     public static boolean supportsLongPressSend(int imeOptions) {
-        return (imeOptions & IME_MASK_ACTION) == IME_ACTION_SEND &&
-                (imeOptions & IME_FLAG_NO_ENTER_ACTION) == 0;
+        // NO_ENTER_ACTION forbids replacing the normal Enter key with Send.
+        // It does not forbid a separate, deliberately held SEND gesture.
+        return (imeOptions & IME_MASK_ACTION) == IME_ACTION_SEND;
     }
 
     /**
