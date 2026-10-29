@@ -1,0 +1,47 @@
+name: Orivra guarded Backspace highlight - Android compile (no APK)
+on:
+  push:
+    branches:
+      - candidate/build292-swipe-snapshot-guard-20261029
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android-compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify Candidate isolation and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build292trial' app/build.gradle.kts
+          grep -Fq 'BackspaceSwipeSnapshotGuard.isCurrent(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'BackspaceSwipeSnapshotGuard.previewText(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          test -s third_party/swiftfloris/LICENSE
+          test -s third_party/swiftfloris/NOTICE
+      - name: Install compile SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile Android Java sources (no assemble, no artifact)
+        run: gradle --no-daemon --stacktrace :app:compileDebugJavaWithJavac
+      - name: Verify no APK is published
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find app/build/outputs/apk -type f -name '*.apk' 2>/dev/null | grep -q .; then
+            echo "Unexpected APK found; this compile-only gate must not package an APK"
+            exit 1
+          fi
+          echo "Android Java compilation only; no signed APK, no user install."
