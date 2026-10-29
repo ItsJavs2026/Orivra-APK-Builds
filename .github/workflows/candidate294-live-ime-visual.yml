@@ -5,6 +5,8 @@ on:
       - candidate/build294-live-ime-emulator-20261029
     paths:
       - .github/workflows/candidate294-live-ime-visual.yml
+      - scripts/qa/capture-real-ime.sh
+      - app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
   workflow_dispatch:
 permissions:
   contents: read
