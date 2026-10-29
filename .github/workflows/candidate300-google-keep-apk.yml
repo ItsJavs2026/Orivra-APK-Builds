@@ -207,19 +207,19 @@ jobs:
           apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
           test -n "$apk" && test -s "$apk"
           mkdir -p dist
-          cp "$apk" dist/Orivra-Candidate-298.apk
+          cp "$apk" dist/Orivra-Candidate-300.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 | tee dist/apk-identity.txt
           grep -Fq "package: name='com.chroomareborn.keyboard.build300trial' versionCode='300'" dist/apk-identity.txt
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" | tee dist/apk-signer.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | tee dist/apk-permissions.txt
           if grep -Fq 'android.permission.INTERNET' dist/apk-permissions.txt; then exit 1; fi
           cd dist
-          sha256sum Orivra-Candidate-298.apk > Orivra-Candidate-298.apk.sha256
-          cat Orivra-Candidate-298.apk.sha256
+          sha256sum Orivra-Candidate-300.apk > Orivra-Candidate-300.apk.sha256
+          cat Orivra-Candidate-300.apk.sha256
       - name: Archive installable test APK with hash and signature evidence
         uses: actions/upload-artifact@v4
         with:
-          name: Orivra-Candidate-298-Android-35-Qualified
+          name: Orivra-Candidate-300-Android-35-Qualified
           path: dist/
           retention-days: 21
           if-no-files-found: error
@@ -233,7 +233,7 @@ jobs:
           Orivra Candidate 300 — Google Keep prediction compatibility hotfix for Samsung Android 17 trial.
           
           This is a DEBUG-SIGNED experimental keyboard, not a production-stable release.
-          Separate application ID: com.chroomareborn.keyboard.build300trial (versionCode 298).
+          Separate application ID: com.chroomareborn.keyboard.build300trial (versionCode 300).
           It cannot overwrite stable Preview #178, Build 262, Candidate 293 or Candidate 298.
           
           Same qualified English SentenceFlow and one-arrow UI as Candidate 298.
@@ -247,14 +247,36 @@ jobs:
           CI checks: pinned English predictor source versus qualified 297, 19 Java suites plus privacy policy assertions, 18 Android 35 emulator instrumented tests, APK package/signature/permission/hash validation. Samsung S26 Ultra Android 17 testing remains a user acceptance step.
           CI debug signing keys are ephemeral. Future upgrade may require removing this *test* candidate only; keep stable installations.
           ORIVRA_NOTES
-          gh release create candidate-300-20261029 \
-            dist/Orivra-Candidate-298.apk \
-            dist/Orivra-Candidate-298.apk.sha256 \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "Orivra Candidate 300 — Google Keep Prediction Hotfix" \
-            --notes-file "$RUNNER_TEMP/notes300.md" \
-            --prerelease
+          if gh release view candidate-300-20261029 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Repair old misleading asset names only after uploading the new,
+            # correctly labelled and newly QA-qualified build.
+            gh release upload candidate-300-20261029 \
+              dist/Orivra-Candidate-300.apk \
+              dist/Orivra-Candidate-300.apk.sha256 \
+              --repo "$GITHUB_REPOSITORY" --clobber
+            for obsolete in Orivra-Candidate-298.apk Orivra-Candidate-298.apk.sha256; do
+              if gh release view candidate-300-20261029 --repo "$GITHUB_REPOSITORY" \
+                  --json assets --jq '.assets[].name' | grep -Fxq "$obsolete"; then
+                gh release delete-asset candidate-300-20261029 "$obsolete" \
+                  --repo "$GITHUB_REPOSITORY" --yes
+              fi
+            done
+          else
+            gh release create candidate-300-20261029 \
+              dist/Orivra-Candidate-300.apk \
+              dist/Orivra-Candidate-300.apk.sha256 \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Orivra Candidate 300 — Google Keep Prediction Hotfix" \
+              --notes-file "$RUNNER_TEMP/notes300.md" \
+              --prerelease
+          fi
+          gh release edit candidate-300-20261029 --repo "$GITHUB_REPOSITORY" \
+            --notes-file "$RUNNER_TEMP/notes300.md"
+          test "$(gh release view candidate-300-20261029 --repo "$GITHUB_REPOSITORY" \
+              --json assets --jq '.assets[].name' | grep -Fc 'Orivra-Candidate-300.apk')" -ge 1
+          ! gh release view candidate-300-20261029 --repo "$GITHUB_REPOSITORY" \
+              --json assets --jq '.assets[].name' | grep -Fq 'Orivra-Candidate-298.apk'
           gh release view candidate-300-20261029 --repo "$GITHUB_REPOSITORY"
       - name: Clarify qualification level
         run: |
