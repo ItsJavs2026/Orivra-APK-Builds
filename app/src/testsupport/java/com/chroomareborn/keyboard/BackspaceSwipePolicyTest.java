@@ -68,8 +68,8 @@ public final class BackspaceSwipePolicyTest {
         equalText("…there",BackspaceSwipePolicy.formatPreviewText("hey there",5));
         equalText("😊",BackspaceSwipePolicy.formatPreviewText("😊",1));
         equalText("…🏽",BackspaceSwipePolicy.formatPreviewText("👍🏽",1));
-        equalText("a↵b",BackspaceSwipePolicy.formatPreviewText("a\\r\\nb",50));
-        equalText("a⇥b",BackspaceSwipePolicy.formatPreviewText("a\\tb",50));
+        equalText("a↵b",BackspaceSwipePolicy.formatPreviewText("a\r\nb",50));
+        equalText("a⇥b",BackspaceSwipePolicy.formatPreviewText("a\tb",50));
         equalText("",BackspaceSwipePolicy.formatPreviewText(null,50));
         equalText("",BackspaceSwipePolicy.formatPreviewText("heythere",0));
 
