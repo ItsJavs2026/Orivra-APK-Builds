@@ -15,6 +15,13 @@ import java.util.Set;
 final class PredictionLite {
     private PredictionLite() {}
     private static final Map<String, Integer> WORDS = new HashMap<>();
+    // Experimental exact-only ESDB tier. Never populated in Candidate 300.
+    // Only qualified offline research injects this pack; no user typing,
+    // network or telemetry is collected.
+    private static volatile ExactOnlyLanguagePack researchExactOnlyPack;
+    static void setResearchExactOnlyPack(ExactOnlyLanguagePack pack) {
+        researchExactOnlyPack=pack;
+    }
     // Round 2: broad general-purpose words, not screenshot-specific phrases.
     private static final String EXPANDED_CORE_LEXICON =
         "able absence access account add address ahead airplane alarm alive amount angle animal apartment apple appointment April area arrived article attention August average baby balance ball bank base beach beautiful bed bedroom began begin behavior beside better birthday blanket block board body book books boring boss bought box boy breakfast brother budget building busy button camera camp card cards careful carry case cat center central chair chance chapter child children city class classroom cloud coffee company copy corner country customer cut dad dance daughter December decision deep desk detail dinner direction doctor dog door downtown dream drink drinking driver early earth east education egg eight email employee engine enjoy example excited exercise eye eyes family famous farm father February field film final finger fire fish flight floor flower focus food football forest forward found four friend friends friendly fruit garden gift girl glass grandma grandpa grocery group guess guitar gym hair hand hands handsome health heart heat heavy history holiday hospital hotel hour hours house hundred hungry husband idea important inside island January job journey joke July June key keys kid kitchen lake language laptop large late later laugh laughing letter library life light line local location longer lunch machine mail manager map March market math May meeting memory menu middle milk minute minutes Monday money month months moon mother mountain movie movies music name names natural neighbor news niece nephew notebook November number office older online open orange order package page pages parent park parking party password path patient payment person picture pictures place places plane planet plant plate player pocket poem point police pool popular practice price princess problem product program purpose rain rainy reason receipt recipe relative repair report restaurant review rice river room rooms route rule sad safety salad Saturday school science season second September serious service seven shirt shoes shop shopping short sister six sleep sleeping smile smiling snow soap socks software song songs soup south spring stairs station story street strong student students style summer sun sunny support sweet system table tablet talk talking task teacher teaching temperature ten test testing theme things thought ticket tired tool tools tooth town train training travel tree trip truck Tuesday uncle university vacation value vegetable vehicle visit visiting voice volume water weather website Wednesday weekend weekends wife window winter woman women wonderful world write writing writer year years yellow young";
@@ -705,6 +712,12 @@ final class PredictionLite {
         Integer exact=WORDS.get(fragment);
         List<Candidate> out=new ArrayList<>();
         if(exact!=null) out.add(new Candidate(fragment,0,exact));
+        else {
+            // Research: zero-error lexeme recovery, not fuzzy correction.
+            ExactOnlyLanguagePack pack=researchExactOnlyPack;
+            if(pack!=null && pack.contains(fragment))
+                out.add(new Candidate(fragment,0,8));
+        }
         if(allowFuzzy && fragment.length()>=2) {
             int limit=fragment.length()>=5?2:1;
             int scanned=0;
@@ -908,6 +921,11 @@ final class PredictionLite {
             }
             return stable;
         }
+        // A valid ordinary word in the second tier is always kept intact;
+        // never divide it into fragments or infer a replacement.
+        ExactOnlyLanguagePack pack=researchExactOnlyPack;
+        if(pack!=null && pack.contains(raw))
+            return Collections.singletonList(caseDisplay(input,display(raw)));
         ArrayList<ScoredText> result=new ArrayList<>();
         Set<String> known=new HashSet<>();
         addConversationalPhrases(input,raw,result,known);
