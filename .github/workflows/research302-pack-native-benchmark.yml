@@ -255,6 +255,17 @@ jobs:
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
           grep -Fq 'LexiconFamilyExpander.enrich(WORDS);' app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
           test -s app/src/main/java/com/chroomareborn/keyboard/LexiconFamilyExpander.java
+      - name: Preflight APK asset contents before instrumented test
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug
+          apk=$(find app/build/outputs/apk/debug -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          echo "APK package and source asset inventory:"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -E 'assets/|^assets' | head -n 70
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/esdb-en-US-60.txt.gz'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
       - name: Enable hardware acceleration
         run: |
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
