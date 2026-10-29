@@ -82,6 +82,47 @@ public final class MainActivity extends Activity {
         });
         root.addView(height);
 
+        // Build 287: discoverable feedback settings in addition to the
+        // toolbar long-press shortcut. Android remains responsible for actual
+        // motor strength and the device's master haptic setting.
+        TextView hapticHelp=new TextView(this);
+        hapticHelp.setText("\nKeyboard vibrations: choose the feedback feel. "
+                +"The system can suppress feedback when vibration is disabled.");
+        hapticHelp.setTextSize(15);
+        hapticHelp.setTextColor(0xFF303846);
+        root.addView(hapticHelp);
+        Button hapticButton=new Button(this);
+        hapticButton.setAllCaps(false);
+        final android.content.SharedPreferences feedback=getSharedPreferences(
+                "keyboard_feedback",MODE_PRIVATE);
+        int currentHaptic=feedback.getBoolean("orivra_haptic_enabled",true)?
+                KeyboardHapticStyle.normalize(feedback.getInt(
+                        "orivra_haptic_style",KeyboardHapticStyle.STANDARD)):
+                KeyboardHapticStyle.OFF;
+        hapticButton.setText("Key vibrations: "+KeyboardHapticStyle.label(currentHaptic)
+                +" (tap to change)");
+        hapticButton.setOnClickListener(v -> {
+            int active=feedback.getBoolean("orivra_haptic_enabled",true)?
+                    KeyboardHapticStyle.normalize(feedback.getInt(
+                            "orivra_haptic_style",KeyboardHapticStyle.STANDARD)):
+                    KeyboardHapticStyle.OFF;
+            int next=KeyboardHapticStyle.next(active);
+            feedback.edit().putBoolean("orivra_haptic_enabled",
+                    KeyboardHapticStyle.enabled(next))
+                    .putInt("orivra_haptic_style",next==KeyboardHapticStyle.OFF?
+                            KeyboardHapticStyle.STANDARD:next).apply();
+            hapticButton.setText("Key vibrations: "+KeyboardHapticStyle.label(next)
+                    +" (tap to change)");
+            if(KeyboardHapticStyle.enabled(next))
+                v.performHapticFeedback(next==KeyboardHapticStyle.LIGHT?
+                        android.view.HapticFeedbackConstants.CLOCK_TICK:
+                        next==KeyboardHapticStyle.CRISP &&
+                        android.os.Build.VERSION.SDK_INT>=30?
+                        android.view.HapticFeedbackConstants.CONFIRM:
+                        android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+        });
+        root.addView(hapticButton);
+
         boolean follow=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
                 .getBoolean(AppPalette.KEY_FOLLOW_SYSTEM,true);
         Button system=new Button(this);
