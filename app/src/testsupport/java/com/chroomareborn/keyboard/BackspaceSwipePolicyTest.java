@@ -45,9 +45,9 @@ public final class BackspaceSwipePolicyTest {
         equal(2, BackspaceSwipePolicy.charsToDelete("a 😊",1));
         equal(4, BackspaceSwipePolicy.charsToDelete("a 😊",2));
         equal(4, BackspaceSwipePolicy.charsToDelete("👍🏽",1));
-        equal(6, BackspaceSwipePolicy.charsToDelete("hi 👍🏽",1));
+        equal(4, BackspaceSwipePolicy.charsToDelete("hi 👍🏽",1));
         equal(6, BackspaceSwipePolicy.charsToDelete("hello!",1));
-        equal(4, BackspaceSwipePolicy.charsToDelete("a\tb\nc",2));
+        equal(3, BackspaceSwipePolicy.charsToDelete("a\tb\nc",2));
         equal(5, BackspaceSwipePolicy.charsToDelete("a\tb\nc",3));
         // A deterministic stress test covers varied whitespace, Unicode,
         // punctuation, repeated separators and multiple-word requests.
