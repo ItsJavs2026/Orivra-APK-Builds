@@ -1,0 +1,130 @@
+name: Orivra Candidate 294 - real collapsible theme panel qualification
+on:
+  push:
+    branches:
+      - candidate/build294-collapsible-theme-layout-20261029
+    paths:
+      - .github/workflows/candidate-build294-theme-panel-qualification.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate294-theme
+  cancel-in-progress: true
+jobs:
+  java-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Validate isolation, safe Enter and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build293trial' app/build.gradle.kts
+          grep -Fq 'EnterKeyPolicy.supportsNewline(info.inputType)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'EnterKeyPolicy.shouldSendOnRelease(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'BackspaceSwipeEditorTransaction.apply(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'BackspaceRepeatGuard.repeatAllowed(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'ThemeStatusLabel.compact(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'enterTouchActive' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'event.getRawX()-startX[0]' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'ThemeStatusLabel.expandedChip(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'ThemePanelLayout.apply(themePanel,toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'base.addView(themePanel' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'paletteControls.addView(paletteButton' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'themeExpanderButton.setOnClickListener(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'base.addView(paletteBar' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo "Old permanent theme row must not return"
+            exit 1
+          fi
+          grep -Fq 'ThemePanelLayout.apply(themePanel,false)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          if git ls-files | grep -Ei '(^research/|^evaluation/|^scripts/|^app/src/debug/|\.(jks|keystore|p12|pem|pfx|key)$)'; then exit 1; fi
+      - name: Run 16 Java suites including 362k seeded Backspace, Enter, touch and theme cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/orivra-classes"
+          javac -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/KeyboardLayoutSpec.java \
+            app/src/main/java/com/chroomareborn/keyboard/KeyboardHapticStyle.java \
+            app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeEditorTransaction.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceRepeatGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/ThemeStatusLabel.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionStripLayoutPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PunctuationSpacing.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/SpacebarCursorGesture.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorSwipeBatch.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorMovementPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorFallbackBoundaryPolicy.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardLayoutSpecTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardHapticStyleTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipePolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipeEditorTransactionTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceRepeatGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ThemeStatusLabelTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterReleaseBoundaryTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SuggestionStripLayoutPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PunctuationSpacingTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SpacebarCursorGestureTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorSwipeBatchTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorFallbackBoundaryPolicyTest.java
+          for suite in EnterKeyPolicyTest BackspaceSwipePolicyTest BackspaceSwipeSnapshotGuardTest BackspaceSwipeEditorTransactionTest BackspaceRepeatGuardTest ThemeStatusLabelTest EnterReleaseBoundaryTest KeyboardLayoutSpecTest KeyboardHapticStyleTest SuggestionStripLayoutPolicyTest PunctuationSpacingTest CursorWordCorrectionPolicyTest SpacebarCursorGestureTest CursorSwipeBatchTest CursorReleaseSuggestionPolicyTest CursorFallbackBoundaryPolicyTest; do
+            java -ea -cp "$RUNNER_TEMP/orivra-classes" "com.chroomareborn.keyboard.$suite"
+          done
+      - name: State scope
+        run: echo "Source-only pure Java qualification. NO Android APK built or published, NO Samsung device test."
+  panel-emulator:
+    needs: java-regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Verify isolated package and app privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build293trial' app/build.gradle.kts
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/BackspaceSwipeAndroidEditorTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ThemeStatusAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/EnterReleaseMotionEventAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ThemePanelLayoutAndroidTest.java
+      - name: Enable hardware acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Clarify qualification level
+        run: |
+          echo "12 Android 35 emulator tests including measured zero-height panel collapse; not physical Samsung UI QA."
+          echo "A temporary instrumented test APK is built by Gradle inside CI."
+          echo "No release artifact is uploaded; no Samsung handset is tested."
