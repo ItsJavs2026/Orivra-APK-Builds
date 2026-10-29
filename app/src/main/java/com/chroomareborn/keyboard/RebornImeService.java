@@ -34,6 +34,7 @@ import java.util.List;
 public final class RebornImeService extends InputMethodService {
     private LinearLayout base, keys, candidates, paletteBar;
     private HorizontalScrollView suggestionScroll;
+    private TextView swipeDeletePreview;
     private TextView paletteLabel;
     private Button paletteButton, sizeButton, toolbarToggle, predictionsToggle, animationSpeedButton, splitModeButton, nextWordButton;
     private LinearLayout predictionHeader, expandedSuggestions;
@@ -264,6 +265,7 @@ public final class RebornImeService extends InputMethodService {
         stopDeleteRepeat();
         stopEnterHold();
         freezeRiseDuringDelete = false;
+        hideSwipeDeletePreview();
     }
 
     private void stopSpacebarCursorGesture() {
@@ -550,6 +552,53 @@ public final class RebornImeService extends InputMethodService {
                     .translationZ(0f).setDuration(65L).start();
         }
     }
+    private void hideSwipeDeletePreview() {
+        if(swipeDeletePreview!=null) {
+            // Clear the transient text immediately; never retain a draft
+            // fragment after the gesture finishes or the editor changes.
+            swipeDeletePreview.setText("");
+            swipeDeletePreview.setVisibility(View.GONE);
+        }
+        if(suggestionScroll!=null)suggestionScroll.setVisibility(View.VISIBLE);
+    }
+    private void showSwipeDeletePreview(InputConnection editor,int words) {
+        if(editor==null || editor!=getCurrentInputConnection() || words<=0 ||
+                swipeDeletePreview==null || suggestionScroll==null || sensitive) {
+            hideSwipeDeletePreview();
+            return;
+        }
+        // This is a local visual preview only. It never moves the cursor or
+        // selects/deletes text in the host app until ACTION_UP.
+        CharSequence selected=editor.getSelectedText(0);
+        boolean selectionAvailable=selected!=null && selected.length()>0;
+        CharSequence preceding=selectionAvailable ? null :
+                editor.getTextBeforeCursor(2048,0);
+        String target=selectionAvailable ?
+                BackspaceSwipePolicy.formatPreviewText(selected,38) :
+                BackspaceSwipePolicy.previewForSwipe(preceding,words,38);
+        String prefix=selectionAvailable ? "Delete selection: " :
+                "Delete "+words+(words==1?" word: ":" words: ");
+        if(target.isEmpty()) {
+            swipeDeletePreview.setText(prefix+"release to confirm");
+        } else {
+            android.text.SpannableStringBuilder preview=
+                    new android.text.SpannableStringBuilder(prefix);
+            int start=preview.length();
+            preview.append(target);
+            preview.setSpan(new android.text.style.BackgroundColorSpan(
+                            Color.argb(95,Color.red(accent),Color.green(accent),
+                                    Color.blue(accent))),
+                    start,preview.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            preview.setSpan(new android.text.style.StyleSpan(
+                            android.graphics.Typeface.BOLD),
+                    start,preview.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            swipeDeletePreview.setText(preview);
+        }
+        suggestionScroll.setVisibility(View.GONE);
+        swipeDeletePreview.setVisibility(View.VISIBLE);
+    }
     private void attachRepeatingBackspace(Button key) {
         // Tap: one character; hold: repeat; slide left: delete whole words.
         // A tap is committed AFTER release, so a swipe never accidentally
@@ -565,6 +614,7 @@ public final class RebornImeService extends InputMethodService {
             switch(event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN: {
                     stopDeleteRepeat();
+                    hideSwipeDeletePreview();
                     gestureEditor[0]=getCurrentInputConnection();
                     gestureSession[0]=inputSessionGeneration;
                     touchStart[0]=event.getRawX();
@@ -607,23 +657,27 @@ public final class RebornImeService extends InputMethodService {
                             keyHaptic(key);
                         }
                         swipeWords[0]=words;
+                        showSwipeDeletePreview(gestureEditor[0],words);
                         key.setText("⌫"+words);
                         key.setContentDescription("Delete "+words+
                                 (words==1?" word":" words")+" on release");
                     } else if(swiping[0]) {
                         // Sliding back toward the original key cancels deletion.
                         swipeWords[0]=0;
+                        hideSwipeDeletePreview();
                         key.setText("⌫");
                         key.setContentDescription("Swipe deletion cancelled");
                     } else if(Math.abs(left)>dp(60) || Math.abs(vertical)>dp(60)) {
                         cancelled[0]=true;
                         stopDeleteRepeat();
+                        hideSwipeDeletePreview();
                     }
                     return true;
                 }
                 case MotionEvent.ACTION_POINTER_DOWN:
                     cancelled[0]=true;
                     stopDeleteRepeat();
+                    hideSwipeDeletePreview();
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL: {
@@ -639,6 +693,7 @@ public final class RebornImeService extends InputMethodService {
                     boolean swipe=shouldCommit && swiping[0] && words>0;
                     stopDeleteRepeat();
                     freezeRiseDuringDelete=false;
+                    hideSwipeDeletePreview();
                     key.setText("⌫");
                     key.setContentDescription(
                             "Delete. Hold to repeat, or slide left to delete words");
@@ -877,6 +932,20 @@ public final class RebornImeService extends InputMethodService {
         predictionHeader.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams stripParams=new LinearLayout.LayoutParams(0,dp(48),1f);
         predictionHeader.addView(suggestionScroll,stripParams);
+        // Reuse a dedicated, initially hidden slot in the existing strip.
+        // Never add/remove child views during a Backspace touch gesture.
+        swipeDeletePreview=new TextView(this);
+        swipeDeletePreview.setSingleLine(true);
+        swipeDeletePreview.setEllipsize(TextUtils.TruncateAt.START);
+        swipeDeletePreview.setGravity(Gravity.CENTER_VERTICAL);
+        swipeDeletePreview.setTextSize(14);
+        swipeDeletePreview.setTextColor(suggestionTextColor);
+        swipeDeletePreview.setPadding(dp(10),0,dp(8),0);
+        swipeDeletePreview.setBackground(rounded(suggestionBackground));
+        swipeDeletePreview.setVisibility(View.GONE);
+        swipeDeletePreview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        predictionHeader.addView(swipeDeletePreview,
+                new LinearLayout.LayoutParams(0,dp(48),1f));
         predictionsToggle=new Button(this);
         predictionsToggle.setText("⌃");
         predictionsToggle.setAllCaps(false);
