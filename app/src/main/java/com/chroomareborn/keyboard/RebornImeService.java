@@ -228,6 +228,15 @@ public final class RebornImeService extends InputMethodService {
     private long inputSessionGeneration = 0L;
     // Cancel the initial hold timer when a swipe wins or the editor closes.
     private Runnable deleteHoldPending;
+    // An Enter long press only arms SEND; the release commits it.
+    private static final long ENTER_SEND_HOLD_MS = 650L;
+    private Runnable enterHoldPending;
+    private void stopEnterHold() {
+        if (enterHoldPending != null) {
+            suggestionHandler.removeCallbacks(enterHoldPending);
+            enterHoldPending = null;
+        }
+    }
     private final Runnable deleteRepeat = new Runnable() {
         @Override public void run() {
             if (!deleteHeld || getCurrentInputConnection() == null) {
@@ -246,9 +255,10 @@ public final class RebornImeService extends InputMethodService {
         }
         deleteHandler.removeCallbacks(deleteRepeat);
     }
-    private void invalidateBackspaceGestureSession() {
+    private void invalidateInputGestureSession() {
         inputSessionGeneration++;
         stopDeleteRepeat();
+        stopEnterHold();
         freezeRiseDuringDelete = false;
     }
 
@@ -920,7 +930,7 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onConfigurationChanged(Configuration newConfig) {
         invalidateEditingTicket();
         super.onConfigurationChanged(newConfig);
-        invalidateBackspaceGestureSession();
+        invalidateInputGestureSession();
         stopSpacebarCursorGesture();
         setColors(getCurrentInputEditorInfo());
         refreshView();
@@ -928,7 +938,7 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onStartInput(EditorInfo info, boolean restarting) {
         invalidateEditingTicket();
         predictionDispatcher.cancel();
-        invalidateBackspaceGestureSession();
+        invalidateInputGestureSession();
         stopSpacebarCursorGesture();
         super.onStartInput(info, restarting);
         composing = "";
@@ -958,7 +968,7 @@ public final class RebornImeService extends InputMethodService {
     }
     @Override public void onStartInputView(EditorInfo info, boolean restarting) {
         invalidateEditingTicket();
-        invalidateBackspaceGestureSession();
+        invalidateInputGestureSession();
         stopSpacebarCursorGesture();
         super.onStartInputView(info, restarting);
         setColors(info);
@@ -968,7 +978,7 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onFinishInput() {
         invalidateEditingTicket();
         predictionDispatcher.cancel();
-        invalidateBackspaceGestureSession();
+        invalidateInputGestureSession();
         stopSpacebarCursorGesture();
         currentFinish();
         super.onFinishInput();
@@ -976,14 +986,14 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onFinishInputView(boolean finishingInput) {
         invalidateEditingTicket();
         predictionDispatcher.cancel();
-        invalidateBackspaceGestureSession();
+        invalidateInputGestureSession();
         stopSpacebarCursorGesture();
         super.onFinishInputView(finishingInput);
     }
     @Override public void onDestroy() {
         invalidateEditingTicket();
         predictionDispatcher.close();
-        invalidateBackspaceGestureSession();
+        invalidateInputGestureSession();
         stopSpacebarCursorGesture();
         super.onDestroy();
     }
@@ -1368,7 +1378,8 @@ public final class RebornImeService extends InputMethodService {
             attachSpacebarCursorControl(spaceKey);
         }
         if(!numericEditor)addKey(bottom,".",0.95f,()->type("."));
-        addKey(bottom,"↵",1.3f,this::enter);
+        Button enterKey = addKey(bottom,"↵",1.3f,this::insertNewlineSafely);
+        attachSafeEnterKey(enterKey);
         keys.addView(bottom);
         showSuggestions();
     }
@@ -1699,24 +1710,138 @@ public final class RebornImeService extends InputMethodService {
         showSuggestions();
         refreshView();
     }
-    private void enter() {
-        invalidateEditingTicket();
-        cancelCursorReleaseSuggestions();
+    /**
+     * Explicit Enter/newline only. Sending a message is never the tap action,
+     * and we intentionally do not send KEYCODE_ENTER, which some messaging
+     * editors interpret as SEND even when their advertised action differs.
+     * Single-line editors may reject a newline; that is safer than sending.
+     */
+    private void insertNewlineSafely() {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
+        invalidateEditingTicket();
+        cancelCursorReleaseSuggestions();
         currentFinish();
-        int action = getCurrentInputEditorInfo() == null ? EditorInfo.IME_ACTION_NONE :
-            getCurrentInputEditorInfo().imeOptions & EditorInfo.IME_MASK_ACTION;
-        if (action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED)
-            ic.performEditorAction(action);
-        else {
-            ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
-            ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER));
-        }
+        ic.commitText("\n", 1);
+        editingInMiddle=cursorHasTextAfter() || hasSelection();
         updateSentenceShift();
         showSuggestions();
         refreshView();
     }
+    private void sendIfExplicitlySupported() {
+        InputConnection ic = getCurrentInputConnection();
+        EditorInfo info = getCurrentInputEditorInfo();
+        if (ic == null || info == null ||
+                !EnterKeyPolicy.supportsLongPressSend(info.imeOptions)) return;
+        invalidateEditingTicket();
+        cancelCursorReleaseSuggestions();
+        // No KEYCODE_ENTER fallback: it could send in an unexpected editor.
+        // Leave the draft intact if the host rejects the SEND editor action.
+        if (ic.performEditorAction(EditorInfo.IME_ACTION_SEND)) {
+            currentFinish();
+            editingInMiddle=cursorHasTextAfter() || hasSelection();
+        }
+        showSuggestions();
+        refreshView();
+    }
+    private void attachSafeEnterKey(Button key) {
+        key.setContentDescription("Enter newline. Hold then release to send if supported");
+        // addKey's normal ACTION_DOWN trigger is replaced for this key.
+        // Accessibility/programmatic clicks also insert a newline, never SEND.
+        key.setOnClickListener(v -> insertNewlineSafely());
+        final float[] startX={0f},startY={0f};
+        final boolean[] armed={false},cancelled={false};
+        final InputConnection[] touchedEditor={null};
+        final long[] touchedSession={0L};
+        key.setOnTouchListener((view,event)->{
+            switch(event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN: {
+                    stopEnterHold();
+                    armed[0]=false;
+                    cancelled[0]=false;
+                    startX[0]=event.getRawX();
+                    startY[0]=event.getRawY();
+                    touchedEditor[0]=getCurrentInputConnection();
+                    touchedSession[0]=inputSessionGeneration;
+                    view.setPressed(true);
+                    animateKeyPress(view,true);
+                    keyHaptic(view);
+                    EditorInfo info=getCurrentInputEditorInfo();
+                    if(info!=null && EnterKeyPolicy.supportsLongPressSend(info.imeOptions)) {
+                        Runnable hold=()->{
+                            enterHoldPending=null;
+                            if(cancelled[0] || !view.isPressed() ||
+                                    !BackspaceSwipePolicy.sameEditorSession(
+                                            touchedSession[0],inputSessionGeneration,
+                                            touchedEditor[0],getCurrentInputConnection()))
+                                return;
+                            armed[0]=true;
+                            key.setText("Send");
+                            key.setContentDescription("Release to send message");
+                            keyHaptic(view); // separate confirmation of arming
+                        };
+                        enterHoldPending=hold;
+                        suggestionHandler.postDelayed(hold,ENTER_SEND_HOLD_MS);
+                    }
+                    return true;
+                }
+                case MotionEvent.ACTION_MOVE: {
+                    float dx=event.getRawX()-startX[0];
+                    float dy=event.getRawY()-startY[0];
+                    if(!EnterKeyPolicy.gestureWithinSlop(dx,dy,dp(22))) {
+                        cancelled[0]=true;
+                        armed[0]=false;
+                        stopEnterHold();
+                        key.setText("↵");
+                    }
+                    return true;
+                }
+                case MotionEvent.ACTION_POINTER_DOWN:
+                case MotionEvent.ACTION_POINTER_UP:
+                    cancelled[0]=true;
+                    armed[0]=false;
+                    stopEnterHold();
+                    key.setText("↵");
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL: {
+                    final InputConnection editor=touchedEditor[0];
+                    final long session=touchedSession[0];
+                    final boolean sameSession=BackspaceSwipePolicy.sameEditorSession(
+                            session,inputSessionGeneration,editor,getCurrentInputConnection());
+                    EditorInfo info=getCurrentInputEditorInfo();
+                    final boolean support=info!=null &&
+                            EnterKeyPolicy.supportsLongPressSend(info.imeOptions);
+                    final boolean release=event.getActionMasked()==MotionEvent.ACTION_UP;
+                    final boolean send=EnterKeyPolicy.shouldSendOnRelease(
+                            release,armed[0],cancelled[0],sameSession,support);
+                    final boolean newline=EnterKeyPolicy.shouldInsertNewline(
+                            release,armed[0],cancelled[0],sameSession);
+                    stopEnterHold();
+                    key.setText("↵");
+                    key.setContentDescription(
+                            "Enter newline. Hold then release to send if supported");
+                    view.setPressed(false);
+                    animateKeyPress(view,false);
+                    // Build 287 showed that rebuilding a LinearLayout during touch
+                    // dispatch can crash Android 17. Commit AFTER dispatch.
+                    suggestionHandler.post(()->{
+                        if(!BackspaceSwipePolicy.sameEditorSession(
+                                session,inputSessionGeneration,editor,getCurrentInputConnection()))
+                            return;
+                        if(send) {
+                            sendIfExplicitlySupported();
+                        } else if(newline) {
+                            insertNewlineSafely();
+                        }
+                    });
+                    return true;
+                }
+                default: return true;
+            }
+        });
+    }
+
     private String suggestionCase(String value) {
         // Correction chips reflect the *existing word's* casing, not the
         // keyboard Shift flag. This includes the visual preview and any
