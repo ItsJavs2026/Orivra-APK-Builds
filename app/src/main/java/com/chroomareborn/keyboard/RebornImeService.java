@@ -546,22 +546,21 @@ public final class RebornImeService extends InputMethodService {
                             || event.getY() > key.getHeight() * 1.5f) {
                         stopDeleteRepeat();
                         freezeRiseDuringDelete = false;
-                        showSuggestions();
                         key.setPressed(false);
                         animateKeyPress(key,false);
-                        refreshView();
+                        // Never detach or recreate children during touch dispatch.
+                        suggestionHandler.post(() -> { showSuggestions(); refreshView(); });
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
                     stopDeleteRepeat();
                     freezeRiseDuringDelete = false;
-                    showSuggestions();
                     key.setPressed(false);
                     animateKeyPress(key,false);
-                    // One rebuild only after lift; never detach the pressed
-                    // backspace key during a fast held-delete sequence.
-                    refreshView();
+                    // Defer view-tree mutation until after ACTION_UP dispatch.
+                    // Android 17 reported a null LinearLayout child while drawing.
+                    suggestionHandler.post(() -> { showSuggestions(); refreshView(); });
                     return true;
                 default:
                     return true;
