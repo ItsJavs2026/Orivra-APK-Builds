@@ -44,6 +44,7 @@ jobs:
           grep -Fq 'predictionHeader.addView(suggestionScroll,stripParams)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'if(toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'SuggestionVisualStyle.chipColor(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'SuggestionVisualStyle.readableText(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'TypingMotionPolicy.scale(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           if grep -Fq 'toolbarToggle' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
             echo 'Second collapse arrow must be removed'
@@ -56,7 +57,7 @@ jobs:
           grep -Fq 'ThemePanelLayout.apply(themePanel,false)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
           if git ls-files | grep -Ei '(^research/|^evaluation/|^app/src/debug/|\.(jks|keystore|p12|pem|pfx|key)$)'; then exit 1; fi
-      - name: Run 18 Java suites including visual contrast and typing motion (175k seeded cases)
+      - name: Run 18 Java suites including seeded suggestion color contrast, Safe Enter and typing motion
         shell: bash
         run: |
           set -euo pipefail
@@ -126,6 +127,7 @@ jobs:
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/ThemeStatusAndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/EnterReleaseMotionEventAndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/ThemePanelLayoutAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SuggestionVisualAndroidTest.java
       - name: Enable hardware acceleration
         run: |
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
@@ -140,6 +142,6 @@ jobs:
           script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
       - name: Clarify qualification level
         run: |
-          echo "12 Android 35 emulator tests including measured zero-height panel collapse; not physical Samsung UI QA."
+          echo "14 Android 35 emulator tests including 16 palette state combinations and measured zero-height theme collapse; not Samsung QA."
           echo "A temporary instrumented test APK is built by Gradle inside CI."
           echo "No release artifact is uploaded; no Samsung handset is tested."
