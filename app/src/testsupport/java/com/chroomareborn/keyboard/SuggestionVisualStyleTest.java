@@ -45,6 +45,15 @@ public final class SuggestionVisualStyleTest {
                         SuggestionVisualStyle.chipColor(base,key,dark,false))
                         : brightness(emphasized)<=brightness(neutral),
                         "emphasis must honor appearance");
+                // Every chip/text pair must remain legible even when a
+                // Material You or app-derived palette supplies low-contrast
+                // suggestion text.
+                int riskyText=random.nextBoolean()?neutral:0xff888888;
+                int text=SuggestionVisualStyle.readableText(riskyText,emphasized);
+                ok(SuggestionVisualStyle.contrastRatio(text,emphasized)>=4.5d,
+                        "highlight text did not meet minimum readability");
+                ok(SuggestionVisualStyle.readableText(0xff202229,0xffffffff)
+                        ==0xff202229,"already-legible text was modified");
                 int size=SuggestionVisualStyle.textSizeSp(random.nextBoolean(),
                         random.nextInt(50));
                 ok(size>=15 && size<=18,"font must remain legible");
