@@ -34,7 +34,7 @@ Individual comparisons: on the 80-case development audit, 35 wrong-to-right, 0 r
 
 Timing caution: the 340-case suite p95 moved from 34.54ms to 37.33ms on the Java GitHub runner. The older 80-case first-pass cold-start p95 also increased. These are not actual Samsung keypress latency or memory measurements; boot dictionary size and p95 require more work.
 
-New native [18-Java-suite and 14-Android-35-emulator workflow](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40956223044) started. **Verify its final conclusion and emulator job before claiming Android pass.** No test APK is published.
+Native [18-Java-suite and 14-Android-35-emulator qualification](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40956223044) **PASS**: both Java-regressions and panel-emulator jobs completed successfully. Emulator job log confirms `Starting 14 tests`, `Finished 14 tests`, and `BUILD SUCCESSFUL in 2m 24s`. This is Android 35 Pixel 6 emulator evidence, **not** Samsung Android 17 or second-device acceptance. A temporary CI instrumented debug APK was built, but none was published for the user.
 
 ## Unfinished quality work
 
