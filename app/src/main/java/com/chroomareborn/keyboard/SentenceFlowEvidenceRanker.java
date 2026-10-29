@@ -10,8 +10,7 @@ import java.util.Map;
  * has already found. Never manufactures text, never auto-commits, and never
  * modifies correctly spelled dictionary words handled upstream.
  *
- * Promotion requires more offline-supported word transitions, no worse
- * compact-text edit distance, and a substantial coherence improvement.
+ * Promotion requires more offline-supported word transitions, at most one extra compact-text edit with strong context, and a substantial coherence improvement.
  * Ambiguous ties and strong existing predictions keep their original order.
  */
 final class SentenceFlowEvidenceRanker {
@@ -58,7 +57,10 @@ final class SentenceFlowEvidenceRanker {
             if(alternative==null || countWords(alternative)<3)continue;
             int nextEdits=PredictionLite.editDistanceLimited(
                     raw,compact(alternative),maxEdits);
-            if(nextEdits>firstEdits || nextEdits>maxEdits)continue;
+            // A plausible correction can require one more letter change
+            // than a mistaken but exact word split (e.g. "us" vs "is").
+            // Require the stronger transition evidence below before promoting.
+            if(nextEdits>firstEdits+1 || nextEdits>maxEdits)continue;
             double coherence=SentenceRescue.coherence(
                     alternative,common,context);
             if(coherence<.67 || coherence<firstCoherence+.32)continue;
