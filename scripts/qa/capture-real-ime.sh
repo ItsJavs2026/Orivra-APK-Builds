@@ -133,9 +133,12 @@ PY
     tap_node "startup-$pass" text "Close app"
     sleep 2
   elif [[ "$result" == "editor-only" ]]; then
-    # Focus the visible scratch field to ask Android to show the active IME.
+    # UIAutomator dumps the active ACTIVITY hierarchy and omits the IME's
+    # separate window even when Orivra is visibly on the screen. Focus once,
+    # then proceed to REAL screenshot-based checks instead of looping forever.
     tap_node "startup-$pass" content-desc "Orivra emulator keyboard screenshot test editor"
     sleep 2
+    break
   else
     adb shell dumpsys input_method > "$OUT/input-method-state-$pass.txt" || true
     adb shell dumpsys window > "$OUT/window-state-$pass.txt" || true
@@ -144,51 +147,69 @@ PY
   fi
 done
 
+
+# Android 35's uiautomator dump can exclude keyboard-window controls even
+# though they are visible in screencap. Verify the REAL selected IME using
+# settings, then measure the screenshots and inject actual screen taps.
+verify_selected() {
+  actual="$(adb shell settings get secure default_input_method | tr -d '\r')"
+  if [[ "$actual" != "$IME" ]]; then
+    echo "FAIL: Android switched away from Orivra to $actual"
+    exit 1
+  fi
+}
+dp_px() {
+  python3 - "$1" "$density" <<'PY'
+import sys
+print(round(float(sys.argv[1])*float(sys.argv[2])))
+PY
+}
+density="$(adb shell wm density | tr -d '\r' | grep -oE '[0-9]+' | tail -n1)"
+density="$(python3 - "$density" <<'PY'
+import sys
+print(float(sys.argv[1])/160.0)
+PY
+)"
+screen_w="$(adb shell wm size | tr -d '\r' | grep -oE '[0-9]+x[0-9]+' | head -n1 | cut -dx -f1)"
+test -n "$screen_w"
+
+verify_selected
 dump_ui collapsed
 screenshot collapsed
-python3 - "$OUT/collapsed.xml" <<'PY'
-import sys,xml.etree.ElementTree as ET
-nodes=[x.attrib for x in ET.parse(sys.argv[1]).getroot().iter('node')]
-def present(needle):
-    return any(needle in (x.get('content-desc','')+' '+x.get('text','')) for x in nodes)
-assert present('Expand theme information and controls'), 'No visible theme expand control in REAL IME'
-assert present('Orivra emulator keyboard screenshot test editor'), 'QA editor is missing'
-assert not present('Collapse theme information and controls'), 'Theme panel should start collapsed'
-print('PASS: actual IME visible, theme starts collapsed')
-PY
-
-tap_node collapsed content-desc "Expand theme information and controls"
-sleep 1
+collapsed_top="$(python3 scripts/qa/inspect_ime_screens.py "$OUT/collapsed.png" --density "$density")"
+echo "Verified actual Orivra collapsed keyboard top: $collapsed_top px"
+# Fixed Pixel 6 emulator: palette icon is 36dp wide, in the 48dp prediction
+# strip at the top of the IME. Coordinates are derived from screenshot top
+# and wm density, rather than hardcoded screen pixel positions.
+tap_x="$(dp_px 18)"
+tap_y="$((collapsed_top+$(dp_px 24)))"
+adb shell input tap "$tap_x" "$tap_y"
+sleep 2
+verify_selected
 dump_ui expanded
 screenshot expanded
-python3 - "$OUT/expanded.xml" <<'PY'
-import sys,xml.etree.ElementTree as ET
-nodes=[n.attrib for n in ET.parse(sys.argv[1]).getroot().iter('node')]
-data=[x.get('content-desc','')+' '+x.get('text','') for x in nodes]
-assert any('Collapse theme information and controls' in x for x in data), 'Expanded theme cannot collapse'
-assert any('Theme: App Match' in x for x in data), 'Selected theme not shown on its own header row'
-assert any('Tap to select the next theme' in x for x in data), 'Theme selector not visible in control row'
-print('PASS: REAL IME has separate theme header, controls, and collapse affordance')
-PY
+expanded_top="$(python3 scripts/qa/inspect_ime_screens.py "$OUT/expanded.png" --mode expanded --collapsed "$collapsed_top" --density "$density")"
+echo "PASS: Orivra real panel grew by $((collapsed_top-expanded_top)) px"
 
-tap_node expanded content-desc "Collapse theme information and controls"
-sleep 1
+# In the expanded two-row panel, the collapse arrow is at the right-hand
+# end of its own 28dp header immediately below the 48dp prediction strip.
+collapse_x="$((screen_w-$(dp_px 22)))"
+collapse_y="$((expanded_top+$(dp_px 48)+$(dp_px 14)))"
+adb shell input tap "$collapse_x" "$collapse_y"
+sleep 2
+verify_selected
 dump_ui recollapsed
 screenshot recollapsed
-python3 - "$OUT/recollapsed.xml" <<'PY'
-import sys,xml.etree.ElementTree as ET
-nodes=[x.attrib for x in ET.parse(sys.argv[1]).getroot().iter('node')]
-def present(needle):
-    return any(needle in (x.get('content-desc','')+' '+x.get('text','')) for x in nodes)
-assert present('Expand theme information and controls'), 'Theme did not reopen correctly after collapse'
-assert not present('Collapse theme information and controls'), 'Extra theme row remains after collapse'
-print('PASS: actual IME collapses both theme rows')
-PY
+python3 scripts/qa/inspect_ime_screens.py "$OUT/recollapsed.png" \
+  --mode recollapsed --collapsed "$collapsed_top" --density "$density"
+echo "PASS: real theme panel collapsed to original zero-reserved-row position"
 
-# One actual keyboard-key tap; the separate emulator EditText fixture starts
-# at "likethis heythere". This catches touch dispatch/real-input failures.
-tap_node recollapsed text "q"
-sleep 1
+# Tap the real Q key in the first keyboard row, following the 48dp
+# predictions strip. Read the activity's EditText through UiAutomator.
+key_y="$((collapsed_top+$(dp_px 83)))"
+adb shell input tap "$tap_x" "$key_y"
+sleep 2
+verify_selected
 dump_ui typed
 screenshot typed
 python3 - "$OUT/typed.xml" <<'PY'
@@ -196,8 +217,7 @@ import sys,xml.etree.ElementTree as ET
 nodes=[n.attrib for n in ET.parse(sys.argv[1]).getroot().iter('node')]
 texts=[n.get('text','') for n in nodes]
 assert any('likethis heythereq' in x for x in texts), (
-    'Real IME key tap did not reach the editor', texts[:24])
-print('PASS: actual Orivra keyboard delivered q to the QA editor')
+    'Real IME Q tap did not reach the editor', texts[:24])
+print('PASS: actual Orivra key delivered Q to disposable editor')
 PY
-
-echo "PASS: real Orivra keyboard screenshots, expand/collapse and key dispatch"
+echo "PASS: real Orivra IME visible, theme expand/collapse and key touch"
