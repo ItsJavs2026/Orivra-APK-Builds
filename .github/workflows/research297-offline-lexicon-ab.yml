@@ -98,13 +98,14 @@ jobs:
           def cases(mode,suite):
               rows={}
               for line in open(os.path.join(root,f'{mode}-{suite}.txt'),encoding='utf-8'):
-                  fields=line.rstrip().split(chr(9))
+                  fields=line.removesuffix(chr(10)).removesuffix(chr(13)).split(chr(9))
                   if len(fields)==5 and fields[0]=='CASE':
                       rows[(fields[1],fields[2])]=(fields[3],fields[4])
               return rows
           for suite in ('SentenceFlowIndependentAudit','SentenceFlowBlind297Audit'):
               old,new=cases('pinned',suite),cases('experimental',suite)
-              assert old and old.keys()==new.keys(),f'Case drift: {suite}'
+              expected_count=80 if suite=='SentenceFlowIndependentAudit' else 100
+              assert len(old)==expected_count and old.keys()==new.keys(),f'Case count/drift: {suite}, expected {expected_count}, got {len(old)}'
               wins=losses=other_changes=0
               for key,(expected,first) in old.items():
                   proposed_expected,proposed_first=new[key]
