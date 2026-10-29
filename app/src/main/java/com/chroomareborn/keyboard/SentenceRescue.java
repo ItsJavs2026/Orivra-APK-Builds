@@ -40,8 +40,15 @@ final class SentenceRescue {
         final String word;
         final int edits;
         final double emission;
+        // Experimental: overflow short-span rescues require a supported LEFT
+        // transition. Normal top-22 candidates keep their original behavior.
+        final boolean contextOnly;
         Candidate(String word,int edits,double emission) {
+            this(word,edits,emission,false);
+        }
+        Candidate(String word,int edits,double emission,boolean contextOnly) {
             this.word=word;this.edits=edits;this.emission=emission;
+            this.contextOnly=contextOnly;
         }
     }
     private static final class Path {
@@ -225,6 +232,24 @@ final class SentenceRescue {
                 }
             }
         }
+        // Research-only candidate generation: preserve up to four otherwise
+        // pruned 4-5 letter words with two interior edits and matching edges.
+        // These additional choices MUST have a supported predecessor in the
+        // decoder. Never relax the established top-22 candidates, edit
+        // budget, exact-word guard, or explicit-tap acceptance.
+        if(fragment.length()>=4 && fragment.length()<=5) {
+            int extra=0;
+            for(Candidate candidate:candidates) {
+                String word=candidate.word;
+                if(selected.contains(candidate) || candidate.edits!=2 ||
+                        word.length()!=fragment.length() ||
+                        word.charAt(0)!=fragment.charAt(0) ||
+                        word.charAt(word.length()-1)!=fragment.charAt(fragment.length()-1))
+                    continue;
+                selected.add(new Candidate(word,candidate.edits,candidate.emission,true));
+                if(++extra==4)break;
+            }
+        }
         return selected;
     }
     /**
@@ -281,6 +306,9 @@ final class SentenceRescue {
                     int errors=previous.edits+candidate.edits;
                     if(errors>budget)continue;
                     boolean isPair=paired(previous.last,candidate.word,common,phrases);
+                    // Context-qualified overflow never starts a sentence and
+                    // cannot create an unsupported short-word correction.
+                    if(candidate.contextOnly && (previous.count==0 || !isPair))continue;
                     double transition=previous.count==0?0:(isPair?6.7:-1.2);
                     if(previous.count>0)
                         transition+=joinedWordBoundaryPenalty(previous.last,
