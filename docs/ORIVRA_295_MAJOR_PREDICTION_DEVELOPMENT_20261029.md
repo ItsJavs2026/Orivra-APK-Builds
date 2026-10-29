@@ -68,8 +68,8 @@ Additional checks: 2,500 seeded Spanish strings, English router-output equivalen
 
 - [English A/B 487 cases](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40945887995) — PASS.
 - [Spanish A/B 180 cases](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40945955025) — PASS (research only).
-- [Native Android/IME 18 Java suites + 14 emulator tests](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40945787279) — verify **actual run conclusion**; do not infer an outcome from source or earlier branches.
-- [Actual installed Android IME screenshot, theme controls, key taps, Backspace gesture](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40945836275) — verify **actual run conclusion**, then inspect saved screenshots.
+- [Native Android/IME 18 Java suites + 14 Android 35 instrumented tests](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40945787279) — **PASS**, 14/14 Android tests, full successful build (2m26s emulator job).
+- [Actual installed Android 35 IME screenshot, theme controls, key taps, Backspace swipe](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40945836275) — **PASS**, 1080×2400 screenshot evidence, 169px theme expansion, zero-height collapse, real Q touch and successful whole-connected-word Backspace deletion.
 
 **No Candidate 295 APK was released.** A fresh test APK must receive a deliberate application ID/version and QA; do not overwrite the existing stable installations or reuse the ephemeral Candidate 293 debug key.
 
