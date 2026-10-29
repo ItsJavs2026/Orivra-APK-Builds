@@ -53,6 +53,10 @@ final class SpanishPredictionLite {
     private static final Map<String,Word> EXACT=new HashMap<>();
     private static final List<Word> WORDS=new ArrayList<>();
     private static final Map<String,Set<String>> NEXT=new HashMap<>();
+    // Keep accent-specific context alongside folded string matching. The
+    // sentence "hola cómo estás" should prefer accented "cómo", but typing
+    // the correctly spelled standalone word "como" remains unchanged.
+    private static final Map<String,Set<String>> NEXT_SURFACE=new HashMap<>();
 
     private static final String FUNCTION_WORDS=
         "a al algo alguien algunos algunas ambos ante antes aquí así aunque "
@@ -86,7 +90,7 @@ final class SpanishPredictionLite {
         "casa casas trabajo trabajos escuela clase estudiante estudiantes "
         +"oficina coche carro carros bicicleta moto patinete teléfono teléfonos "
         +"pantalla pantallas teclado teclados aplicación aplicaciones "
-        +"programa programas computadora computadoras ordenador internet "
+        +"programa programas computadora computadoras ordenador internet español española "
         +"red redes conexión conexiones configuración configuraciones ajustes "
         +"actualización actualizaciones versión versiones archivo archivos "
         +"foto fotos vídeo videos cámara cámaras batería baterías cargador "
@@ -128,7 +132,7 @@ final class SpanishPredictionLite {
         +"digo dices dice decimos dicen diciendo dicho "
         +"quiero aprender mejorar arreglar reparar "
         +"funciona funcionan funcionando funcionaba "
-        +"trabajo trabajas trabaja trabajamos trabajando "
+        +"trabajo trabajas trabaja trabajamos trabajando trabajar "
         +"esperar esperando espero esperas esperamos "
         +"gustar gusta gustan gustó me te le les "
         +"necesito necesitamos necesita necesitar "
@@ -151,7 +155,11 @@ final class SpanishPredictionLite {
     }
     private static void next(String left,String... right) {
         Set<String> out=NEXT.computeIfAbsent(left,k->new HashSet<>());
-        for(String word:right)out.add(fold(word));
+        Set<String> surface=NEXT_SURFACE.computeIfAbsent(left,k->new HashSet<>());
+        for(String word:right) {
+            out.add(fold(word));
+            surface.add(word.toLowerCase(Locale.ROOT));
+        }
     }
     static {
         addWords(FUNCTION_WORDS,60);
@@ -249,7 +257,17 @@ final class SpanishPredictionLite {
                     Math.abs(fragment.length()-word.normalized.length())>max)
                 continue;
             if(fragment.length()>1 && word.normalized.length()>1 &&
-                    fragment.charAt(0)!=word.normalized.charAt(0))continue;
+                    fragment.charAt(0)!=word.normalized.charAt(0)) {
+                // A mistyped initial letter can still be a useful 1-edit
+                // match for a substantial word whose ending is intact.
+                // This is not applied to short function words or exact words.
+                if(max==0 || fragment.length()<5 ||
+                        word.normalized.length()<5 ||
+                        !fragment.substring(fragment.length()-3)
+                                .equals(word.normalized.substring(
+                                        word.normalized.length()-3)))
+                    continue;
+            }
             int edits=distance(fragment,word.normalized,max);
             if(edits>max)continue;
             double score=Math.log1p(word.frequency)*1.4+
@@ -329,6 +347,12 @@ final class SpanishPredictionLite {
                                 Collections.emptySet()).contains(
                                         choice.word.normalized);
                         double pair=supported?4.0:prev.words==0?0:-1.8;
+                        // Favor the accent surface explicitly supported
+                        // by the previous word, not an across-the-board
+                        // forced accent change. No personal data involved.
+                        if(supported && NEXT_SURFACE.getOrDefault(prev.last,
+                                Collections.emptySet()).contains(choice.word.display))
+                            pair+=1.15;
                         double score=prev.score+choice.score+pair;
                         String text=prev.text.isEmpty()?choice.word.display:
                                 prev.text+" "+choice.word.display;
