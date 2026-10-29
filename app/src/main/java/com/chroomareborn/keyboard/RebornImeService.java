@@ -546,6 +546,7 @@ public final class RebornImeService extends InputMethodService {
                         showSuggestions();
                         key.setPressed(false);
                         animateKeyPress(key,false);
+                        refreshView();
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
@@ -555,6 +556,9 @@ public final class RebornImeService extends InputMethodService {
                     showSuggestions();
                     key.setPressed(false);
                     animateKeyPress(key,false);
+                    // One rebuild only after lift; never detach the pressed
+                    // backspace key during a fast held-delete sequence.
+                    refreshView();
                     return true;
                 default:
                     return true;
@@ -1549,9 +1553,12 @@ public final class RebornImeService extends InputMethodService {
             // Fallback for editors that do not support code-point deletion.
             ic.deleteSurroundingText(1, 0);
         }
+        boolean oldShift=shift;
         updateSentenceShift();
         showSuggestions();
-        refreshView();
+        // The previous per-repeat refresh recreated every key ~15 times/sec.
+        // Preserve the live backspace touch target until release.
+        if(!deleteHeld && oldShift!=shift)refreshView();
     }
     private void space() {
         invalidateEditingTicket();
