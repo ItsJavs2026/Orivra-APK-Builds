@@ -12,9 +12,9 @@ public final class EnterKeyPolicyTest {
         for(int options:notSend)
             check(!EnterKeyPolicy.supportsLongPressSend(options),
                     "Non-SEND action must not submit: " + options);
-        check(!EnterKeyPolicy.supportsLongPressSend(
+        check(EnterKeyPolicy.supportsLongPressSend(
                 4 | EnterKeyPolicy.IME_FLAG_NO_ENTER_ACTION),
-                "Editor requests plain Enter even when SEND is also advertised");
+                "Dedicated hold may send even when inline Send is forbidden");
         check(EnterKeyPolicy.supportsNewline(0x20001),
                 "multiline text input supports newline");
         check(!EnterKeyPolicy.supportsNewline(0x1),
