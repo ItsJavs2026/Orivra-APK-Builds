@@ -1,0 +1,101 @@
+name: Orivra Public Trial — Manual Android Qualification
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orivra-public-trial-manual
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout public snapshot only
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enforce public-source and privacy boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files | sort | tee "$RUNNER_TEMP/public-inventory.txt"
+          if git ls-files | grep -Ei '(^research/|^evaluation/|^scripts/|^docs/ORIVRA_SIGNING\.md$|\.env($|\.)|\.(jks|keystore|p12|pem|pfx|key)$|(^|/)(id_rsa|credentials\.json|service-account[^/]*)$|^\.github/workflows/publish-orivra-stable-preview\.yml$)'; then
+            echo "::error::Prohibited internal or secret-like file category present"
+            exit 1
+          fi
+          test -s app/src/main/AndroidManifest.xml
+          test -s app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          test -s third_party/swiftfloris/LICENSE
+          test -s third_party/swiftfloris/NOTICE
+          grep -Fq 'com.chroomareborn.keyboard.publictrial' app/build.gradle.kts
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml;then
+            echo "::error::Unexpected INTERNET permission in trial keyboard"
+            exit 1
+          fi
+      - name: Java-only regression tests where present
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/orivra-testclasses"
+          if [ -f app/src/testsupport/java/com/chroomareborn/keyboard/SpacebarCursorGestureTest.java ]; then
+            javac -d "$RUNNER_TEMP/orivra-testclasses" \
+              app/src/main/java/com/chroomareborn/keyboard/SpacebarCursorGesture.java \
+              app/src/testsupport/java/com/chroomareborn/keyboard/SpacebarCursorGestureTest.java
+            java -ea -cp "$RUNNER_TEMP/orivra-testclasses" \
+              com.chroomareborn.keyboard.SpacebarCursorGestureTest
+          fi
+          if [ -f app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardLayoutSpecTest.java ]; then
+            javac -d "$RUNNER_TEMP/orivra-testclasses" \
+              app/src/main/java/com/chroomareborn/keyboard/KeyboardLayoutSpec.java \
+              app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardLayoutSpecTest.java
+            java -ea -cp "$RUNNER_TEMP/orivra-testclasses" \
+              com.chroomareborn.keyboard.KeyboardLayoutSpecTest
+          fi
+      - name: Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile Android debug APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify APK identity and debug certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs --verbose "$apk" \
+            | tee "$RUNNER_TEMP/apk-signature.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 \
+            | tee "$RUNNER_TEMP/apk-identity.txt"
+          grep -Fq "package: name='com.chroomareborn.keyboard.publictrial' versionCode='1'" \
+            "$RUNNER_TEMP/apk-identity.txt"
+          sha256sum "$apk" | tee "$RUNNER_TEMP/apk-sha256.txt"
+          cat "$RUNNER_TEMP/apk-identity.txt" >> "$GITHUB_STEP_SUMMARY"
+          echo 'CI APK signed with ephemeral debug key. NOT approved for update installs or personal data.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Candidate/Stable Preview package IDs unchanged. Real device testing still required.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload APK and text-only verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Public-Trial-APK-Internal-Testing
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            ${{ runner.temp }}/apk-signature.txt
+            ${{ runner.temp }}/apk-identity.txt
+            ${{ runner.temp }}/apk-sha256.txt
+          retention-days: 7
+          if-no-files-found: error
