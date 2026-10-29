@@ -25,7 +25,7 @@ test "$(wc -c < "$temporary")" -eq 1022018
 asset="$root/app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack"
 mkdir -p "$(dirname "$asset")"
 gzip -n -9 < "$temporary" > "$asset"
-gzip -t "$asset"
+gzip -t < "$asset"
 printf "Generated exact-only research asset: %s\n" "$asset"
 wc -c "$asset"
 sha256sum "$asset"
