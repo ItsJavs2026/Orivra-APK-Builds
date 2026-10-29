@@ -151,7 +151,7 @@ public final class BackspaceSwipePolicyTest {
         Random composingRandom=new Random(293292L);
         String[] components={"heythere","hello","café","中文","😊","👍🏽",
                 "abc","12345","one.two","hello_world",""};
-        String[] separators={" ","  ","\\n","\\t","\\r\\n"};
+        String[] separators={" ","  ","\n","\t","\r\n"};
         for(int sample=0;sample<30000;sample++) {
             StringBuilder prefix=new StringBuilder();
             int wordsBefore=composingRandom.nextInt(6);
