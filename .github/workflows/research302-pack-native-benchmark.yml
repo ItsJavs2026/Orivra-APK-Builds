@@ -237,10 +237,10 @@ jobs:
           printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en-US-60.txt" | sha256sum --check
           test "$(wc -c < "$RUNNER_TEMP/esdb-en-US-60.txt")" -eq 1022018
           mkdir -p app/src/main/assets/dictionaries
-          gzip -n -9 < "$RUNNER_TEMP/esdb-en-US-60.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.txt.gz
-          gzip -t app/src/main/assets/dictionaries/esdb-en-US-60.txt.gz
-          ls -lh app/src/main/assets/dictionaries/esdb-en-US-60.txt.gz
-          sha256sum app/src/main/assets/dictionaries/esdb-en-US-60.txt.gz
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en-US-60.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          gzip -t < app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          ls -lh app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          sha256sum app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
       - name: Verify isolated package and app privacy
         shell: bash
         run: |
@@ -264,7 +264,7 @@ jobs:
           echo "APK package and source asset inventory:"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1
           "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -E 'assets/|^assets' | head -n 70
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/esdb-en-US-60.txt.gz'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/esdb-en-US-60.esdbpack'
           "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
       - name: Enable hardware acceleration
         run: |
@@ -285,7 +285,7 @@ jobs:
           set -euo pipefail
           apk=$(find app/build/outputs/apk/debug -name '*.apk' -type f -print -quit)
           test -n "$apk" && test -s "$apk"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/esdb-en-US-60.txt.gz'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/esdb-en-US-60.esdbpack'
           "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 | grep -Fq "com.chroomareborn.keyboard.build300trial"
           ! "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | grep -Fq 'android.permission.INTERNET'
