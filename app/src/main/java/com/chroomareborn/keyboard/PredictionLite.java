@@ -1158,7 +1158,19 @@ final class PredictionLite {
                     SentenceRescue.recover(raw,WORDS,NEXT,RECOVERY_CONTEXT);
             if(!recovered.isEmpty()) {
                 SentenceRescue.Proposal best=recovered.get(0);
-                if(best.coherence()>=0.67 && best.coherence()>oldCoherence+0.15) {
+                // Long multi-typo joined sentences may have only modest
+                // transition evidence, but lowering the threshold blindly
+                // risks false corrections. Demand comparable character-level
+                // evidence and protect already letter-exact suggestions.
+                String originalLetters=suggestions.isEmpty()?"":suggestions.get(0)
+                        .toLowerCase(Locale.US).replaceAll("[^a-z]","");
+                boolean exactLetterSegmentation=originalLetters.equals(raw);
+                int editBudget=Math.max(2,(int)Math.ceil(raw.length()*.24));
+                double requiredGain=raw.length()>=16?.085:.15;
+                if(best.coherence()>=0.67 &&
+                        best.coherence()>oldCoherence+requiredGain &&
+                        best.totalEdits<=editBudget &&
+                        (!exactLetterSegmentation || best.totalEdits==0)) {
                     String corrected=caseDisplay(input,displayRecovered(best.text));
                     if(!corrected.equals(input)) {
                         suggestions.remove(corrected);
