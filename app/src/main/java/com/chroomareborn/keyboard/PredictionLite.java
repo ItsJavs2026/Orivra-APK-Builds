@@ -712,12 +712,7 @@ final class PredictionLite {
         Integer exact=WORDS.get(fragment);
         List<Candidate> out=new ArrayList<>();
         if(exact!=null) out.add(new Candidate(fragment,0,exact));
-        else {
-            // Research: zero-error lexeme recovery, not fuzzy correction.
-            ExactOnlyLanguagePack pack=researchExactOnlyPack;
-            if(pack!=null && pack.contains(fragment))
-                out.add(new Candidate(fragment,0,8));
-        }
+
         if(allowFuzzy && fragment.length()>=2) {
             int limit=fragment.length()>=5?2:1;
             int scanned=0;
@@ -1207,8 +1202,21 @@ final class PredictionLite {
         // candidate only with strictly stronger adjacent-word evidence
         // and no worse compact-string edit distance.
         // Always explicit one-tap accept; never silently edit the input.
-        return SentenceFlowEvidenceRanker.rerank(
+        List<String> stable=SentenceFlowEvidenceRanker.rerank(
                 input,suggestions,NEXT,RECOVERY_CONTEXT);
+        // 301 second-stage research: keep the production fuzzy beam untouched.
+        // A high-confidence zero-letter-edit segmentation may repair an
+        // obviously overfragmented first candidate. Never silently commit.
+        ExactOnlyLanguagePack pack=researchExactOnlyPack;
+        if(pack==null || stable.isEmpty())return stable;
+        String proposed=ExactOnlySegmentation.propose(raw,stable.get(0),WORDS,pack);
+        if(proposed==null)return stable;
+        String candidate=caseDisplay(input,displayRecovered(proposed));
+        if(stable.contains(candidate))return stable;
+        ArrayList<String> result=new ArrayList<>(stable);
+        result.add(0,candidate);
+        while(result.size()>8)result.remove(result.size()-1);
+        return result;
     }
     private static String displayRecovered(String plain) {
         String[] words=plain.split(" ");
