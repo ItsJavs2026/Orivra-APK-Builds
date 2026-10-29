@@ -95,7 +95,7 @@ jobs:
               found={}
               file=os.path.join(root,f'{mode}-SentenceFlowIndependentAudit.txt')
               for line in open(file,encoding='utf-8'):
-                  fields=line.rstrip('\\n').split('\\t')
+                  fields=line.rstrip().split(chr(9))
                   if len(fields)==5 and fields[0]=='CASE':
                       found[(fields[1],fields[2])]=(fields[3],fields[4])
               return found
