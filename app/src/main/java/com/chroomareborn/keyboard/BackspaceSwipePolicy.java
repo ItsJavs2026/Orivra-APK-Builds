@@ -13,10 +13,20 @@ public final class BackspaceSwipePolicy {
         // Malformed pointer coordinates must fail closed, never delete text.
         if (!Float.isFinite(leftPx) || !Float.isFinite(verticalPx) ||
                 !Float.isFinite(thresholdPx) || !Float.isFinite(additionalWordPx) ||
-                thresholdPx <= 0 || leftPx < thresholdPx ||
+                thresholdPx <= 0 || additionalWordPx <= 0 || leftPx < thresholdPx ||
                 leftPx < Math.abs(verticalPx) * 1.25f) return 0;
         float step = Math.max(1f, additionalWordPx);
         return Math.min(8, 1 + (int) ((leftPx - thresholdPx) / step));
+    }
+
+    /**
+     * A delayed deletion must only target the editor and input session that
+     * received the original finger-down event.
+     */
+    public static boolean sameEditorSession(long gestureSession, long currentSession,
+                                            Object touchedEditor, Object currentEditor) {
+        return touchedEditor != null && touchedEditor == currentEditor &&
+                gestureSession == currentSession;
     }
 
     /**
