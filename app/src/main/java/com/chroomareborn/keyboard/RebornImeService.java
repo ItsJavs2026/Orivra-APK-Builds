@@ -130,6 +130,9 @@ public final class RebornImeService extends InputMethodService {
     private int currentRowHeightDp=72;
     private String composing = "";
     private boolean sensitive, shift, symbols, capsLock;
+    // NO_SUGGESTIONS is not a password marker in Google Keep note editors.
+    // Honor NO_PERSONALIZED_LEARNING separately even when suggestions appear.
+    private boolean editorAllowsPersonalLearning=false;
     // Prevent detaching a pressed letter key while its long-press symbol
     // is committed. Refresh any changed Shift appearance after finger lift.
     private boolean symbolHoldInProgress=false;
@@ -1155,7 +1158,9 @@ public final class RebornImeService extends InputMethodService {
         composing = "";
         editingInMiddle = false;
         lastSelectionStart = lastSelectionEnd = -1;
-        sensitive = isSensitive(info);
+        EditorSuggestionPrivacyPolicy.Decision privacy=editorPrivacyDecision(info);
+        sensitive=privacy.sensitive;
+        editorAllowsPersonalLearning=privacy.allowPersonalLearning;
         numericEditor=info!=null && ((info.inputType & InputType.TYPE_MASK_CLASS)==InputType.TYPE_CLASS_NUMBER
                 || (info.inputType & InputType.TYPE_MASK_CLASS)==InputType.TYPE_CLASS_PHONE);
         symbols=false;
@@ -1261,19 +1266,25 @@ public final class RebornImeService extends InputMethodService {
         }
         editingInMiddle=cursorHasTextAfter() || hasSelection();
     }
-    private boolean isSensitive(EditorInfo info) {
-        if (info == null) return true;
-        int input = info.inputType;
-        int cls = input & InputType.TYPE_MASK_CLASS;
-        int variation = input & InputType.TYPE_MASK_VARIATION;
-        return cls != InputType.TYPE_CLASS_TEXT ||
-            (input & InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0 ||
-            variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-            variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
-            variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
-            variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
-            variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
-            variation == InputType.TYPE_TEXT_VARIATION_URI;
+    private EditorSuggestionPrivacyPolicy.Decision editorPrivacyDecision(EditorInfo info) {
+        if(info==null)
+            return EditorSuggestionPrivacyPolicy.decide(null,false,true,true,true);
+        int input=info.inputType;
+        int cls=input & InputType.TYPE_MASK_CLASS;
+        int variation=input & InputType.TYPE_MASK_VARIATION;
+        boolean identifierOrPassword=
+                variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
+                variation == InputType.TYPE_TEXT_VARIATION_URI;
+        boolean noSuggestions=(input & InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)!=0;
+        boolean noPersonalizedLearning=(info.imeOptions &
+                EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING)!=0;
+        return EditorSuggestionPrivacyPolicy.decide(info.packageName,
+                cls==InputType.TYPE_CLASS_TEXT,identifierOrPassword,
+                noSuggestions,noPersonalizedLearning);
     }
     private void currentFinish() {
         InputConnection ic = getCurrentInputConnection();
@@ -2164,7 +2175,8 @@ public final class RebornImeService extends InputMethodService {
         if(done) {
             editingInMiddle=cursorHasTextAfter();
             confirmSuggestionTap(source);
-            PersonalLearning.recordAcceptance(this,expected,replacement);
+            if(editorAllowsPersonalLearning)
+                PersonalLearning.recordAcceptance(this,expected,replacement);
             updateSentenceShift();
             showSuggestions();
             refreshView();
@@ -2267,7 +2279,8 @@ public final class RebornImeService extends InputMethodService {
             composing="";
             if(shift && !capsLock)shift=false;
             confirmSuggestionTap(source);
-            PersonalLearning.recordAcceptance(this,expected,suggestion);
+            if(editorAllowsPersonalLearning)
+                PersonalLearning.recordAcceptance(this,expected,suggestion);
             predictionsExpanded=false;
             updateSentenceShift();
             showSuggestions();
@@ -2396,7 +2409,8 @@ public final class RebornImeService extends InputMethodService {
                                 PersonalDictionary.matching(this,input));
                 // Existing opt-in Learning v1 remains independent: only a
                 // twice-accepted explicit single-word correction may outrank.
-                String preferred=PersonalLearning.preferredCorrection(this,input);
+                String preferred=editorAllowsPersonalLearning ?
+                        PersonalLearning.preferredCorrection(this,input):null;
                 if(preferred!=null) {
                     java.util.ArrayList<String> ranked=new java.util.ArrayList<>(withPersonal);
                     ranked.remove(preferred);
