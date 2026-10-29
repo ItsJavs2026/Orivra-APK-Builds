@@ -62,10 +62,12 @@ public final class SuggestionVisualStyle {
      */
     public static int readableText(int preferred,int tileColor) {
         if(contrastRatio(preferred,tileColor)>=4.5d)return preferred;
-        int nearBlack=0xff202229;
+        // Pure black and white guarantee at least ~4.58:1 for any opaque
+        // sRGB surface. A softened charcoal can miss 4.5:1 on mid-tones.
+        int black=0xff000000;
         int white=0xffffffff;
-        return contrastRatio(nearBlack,tileColor)>=
-                contrastRatio(white,tileColor) ? nearBlack : white;
+        return contrastRatio(black,tileColor)>=
+                contrastRatio(white,tileColor) ? black : white;
     }
 
     public static int textSizeSp(boolean sentence,int codePoints) {
