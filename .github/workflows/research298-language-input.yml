@@ -1,0 +1,39 @@
+name: Orivra 298 Research - Unicode language input safety
+on:
+  push:
+    branches:
+      - research/build298-unicode-language-input-20261029
+    paths:
+      - app/src/main/java/com/chroomareborn/keyboard/LanguageInputProfile.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/LanguageInputProfileTest.java
+      - .github/workflows/research298-language-input.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pure-java-language-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Isolate from live IME, prevent accidental release
+        run: |
+          set -euo pipefail
+          ! grep -q 'LanguageInputProfile' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          ! grep -q 'LanguageInputProfile' app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          ! grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          grep -Fq 'com.chroomareborn.keyboard.build293trial' app/build.gradle.kts
+      - name: Compile and execute pure Java Unicode safety assertions
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/language-research"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/language-research" \
+            app/src/main/java/com/chroomareborn/keyboard/LanguageInputProfile.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LanguageInputProfileTest.java
+          java -ea -cp "$RUNNER_TEMP/language-research" com.chroomareborn.keyboard.LanguageInputProfileTest
+      - name: Document limited scope
+        run: echo "Research-only classifier. No prediction changes, no APK, no actual Samsung tests."
