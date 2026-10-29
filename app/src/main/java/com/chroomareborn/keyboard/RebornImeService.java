@@ -2005,10 +2005,12 @@ public final class RebornImeService extends InputMethodService {
         final boolean primarySentence=!options.isEmpty()
                 && SuggestionDisplayPolicy.longSentence(input,options.get(0));
         final int emphasizedIndex=primarySentence?0:1;
-        final int shownCount=stableSentenceStrip?1:options.size();
-        final String cellSignature="chips:"+shownCount+":"+input.isEmpty();
-        final int expectedChildren=shownCount+
-                (input.isEmpty()?Math.max(0,shownCount-1):Math.max(0,shownCount-3));
+        final int shownCount=SuggestionStripLayoutPolicy.shownCount(
+                options.size(),stableSentenceStrip);
+        final boolean emptyInput=input.isEmpty();
+        final String cellSignature="chips:"+shownCount+":"+emptyInput;
+        final int expectedChildren=SuggestionStripLayoutPolicy.childCount(
+                shownCount,emptyInput);
         boolean reuseCells=cellSignature.equals(candidates.getTag()) &&
                 candidates.getChildCount()==expectedChildren;
         if(!reuseCells) {
@@ -2017,7 +2019,7 @@ public final class RebornImeService extends InputMethodService {
         }
         for (int i=0;i<shownCount;i++) {
             String suggestion=options.get(i);
-            int childIndex=input.isEmpty()?i*2:i+Math.max(0,i-2);
+            int childIndex=SuggestionStripLayoutPolicy.chipChildIndex(i,emptyInput);
             TextView option=reuseCells?(TextView)candidates.getChildAt(childIndex):new TextView(this);
             String shownSuggestion=suggestionCase(suggestion);
             if(!TextUtils.equals(option.getText(),shownSuggestion))
@@ -2072,7 +2074,8 @@ public final class RebornImeService extends InputMethodService {
             } else candidates.addView(option,params);
             final String expected=input;
             option.setOnClickListener(v->acceptSuggestion(v,expected,suggestion));
-            if(!reuseCells && i<shownCount-1 && (input.isEmpty() || i>=2)) {
+            if(!reuseCells && SuggestionStripLayoutPolicy.dividerAfter(
+                    i,shownCount,emptyInput)) {
                 View separator=new View(this);
                 separator.setBackgroundColor(borderColor);
                 LinearLayout.LayoutParams divider=new LinearLayout.LayoutParams(dp(1),dp(26));
