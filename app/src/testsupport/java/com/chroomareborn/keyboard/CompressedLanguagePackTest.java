@@ -33,8 +33,8 @@ public final class CompressedLanguagePackTest {
         Arrays.fill(expanded,(byte)'a');
         verify(CompressedLanguagePack.tryRead(new ByteArrayInputStream(gzip(expanded)))==null,
                 "decompression bomb must be rejected before heap growth");
-        verify(CompressedLanguagePack.ASSET_PATH.endsWith(".gz"),
-                "compressed asset must be named explicitly");
+        verify(CompressedLanguagePack.ASSET_PATH.endsWith(".esdbpack"),
+                "compressed asset must avoid Android special .gz asset rewriting");
         verify(CompressedLanguagePack.EXPECTED_SOURCE_SHA256.length()==64,
                 "full SHA-256 integrity source pin");
         System.out.println("PASS: CompressedLanguagePackTest "+checks+" assertions");
