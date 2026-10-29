@@ -40,6 +40,34 @@ public final class SuggestionVisualStyle {
         return blend(neutral,dark?0xffffffff:0xff000000,dark?.09f:.08f);
     }
 
+    private static double linear(int byteChannel) {
+        double v=byteChannel/255.0;
+        return v<=.04045 ? v/12.92 : Math.pow((v+.055)/1.055,2.4);
+    }
+
+    public static double contrastRatio(int foreground,int background) {
+        double fg=.2126*linear((foreground>>>16)&255)+
+                .7152*linear((foreground>>>8)&255)+
+                .0722*linear(foreground&255);
+        double bg=.2126*linear((background>>>16)&255)+
+                .7152*linear((background>>>8)&255)+
+                .0722*linear(background&255);
+        return (Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05);
+    }
+
+    /**
+     * Preserve the selected theme's text where it is legible. Otherwise
+     * fall back to a high-contrast neutral WITHOUT altering suggestion text,
+     * ranking, or the editor. Target WCAG AA 4.5:1 for small labels.
+     */
+    public static int readableText(int preferred,int tileColor) {
+        if(contrastRatio(preferred,tileColor)>=4.5d)return preferred;
+        int nearBlack=0xff202229;
+        int white=0xffffffff;
+        return contrastRatio(nearBlack,tileColor)>=
+                contrastRatio(white,tileColor) ? nearBlack : white;
+    }
+
     public static int textSizeSp(boolean sentence,int codePoints) {
         if(sentence || codePoints>28)return 15;
         if(codePoints>18)return 16;
