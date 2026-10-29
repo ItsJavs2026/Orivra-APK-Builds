@@ -178,12 +178,16 @@ dump_ui collapsed
 screenshot collapsed
 collapsed_top="$(python3 scripts/qa/inspect_ime_screens.py "$OUT/collapsed.png" --density "$density")"
 echo "Verified actual Orivra collapsed keyboard top: $collapsed_top px"
-# Fixed Pixel 6 emulator: palette icon is 36dp wide, in the 48dp prediction
-# strip at the top of the IME. Coordinates are derived from screenshot top
-# and wm density, rather than hardcoded screen pixel positions.
+# The palette button has been REMOVED from the prediction strip.
+# The existing right caret preserves short-tap expanded predictions and
+# long-press (500ms) theme settings. Swipe with zero displacement for 750ms
+# to exercise its real Android long-press touch handling.
 tap_x="$(dp_px 18)"
 tap_y="$((collapsed_top+$(dp_px 24)))"
-adb shell input tap "$tap_x" "$tap_y"
+settings_x="$((screen_w-$(dp_px 20)))"
+settings_y="$tap_y"
+adb shell input swipe "$settings_x" "$settings_y" \
+  "$settings_x" "$settings_y" 750
 sleep 2
 verify_selected
 dump_ui expanded
@@ -220,7 +224,7 @@ assert any('likethis heythereq' in x for x in texts), (
     'Real IME Q tap did not reach the editor', texts[:24])
 print('PASS: actual Orivra key delivered Q to disposable editor')
 PY
-echo "PASS: real Orivra IME visible, theme expand/collapse and key touch"
+echo "PASS: real Orivra IME visible, full-width prediction row, theme toggle via right-caret long hold, and key touch"
 
 # An actual Android touch swipe across Orivra's Backspace key. The
 # disposable editor currently contains "likethis heythereq". Swipe-left
