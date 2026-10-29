@@ -25,6 +25,18 @@ Only the CI Android debug test build contains the experimental gzip asset. A che
 - Initial [run 40972469666](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40972469666) failed because a Java-only job incorrectly required the still-to-be-generated gzip asset. The workflow condition was corrected; this failure did not exercise Android typing or predictors.
 - Corrected [run 40972532494](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40972532494) Java regression job **passed**. Its final emulator result and measured size/latency must be checked before claiming Android qualification.
 
+## Verified native Build 302 qualification (final)
+
+- Fully qualified [GitHub Actions run 40973573595](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40973573595) **SUCCESS** (both Java regression and native Android 35 emulator jobs).
+- **21/21 Android 35 Pixel 6 emulator instrumentation tests passed**. These include the 18 inherited keyboard/security/UI tests and three new compressed asset integrity, worker loading and measured prediction-latency tests.
+- **43 Keep/privacy-policy assertions, 11 exact-segmentation assertions, and seven compressed-asset fallback assertions passed.** Other inherited Java regressions also passed.
+- Original source wordlist SHA-256 `a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600` verified again; generated neutral-extension gzip blob **280 KiB**, exact compressed SHA-256 `c7ae38d8c2d3e83652ecacc947067e823ab6daec9993baaf7e2dc24501794098`.
+- AAPT preflight verified APK contains `assets/dictionaries/esdb-en-US-60.esdbpack` **and** `assets/dictionaries/ESDB_COPYRIGHT.txt`; asset manager on Android saw both filenames. The previous `.gz` missing-asset bug is resolved by retaining gzip bytes under neutral `.esdbpack` filename.
+- New Android instrumentation successfully read the verified pack with **78,942 distinct lowercase ASCII words**, source uncompressed bytes **1,022,018**, and safely invoked its off-main-thread loader with a main-thread callback.
+- In Android 35 emulator logs, cold verified load **478 ms** on the first instrumentation test, subsequent load **45 ms** on the warm benchmark test. These are not normal first-key event timings and the loader remains disconnected from the live IME.
+- **Warm prediction p95** for 60 fixed synthetic operations: baseline **210.62 ms**, experimental pack **194.21 ms** on one emulator run. The experimental pass does **not** establish a general speed improvement because this is a small, unpaired, noisy emulator timing sample. The p95 guard passed; no real S26 Ultra memory/p95 evidence yet.
+- No release APK has been published, installed or enabled. Existing Android app identity, `RebornImeService.java` and Google Keep privacy remain unchanged. The native debug APK only existed ephemerally inside CI for tests.
+
 ## Next steps
 1. Verify final emulator job, actual packed gzip size, source integrity, Android load time, warm p95, and any regressions. On failure, correct and rerun; keep stable Candidate 300 unchanged.
 2. When verified, evaluate if activation can occur safely on a low-priority worker without blocking the first key event. Add a hard feature flag and privacy gates; never auto-enable an experimental dataset in user builds.
