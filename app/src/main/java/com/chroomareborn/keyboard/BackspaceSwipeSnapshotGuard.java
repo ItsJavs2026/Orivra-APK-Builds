@@ -48,6 +48,21 @@ public final class BackspaceSwipeSnapshotGuard {
                 hasSelectedText,words);
     }
 
+    /**
+     * The highlighted preview comes from the SAME snapshot that will be
+     * checked at release, never from a second potentially drifting editor read.
+     */
+    public static String previewText(Ticket ticket,int maxCodePoints) {
+        if(ticket==null || maxCodePoints<=0)return "";
+        return ticket.hadSelection ?
+                BackspaceSwipePolicy.formatPreviewText(ticket.selected,maxCodePoints) :
+                BackspaceSwipePolicy.previewForSwipe(ticket.before,ticket.words,maxCodePoints);
+    }
+
+    public static boolean previewsSelection(Ticket ticket) {
+        return ticket!=null && ticket.hadSelection;
+    }
+
     /** Exact word count and surrounding editor text must still match. */
     public static boolean isCurrent(Ticket ticket, CharSequence before,
                                     CharSequence selected, CharSequence after,
