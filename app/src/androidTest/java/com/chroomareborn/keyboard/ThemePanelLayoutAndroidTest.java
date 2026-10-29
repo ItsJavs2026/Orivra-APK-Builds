@@ -77,7 +77,8 @@ public final class ThemePanelLayoutAndroidTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
             Context ctx=InstrumentationRegistry.getInstrumentation().getTargetContext();
             Fixture f=new Fixture(ctx,dp(ctx,28),dp(ctx,36),dp(ctx,48),dp(ctx,100));
-            int collapsed=dp(ctx,148),expanded=dp(ctx,212);
+            int collapsed=dp(ctx,48)+dp(ctx,100);
+            int expanded=collapsed+dp(ctx,28)+dp(ctx,36);
             for(int i=0;i<250;i++) {
                 boolean open=(i%2)==0;
                 ThemePanelLayout.apply(f.panel,open);
