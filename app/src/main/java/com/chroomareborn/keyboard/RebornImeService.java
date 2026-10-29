@@ -133,6 +133,68 @@ public final class RebornImeService extends InputMethodService {
     // NO_SUGGESTIONS is not a password marker in Google Keep note editors.
     // Honor NO_PERSONALIZED_LEARNING separately even when suggestions appear.
     private boolean editorAllowsPersonalLearning=false;
+    // Build 303 research: optional, default-OFF large exact-word dictionary.
+    // This pack is never loaded on touch or inside the 40ms prediction worker.
+    // Unlike personal dictionary, this contains only publicly sourced words.
+    private OfflineLanguagePackWorker optionalDictionaryLoader;
+    private ExactOnlyLanguagePack readyOptionalDictionary;
+    private boolean optionalDictionaryAttempted=false;
+    private boolean optionalDictionaryEnabled() {
+        return getSharedPreferences(OfflineDictionaryActivationPolicy.PREFS,MODE_PRIVATE)
+                .getBoolean(OfflineDictionaryActivationPolicy.KEY,false);
+    }
+    private void closeOptionalDictionary() {
+        if(optionalDictionaryLoader!=null){
+            optionalDictionaryLoader.close();
+            optionalDictionaryLoader=null;
+        }
+        optionalDictionaryAttempted=false;
+        readyOptionalDictionary=null;
+        PredictionLite.setResearchExactOnlyPack(null);
+    }
+    private void reconcileOptionalDictionary() {
+        boolean optedIn=optionalDictionaryEnabled();
+        if(!optedIn){
+            closeOptionalDictionary();
+            return;
+        }
+        if(!OfflineDictionaryActivationPolicy.usable(optedIn,sensitive)){
+            // Protected fields NEVER use the supplemental dictionary.
+            PredictionLite.setResearchExactOnlyPack(null);
+            return;
+        }
+        if(readyOptionalDictionary!=null){
+            PredictionLite.setResearchExactOnlyPack(readyOptionalDictionary);
+            return;
+        }
+        // Always retain the old predictor until a verified asset loads.
+        PredictionLite.setResearchExactOnlyPack(null);
+        if(!OfflineDictionaryActivationPolicy.startWorker(optedIn,sensitive,
+                optionalDictionaryAttempted,readyOptionalDictionary!=null))return;
+        optionalDictionaryAttempted=true;
+        final OfflineLanguagePackWorker loader=new OfflineLanguagePackWorker();
+        optionalDictionaryLoader=loader;
+        if(!loader.start(this,result->{
+            boolean eligible=OfflineDictionaryActivationPolicy.acceptCallback(
+                    optionalDictionaryEnabled(),sensitive,
+                    optionalDictionaryLoader==loader,
+                    result!=null && result.pack!=null);
+            if(eligible){
+                readyOptionalDictionary=result.pack;
+                PredictionLite.setResearchExactOnlyPack(result.pack);
+                // No editor reads or direct UI refresh: next ordinary
+                // prediction request safely uses the newly ready pack.
+            }else{
+                PredictionLite.setResearchExactOnlyPack(null);
+                // If the editor merely became sensitive before callback,
+                // do not retain the pack there. A later normal input may
+                // retry from the preserved verified asset.
+            }
+        })){
+            loader.close();
+            if(optionalDictionaryLoader==loader)optionalDictionaryLoader=null;
+        }
+    }
     // Prevent detaching a pressed letter key while its long-press symbol
     // is committed. Refresh any changed Shift appearance after finger lift.
     private boolean symbolHoldInProgress=false;
@@ -1161,6 +1223,7 @@ public final class RebornImeService extends InputMethodService {
         EditorSuggestionPrivacyPolicy.Decision privacy=editorPrivacyDecision(info);
         sensitive=privacy.sensitive;
         editorAllowsPersonalLearning=privacy.allowPersonalLearning;
+        reconcileOptionalDictionary();
         numericEditor=info!=null && ((info.inputType & InputType.TYPE_MASK_CLASS)==InputType.TYPE_CLASS_NUMBER
                 || (info.inputType & InputType.TYPE_MASK_CLASS)==InputType.TYPE_CLASS_PHONE);
         symbols=false;
@@ -1209,6 +1272,7 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onDestroy() {
         invalidateEditingTicket();
         predictionDispatcher.close();
+        closeOptionalDictionary();
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         super.onDestroy();
