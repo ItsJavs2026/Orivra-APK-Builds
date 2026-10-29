@@ -1,0 +1,105 @@
+name: Orivra 296 - context-gated candidate A/B research
+on:
+  push:
+    branches:
+      - research/build296-context-gated-shortspan-20261029
+    paths:
+      - .github/workflows/research296-context-gated-shortspan.yml
+      - app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowIndependentAudit.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-296-shortspan
+  cancel-in-progress: true
+jobs:
+  offline-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin untouched Candidate 295 qualified baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 73b71da9eadcac125217cb8c7f8f145c58a2ab30
+          path: candidate295-baseline
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Safeguard UI and build identity
+        run: |
+          set -euo pipefail
+          cmp candidate295-baseline/app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          cmp candidate295-baseline/app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          cmp candidate295-baseline/app/build.gradle.kts app/build.gradle.kts
+          if grep -q android.permission.INTERNET app/src/main/AndroidManifest.xml; then
+            echo "Unexpected network permission"; exit 1
+          fi
+      - name: Compile pinned and research offline predictors
+        run: |
+          set -euo pipefail
+          for mode in pinned research; do
+            if [ "$mode" = pinned ]; then root=candidate295-baseline; else root=.; fi
+            mkdir -p "$RUNNER_TEMP/$mode"
+            javac -encoding UTF-8 -d "$RUNNER_TEMP/$mode" \
+              "$root/app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java" \
+              "$root/app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java" \
+              "$root/app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java" \
+              "$root/app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java" \
+              "$root/app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowHoldoutBenchmark.java" \
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowIndependentAudit.java
+          done
+      - name: Run identical 487 benchmark and independent audit cases
+        run: |
+          set -euo pipefail
+          for mode in pinned research; do
+            for suite in SentenceFlowAccuracyBenchmark SentenceFlowHoldoutBenchmark SentenceFlowIndependentAudit; do
+              timeout 600s java -Xmx1g -ea -cp "$RUNNER_TEMP/$mode" \
+                "com.chroomareborn.keyboard.$suite" > "$RUNNER_TEMP/$mode-$suite.txt"
+            done
+          done
+      - name: Enforce exact-word, joined-text, and top-three non-regression
+        run: |
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import sys,re,os
+          root=sys.argv[1]
+          for suite in ('SentenceFlowAccuracyBenchmark',
+                        'SentenceFlowHoldoutBenchmark',
+                        'SentenceFlowIndependentAudit'):
+              def parse(mode):
+                  groups={}
+                  path=os.path.join(root,f'{mode}-{suite}.txt')
+                  for line in open(path,encoding='utf-8'):
+                      m=re.match(r'^(?:GROUP|HOLDOUT|AUDIT)\s+(\w+)\s+n=\s*(\d+)\s+top1=\s*(\d+).*?top3=\s*(\d+)',line)
+                      if m:groups[m[1]]=(int(m[2]),int(m[3]),int(m[4]))
+                  return groups
+              old,new=parse('pinned'),parse('research')
+              assert old and new and old.keys()==new.keys(),f'Benchmark mismatch: {suite}: {old.keys()} vs {new.keys()}'
+              for name,baseline in old.items():
+                  candidate=new[name]
+                  assert baseline[0]==candidate[0],f'Fixture count changed: {suite}/{name}'
+                  print(f'{suite}/{name}: top1 {baseline[1]}->{candidate[1]}, top3 {baseline[2]}->{candidate[2]}')
+                  assert candidate[2]>=baseline[2],f'Top3 regression: {suite}/{name}'
+                  if name in ('known_word','stable_words','word_one_typo',
+                              'word_typos','joined_exact','joined_0_typos'):
+                      assert candidate[1]>=baseline[1],f'Protected category regression: {suite}/{name}'
+                  if name=='ALL':
+                      assert candidate[1]>=baseline[1],f'Overall top1 regression: {suite}'
+          print('PASS: all 487 legacy/holdout cases plus independent two-typo negative controls')
+          PY
+      - name: Archive matched raw evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orivra-296-offline-ab-research
+          path: |
+            ${{ runner.temp }}/pinned-*.txt
+            ${{ runner.temp }}/research-*.txt
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Research qualification only
+        if: success()
+        run: echo "No APK built, no keyboard merged, no physical Samsung test."
