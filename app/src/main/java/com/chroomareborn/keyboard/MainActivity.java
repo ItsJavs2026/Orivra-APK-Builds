@@ -27,13 +27,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 287 Visual Trial");
+        title.setText("Orivra — Candidate 293 Test");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nExperimental Build 287: Clean Neutral (Gboard-inspired) appearance, adaptive light/dark colors, corrected symbol hints, reduced prediction motion, and customizable key feedback. App matching uses estimated icon hues or system dynamic color—not screenshots. Letter-to-letter swipe typing remains incomplete. Keep your stable keyboard installed and avoid sensitive typing during trials.\n");
+        notes.setText("\nCandidate 293: test Backspace swipe-left deleting complete connected words (likethis / heythere), the live highlighted deletion preview, Safe Enter (tap inserts a newline in multiline editors; intentional long-hold Send only), and the always-visible active theme label. Also check typing stability, predictions, and hold Backspace. Letter-to-letter swipe typing remains incomplete. This is a separate trial keyboard; keep the stable Orivra installed. Avoid entering passwords or other sensitive text during testing.\n");
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
@@ -44,7 +44,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra SentenceFlow keyboard");
+        picker.setText("2. Choose Orivra Candidate 293 keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
