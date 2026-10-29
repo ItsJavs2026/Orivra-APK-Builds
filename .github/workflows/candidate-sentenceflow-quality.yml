@@ -5,6 +5,9 @@ on:
       - candidate/build294-sentenceflow-benchmark-20261029
     paths:
       - .github/workflows/candidate-sentenceflow-quality.yml
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java
+      - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java
   workflow_dispatch:
 permissions:
   contents: read
