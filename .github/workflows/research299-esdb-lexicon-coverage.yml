@@ -1,0 +1,73 @@
+name: Orivra 299 - official ESDB size-60 offline coverage study
+on:
+  push:
+    branches:
+      - research/build299-prediction-failure-attribution-20261029
+    paths:
+      - .github/workflows/research299-esdb-lexicon-coverage.yml
+      - app/src/testsupport/java/com/chroomareborn/keyboard/ESDBCoverageLab.java
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  esdb-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify immutable upstream licensing and extract a bounded American English list
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          grep -Fq 'Permission to use, copy, modify, distribute' official-esdb/Copyright
+          grep -Fq 'Kevin Atkinson' official-esdb/Copyright
+          make -C official-esdb
+          cd official-esdb
+          ./scowl word-list 60 A 1 --categories= > "$RUNNER_TEMP/esdb-en-US-60.txt"
+          test -s "$RUNNER_TEMP/esdb-en-US-60.txt"
+          echo "Filtered size-60 entries:"
+          wc -l -c "$RUNNER_TEMP/esdb-en-US-60.txt"
+          sha256sum "$RUNNER_TEMP/esdb-en-US-60.txt" | tee "$RUNNER_TEMP/esdb-en-US-60.sha256"
+      - name: Compile audit against unchanged Candidate 298 predictor
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build298trial' app/build.gradle.kts
+          if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          mkdir -p "$RUNNER_TEMP/compiled"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/compiled" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java \
+            app/src/main/java/com/chroomareborn/keyboard/LexiconFamilyExpander.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowBlind297Audit.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ESDBCoverageLab.java
+      - name: Report exact-only dictionary coverage and bounded source size
+        run: |
+          set -euo pipefail
+          timeout 120s java -ea -Xmx1g -cp "$RUNNER_TEMP/compiled" \
+            com.chroomareborn.keyboard.ESDBCoverageLab "$RUNNER_TEMP/esdb-en-US-60.txt" \
+            | tee "$RUNNER_TEMP/Orivra-299-ESDB-Coverage.txt"
+      - name: Preserve attribution and independent summary, not a shipping dictionary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-299-ESDB-Coverage-and-Source-Notice-No-APK
+          path: |
+            ${{ runner.temp }}/Orivra-299-ESDB-Coverage.txt
+            ${{ runner.temp }}/esdb-en-US-60.sha256
+            official-esdb/Copyright
+          retention-days: 21
+          if-no-files-found: warn
+      - name: Confirm this is NOT a new APK or active language model
+        if: success()
+        run: echo "Unintegrated source comparison; no language pack shipped or installed."
