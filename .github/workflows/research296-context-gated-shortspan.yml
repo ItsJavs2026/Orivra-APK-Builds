@@ -88,7 +88,32 @@ jobs:
                       assert candidate[1]>=baseline[1],f'Protected category regression: {suite}/{name}'
                   if name=='ALL':
                       assert candidate[1]>=baseline[1],f'Overall top1 regression: {suite}'
-          print('PASS: all 487 legacy/holdout cases plus independent two-typo negative controls')
+          # Aggregate metrics can hide one win and one loss. Compare
+          # individual new cases, preventing a correct top result becoming
+          # incorrect even if the totals stay unchanged.
+          def cases(mode):
+              found={}
+              file=os.path.join(root,f'{mode}-SentenceFlowIndependentAudit.txt')
+              for line in open(file,encoding='utf-8'):
+                  fields=line.rstrip('\\n').split('\\t')
+                  if len(fields)==5 and fields[0]=='CASE':
+                      found[(fields[1],fields[2])]=(fields[3],fields[4])
+              return found
+          old_cases,new_cases=cases('pinned'),cases('research')
+          assert old_cases and old_cases.keys()==new_cases.keys(),'Missing individual-case evidence'
+          improved=regressed=changed_wrong=0
+          for key,(expected,old_first) in old_cases.items():
+              new_expected,new_first=new_cases[key]
+              assert expected==new_expected,'Test target changed'
+              old_good=(old_first.lower()==expected.lower())
+              new_good=(new_first.lower()==expected.lower())
+              if old_good and not new_good: regressed+=1
+              if new_good and not old_good: improved+=1
+              if not old_good and not new_good and old_first!=new_first:
+                  changed_wrong+=1
+          print(f'Independent per-case: n={len(old_cases)}, wins={improved}, losses={regressed}, wrong-to-wrong changes={changed_wrong}')
+          assert regressed==0,f'{regressed} per-case regressions hidden by totals'
+          print('PASS: 487 legacy/holdout cases and independent per-case safety audits')
           PY
       - name: Archive matched raw evidence, including failures
         if: always()
