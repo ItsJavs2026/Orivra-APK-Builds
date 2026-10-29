@@ -1207,16 +1207,16 @@ final class PredictionLite {
         // 301 second-stage research: keep the production fuzzy beam untouched.
         // A high-confidence zero-letter-edit segmentation may repair an
         // obviously overfragmented first candidate. Never silently commit.
-        ExactOnlyLanguagePack pack=researchExactOnlyPack;
-        if(pack==null || stable.isEmpty())return stable;
-        String proposed=ExactOnlySegmentation.propose(raw,stable.get(0),WORDS,pack);
+        ExactOnlyLanguagePack postDecodePack=researchExactOnlyPack;
+        if(postDecodePack==null || stable.isEmpty())return stable;
+        String proposed=ExactOnlySegmentation.propose(raw,stable.get(0),WORDS,postDecodePack);
         if(proposed==null)return stable;
         String candidate=caseDisplay(input,displayRecovered(proposed));
         if(stable.contains(candidate))return stable;
-        ArrayList<String> result=new ArrayList<>(stable);
-        result.add(0,candidate);
-        while(result.size()>8)result.remove(result.size()-1);
-        return result;
+        ArrayList<String> postDecodeOptions=new ArrayList<>(stable);
+        postDecodeOptions.add(0,candidate);
+        while(postDecodeOptions.size()>8)postDecodeOptions.remove(postDecodeOptions.size()-1);
+        return postDecodeOptions;
     }
     private static String displayRecovered(String plain) {
         String[] words=plain.split(" ");
