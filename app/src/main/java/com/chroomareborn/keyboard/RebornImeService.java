@@ -224,6 +224,11 @@ public final class RebornImeService extends InputMethodService {
         }
     };
     private boolean deleteHeld = false;
+    // Physical Backspace contact and repeat arming are independent: a
+    // cancelled swipe can stop repeating but still owns its touch target.
+    private boolean backspaceTouchActive = false;
+    private InputConnection deleteRepeatEditor;
+    private long deleteRepeatSession;
     // No Enter action is committed while a finger is still held down.
     private static final long ENTER_SEND_HOLD_MS = 650L;
     private Runnable enterHoldPending;
@@ -244,7 +249,10 @@ public final class RebornImeService extends InputMethodService {
     private Runnable deleteHoldPending;
     private final Runnable deleteRepeat = new Runnable() {
         @Override public void run() {
-            if (!deleteHeld || getCurrentInputConnection() == null) {
+            if (!BackspaceRepeatGuard.repeatAllowed(
+                    backspaceTouchActive,deleteHeld,
+                    deleteRepeatSession,inputSessionGeneration,
+                    deleteRepeatEditor,getCurrentInputConnection())) {
                 stopDeleteRepeat();
                 return;
             }
@@ -254,6 +262,7 @@ public final class RebornImeService extends InputMethodService {
     };
     private void stopDeleteRepeat() {
         deleteHeld = false;
+        deleteRepeatEditor = null;
         if (deleteHoldPending != null) {
             deleteHandler.removeCallbacks(deleteHoldPending);
             deleteHoldPending = null;
@@ -262,6 +271,7 @@ public final class RebornImeService extends InputMethodService {
     }
     private void invalidateBackspaceGestureSession() {
         inputSessionGeneration++;
+        backspaceTouchActive=false;
         stopDeleteRepeat();
         stopEnterHold();
         freezeRiseDuringDelete = false;
@@ -642,6 +652,9 @@ public final class RebornImeService extends InputMethodService {
                     hideSwipeDeletePreview();
                     gestureEditor[0]=getCurrentInputConnection();
                     gestureSession[0]=inputSessionGeneration;
+                    deleteRepeatEditor=gestureEditor[0];
+                    deleteRepeatSession=gestureSession[0];
+                    backspaceTouchActive=true;
                     touchStart[0]=event.getRawX();
                     touchStart[1]=event.getRawY();
                     swiping[0]=false;
@@ -657,8 +670,11 @@ public final class RebornImeService extends InputMethodService {
                     freezeRiseDuringDelete=true;
                     Runnable hold=()->{
                         deleteHoldPending=null;
-                        if(!deleteHeld || cancelled[0] || swiping[0] ||
-                                getCurrentInputConnection()==null)return;
+                        if(!BackspaceRepeatGuard.startAllowed(
+                                backspaceTouchActive,deleteHeld,cancelled[0],
+                                swiping[0],moved[0],gestureSession[0],
+                                inputSessionGeneration,gestureEditor[0],
+                                getCurrentInputConnection()))return;
                         repeating[0]=true;
                         backspace();
                         deleteHandler.postDelayed(deleteRepeat,DELETE_REPEAT_MS);
@@ -763,6 +779,7 @@ public final class RebornImeService extends InputMethodService {
                     boolean swipe=shouldCommit && swiping[0] && words>0 && ticket!=null;
                     swipeTicket[0]=null; // transient content cannot outlive the gesture
                     stopDeleteRepeat();
+                    backspaceTouchActive=false;
                     freezeRiseDuringDelete=false;
                     hideSwipeDeletePreview();
                     key.setText("⌫");
@@ -1432,7 +1449,9 @@ public final class RebornImeService extends InputMethodService {
         expandedSuggestions.setTranslationY(0f);
     }
     private void refreshView() {
-        if (base == null || keys == null || spacebarTouchActive || deleteHeld) return;
+        if (base == null || keys == null || spacebarTouchActive ||
+                !BackspaceRepeatGuard.mayRebuildKeys(backspaceTouchActive,deleteHeld))
+            return;
         base.setBackgroundColor(background);
         if (paletteBar != null) paletteBar.setBackgroundColor(background);
         updateToolbar();
