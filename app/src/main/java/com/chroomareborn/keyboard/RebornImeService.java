@@ -588,33 +588,22 @@ public final class RebornImeService extends InputMethodService {
             return false;
         }
     }
-    private void showSwipeDeletePreview(InputConnection editor,int words) {
+    private void showSwipeDeletePreview(InputConnection editor,int words,
+            BackspaceSwipeSnapshotGuard.Ticket ticket) {
         if(editor==null || editor!=getCurrentInputConnection() || words<=0 ||
                 swipeDeletePreview==null || suggestionScroll==null || sensitive) {
             hideSwipeDeletePreview();
             return;
         }
-        // This is a local visual preview only. It never moves the cursor or
-        // selects/deletes text in the host app until ACTION_UP.
-        CharSequence selected;
-        CharSequence preceding;
-        try {
-            selected=editor.getSelectedText(0);
-            boolean hasLiveSelection=selected!=null && selected.length()>0;
-            preceding=hasLiveSelection ? null :
-                    editor.getTextBeforeCursor(2048,0);
-        } catch(RuntimeException detachedEditor) {
-            hideSwipeDeletePreview();
-            return;
-        }
-        boolean selectionAvailable=selected!=null && selected.length()>0;
-        String target=selectionAvailable ?
-                BackspaceSwipePolicy.formatPreviewText(selected,38) :
-                BackspaceSwipePolicy.previewForSwipe(preceding,words,38);
+        // Only display text from the same ephemeral snapshot later checked
+        // before deletion. Never promise a deletion when the editor rejects
+        // a reliable snapshot; the gesture will safely do nothing.
+        boolean selectionAvailable=BackspaceSwipeSnapshotGuard.previewsSelection(ticket);
+        String target=BackspaceSwipeSnapshotGuard.previewText(ticket,38);
         String prefix=selectionAvailable ? "Delete selection: " :
                 "Delete "+words+(words==1?" word: ":" words: ");
         if(target.isEmpty()) {
-            swipeDeletePreview.setText(prefix+"release to confirm");
+            swipeDeletePreview.setText("Swipe delete unavailable");
         } else {
             android.text.SpannableStringBuilder preview=
                     new android.text.SpannableStringBuilder(prefix);
@@ -709,7 +698,7 @@ public final class RebornImeService extends InputMethodService {
                         if(swipeWords[0]!=words) {
                             swipeWords[0]=words;
                             swipeTicket[0]=captureSwipeDeleteTicket(gestureEditor[0],words);
-                            showSwipeDeletePreview(gestureEditor[0],words);
+                            showSwipeDeletePreview(gestureEditor[0],words,swipeTicket[0]);
                             key.setText("⌫"+words);
                             key.setContentDescription("Delete "+words+
                                     (words==1?" word":" words")+" on release");
