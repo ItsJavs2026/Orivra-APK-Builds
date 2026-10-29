@@ -39,7 +39,7 @@ jobs:
             exit 1
           fi
           grep -Fq 'paletteControls.addView(paletteButton' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
-          grep -Fq 'if(!riseLongPressed[0])toggleRisePanel();' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'if(toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'setThemePanelExpanded(!toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'SuggestionVisualStyle.chipColor(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'TypingMotionPolicy.scale(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
