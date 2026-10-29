@@ -67,13 +67,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Candidate 298 Test");
+        title.setText("Orivra — Candidate 300 Test");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nCandidate 298: major prediction test with Candidate 294 cleaner one-arrow suggestion strip, English 295 SentenceFlow and 297 offline vocabulary expansion. Test connected words, multiple typos, three suggestion choices, tap acceptance and correct spacing. Preserve Safe Enter tap/held-Send and Backspace swipe / hold, theme controls and smooth typing. Spanish remains research-only. Letter-to-letter swipe typing remains incomplete. This is a separate trial keyboard; keep the stable Orivra installed. Avoid entering passwords or other sensitive text during testing.\n");
+        notes.setText("\nCandidate 300: Google Keep compatibility hotfix. Ordinary Google Keep notes can show offline predictions when Android requests no suggestions, while password, email, URL, numeric and private fields remain protected. Personal correction learning is disabled where the editor requests no suggestions or no personalized learning. This trial keeps the Candidate 298 SentenceFlow prediction engine, cleaned one-arrow UI, Safe Enter, Backspace and theme behavior. Test in a disposable note. Spanish remains research-only; letter-to-letter swipe typing remains incomplete. This is a separate trial keyboard; keep the stable Orivra installed. Avoid entering passwords or other sensitive text during testing.\n");
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
@@ -84,7 +84,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra Candidate 298 keyboard");
+        picker.setText("2. Choose Orivra Candidate 300 keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
