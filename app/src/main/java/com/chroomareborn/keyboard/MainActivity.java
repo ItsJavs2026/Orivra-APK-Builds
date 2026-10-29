@@ -27,13 +27,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — SentenceFlow Alpha");
+        title.setText("Orivra — Build 287 Visual Trial");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nMaterial-inspired keys, phone light/dark switching, app-matched shaded colors, and starter predictions. App matching uses icon hues or system dynamic color, not screenshots. Spacebar cursor swiping is available; letter-to-letter swipe typing and Sentence Lab v0.9.2 are not yet fully integrated. Keep Gboard installed and avoid sensitive typing.\n");
+        notes.setText("\nExperimental Build 287: Clean Neutral (Gboard-inspired) appearance, adaptive light/dark colors, corrected symbol hints, reduced prediction motion, and customizable key feedback. App matching uses estimated icon hues or system dynamic color—not screenshots. Letter-to-letter swipe typing remains incomplete. Keep your stable keyboard installed and avoid sensitive typing during trials.\n");
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
@@ -64,6 +64,18 @@ public final class MainActivity extends Activity {
             android.widget.Toast.makeText(this,"Tap the palette icon on the keyboard to see changes immediately",android.widget.Toast.LENGTH_SHORT).show();
         });
         root.addView(theme);
+        Button cleanLook=new Button(this);
+        cleanLook.setAllCaps(false);
+        cleanLook.setText("Apply Clean Neutral keyboard look");
+        cleanLook.setOnClickListener(v -> {
+            getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE).edit()
+                    .putInt(AppPalette.KEY_MODE,AppPalette.CLEAN_NEUTRAL).apply();
+            theme.setText("3. Keyboard theme: "+AppPalette.modeName(AppPalette.CLEAN_NEUTRAL));
+            android.widget.Toast.makeText(this,
+                    "Clean Neutral selected; reopen keyboard to apply",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(cleanLook);
 
         Button height=new Button(this);
         int saved=getSharedPreferences(KeyboardSizing.PREFS,MODE_PRIVATE)
