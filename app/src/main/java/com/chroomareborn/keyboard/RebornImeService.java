@@ -552,19 +552,24 @@ public final class RebornImeService extends InputMethodService {
         });
     }
 
-    // Visual feedback only: the Button's layout bounds and hit target never move.
-    // Cancel old animations so rapid alternating thumb taps do not queue effects.
+    // Reuse a single interpolator. Do not allocate extra Animators per key,
+    // mutate layout bounds, or animate suggestion panels during fast typing.
+    private static final android.view.animation.Interpolator KEY_MOTION_EASE=
+            new android.view.animation.DecelerateInterpolator(1.35f);
     private void animateKeyPress(View view, boolean pressed) {
+        if(view==null)return;
         view.animate().cancel();
-        // Gboard-inspired restrained feedback: no overshoot or bouncing.
-        // Layout bounds remain unchanged even during rapid multi-touch.
-        if (pressed) {
-            view.animate().scaleX(.97f).scaleY(.97f)
-                    .translationZ(0f).setDuration(45L).start();
-        } else {
-            view.animate().scaleX(1f).scaleY(1f)
-                    .translationZ(0f).setDuration(65L).start();
+        // Respect OS animation disable/reduced-motion settings.
+        boolean enabled=android.animation.ValueAnimator.areAnimatorsEnabled();
+        float scale=TypingMotionPolicy.scale(pressed,enabled);
+        if(!enabled || !view.isAttachedToWindow()) {
+            view.setScaleX(TypingMotionPolicy.REST_SCALE);
+            view.setScaleY(TypingMotionPolicy.REST_SCALE);
+            return;
         }
+        view.animate().scaleX(scale).scaleY(scale)
+                .setInterpolator(KEY_MOTION_EASE)
+                .setDuration(TypingMotionPolicy.duration(pressed,true)).start();
     }
     private void hideSwipeDeletePreview() {
         if(swipeDeletePreview!=null) {
@@ -1478,6 +1483,10 @@ public final class RebornImeService extends InputMethodService {
             item.setText(suggestionCase(candidate));
             item.setTextColor(suggestionTextColor);
             item.setTextSize(candidate.length()>28?14:16);
+            item.setTypeface(android.graphics.Typeface.create(
+                    "sans-serif",android.graphics.Typeface.NORMAL));
+            item.setLetterSpacing(.004f);
+            item.setIncludeFontPadding(false);
             item.setGravity(Gravity.CENTER);
             boolean phrase=candidate.indexOf(' ')>=0;
             item.setSingleLine(!phrase);
@@ -2524,7 +2533,10 @@ public final class RebornImeService extends InputMethodService {
                 option.setText(shownSuggestion);
             option.setTextColor(suggestionTextColor);
             boolean fullSentenceChip=longPhrase && suggestion.indexOf(' ')>=0;
-            option.setTextSize(fullSentenceChip?14:(suggestion.length()>25?14:18));
+            option.setTextSize(SuggestionVisualStyle.textSizeSp(fullSentenceChip,
+                    suggestion.codePointCount(0,suggestion.length())));
+            option.setLetterSpacing(SuggestionVisualStyle.letterSpacing(fullSentenceChip));
+            option.setIncludeFontPadding(false);
             option.setSingleLine(!fullSentenceChip);
             option.setMaxLines(fullSentenceChip?2:1);
             option.setEllipsize(TextUtils.TruncateAt.END);
@@ -2540,22 +2552,21 @@ public final class RebornImeService extends InputMethodService {
                 return true;
             });
             else option.setOnLongClickListener(null);
-            // Subtle, theme-derived tint for suggestion chips. The first
-            // candidate is visually distinct, but is NOT auto-committed:
-            // rank alone does not establish sufficient correction confidence.
-            float tint=(!input.isEmpty() && i==emphasizedIndex) ? .34f : .20f;
-            int tileColor=Color.argb(
-                    Math.round(Color.alpha(suggestionBackground)*(1f-tint)+Color.alpha(keyBackground)*tint),
-                    Math.round(Color.red(suggestionBackground)*(1f-tint)+Color.red(keyBackground)*tint),
-                    Math.round(Color.green(suggestionBackground)*(1f-tint)+Color.green(keyBackground)*tint),
-                    Math.round(Color.blue(suggestionBackground)*(1f-tint)+Color.blue(keyBackground)*tint));
+            // Emphasize the best displayed correction, without indicating
+            // verified accuracy or changing the prediction rank/accepted text.
+            // Never mark unchanged typed text as a confident correction.
+            final boolean emphasize=SuggestionVisualStyle.highlight(
+                    input,suggestion,i,shownCount==1?0:emphasizedIndex);
+            int tileColor=SuggestionVisualStyle.chipColor(
+                    suggestionBackground,keyBackground,themeDark,emphasize);
             if(!(option.getTag() instanceof Integer) ||
                     ((Integer)option.getTag())!=tileColor) {
                 option.setBackground(feedbackBackground(tileColor));
                 option.setTag(tileColor);
             }
-            option.setTypeface(null,(!input.isEmpty() && i==emphasizedIndex)?
-                    android.graphics.Typeface.BOLD:android.graphics.Typeface.NORMAL);
+            option.setTypeface(android.graphics.Typeface.create(
+                    emphasize?"sans-serif-medium":"sans-serif",
+                    android.graphics.Typeface.NORMAL));
             // Give long phrases almost the whole scrollable strip. A 1/3-
             // width chip hid most of the correction on the Galaxy S26 Ultra.
             LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(
