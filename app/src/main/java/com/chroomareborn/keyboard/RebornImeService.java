@@ -1090,9 +1090,6 @@ public final class RebornImeService extends InputMethodService {
         expandedSuggestions.setVisibility(View.VISIBLE);
         // A single slim row above the standard suggestion strip.
         // Show alternatives rather than repeating the first three strip items.
-        LinearLayout row=new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
         // Split Mode should prefer phrases, but must not suppress the Rise
         // panel when no phrase is available. Restore additional predictions
         // above the strip without repeating the primary three choices.
@@ -1133,12 +1130,25 @@ public final class RebornImeService extends InputMethodService {
         String signature=latestSnapshot+"\u0001"+android.text.TextUtils.join("\u0001",riseOptions);
         if(wasVisible && signature.equals(riseRenderedSignature))return;
         riseRenderedSignature=signature;
-        expandedSuggestions.removeAllViews();
-        expandedSuggestions.addView(row,new LinearLayout.LayoutParams(-1,dp(64)));
+        // Update chips in place while their count stays unchanged.
+        // Removing/readding the whole row each keystroke caused visible flashing.
+        boolean reuseRiseRow=wasVisible && expandedSuggestions.getChildCount()==1 &&
+                expandedSuggestions.getChildAt(0) instanceof LinearLayout &&
+                ((LinearLayout)expandedSuggestions.getChildAt(0)).getChildCount()==count*2-1;
+        LinearLayout row;
+        if(reuseRiseRow) {
+            row=(LinearLayout)expandedSuggestions.getChildAt(0);
+        } else {
+            expandedSuggestions.removeAllViews();
+            row=new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            expandedSuggestions.addView(row,new LinearLayout.LayoutParams(-1,dp(64)));
+        }
         for(int i=start;i<count;i++) {
             final String candidate=riseOptions.get(i);
             final String expected=latestSnapshot;
-            TextView item=new TextView(this);
+            TextView item=reuseRiseRow ? (TextView)row.getChildAt((i-start)*2) : new TextView(this);
             item.setText(suggestionCase(candidate));
             item.setTextColor(suggestionTextColor);
             item.setTextSize(candidate.length()>28?14:16);
@@ -1152,7 +1162,7 @@ public final class RebornImeService extends InputMethodService {
             // No card backgrounds: match the regular suggestion strip.
             LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,dp(60),1f);
             params.setMargins(dp(2),dp(1),dp(2),dp(1));
-            row.addView(item,params);
+            if(!reuseRiseRow)row.addView(item,params);
             item.setOnTouchListener((v,event)->{
                 int action=event.getActionMasked();
                 if(action==MotionEvent.ACTION_DOWN)riseChipPressed=true;
@@ -1167,7 +1177,7 @@ public final class RebornImeService extends InputMethodService {
                 predictionsExpanded=false;
                 updatePredictionPanel();
             });
-            if(i<count-1) {
+            if(!reuseRiseRow && i<count-1) {
                 View divider=new View(this);
                 divider.setBackgroundColor(borderColor);
                 row.addView(divider,new LinearLayout.LayoutParams(dp(1),dp(22)));
@@ -1589,11 +1599,11 @@ public final class RebornImeService extends InputMethodService {
     // Respect the existing keyboard haptic toggle and system vibration policy.
     private void confirmSuggestionTap(View source) {
         if (source == null) return;
-        keyHaptic(source);
-        // Successful acceptance gets a distinct confirmation tick, but
-        // the candidate stays in the same place without scaling.
+        // One tick only; do not double-vibrate on accepted candidates.
+        if(!hapticsEnabled())return;
         if(Build.VERSION.SDK_INT>=30)
             source.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
+        else keyHaptic(source);
     }
     // Apply a cursor-word correction only after re-reading the live editor text.
     // Cursor movement and the centered original suggestion never change content.
@@ -1937,12 +1947,14 @@ public final class RebornImeService extends InputMethodService {
         }
         updatePredictionPanel();
         candidates.setAlpha(1f);
-        candidates.removeAllViews();
-        if(suggestionScroll!=null)suggestionScroll.scrollTo(0,0);
+        if(suggestionScroll!=null && suggestionScroll.getScrollX()!=0)
+            suggestionScroll.scrollTo(0,0);
         if(options.isEmpty() && !input.isEmpty() && !sensitive) {
             options=java.util.Collections.singletonList(input);
         }
         if(options.isEmpty()) {
+            candidates.removeAllViews();
+            candidates.setTag("message");
             TextView message=new TextView(this);
             message.setText(sensitive?"Private field • predictions off":
                     NextWordControlLabels.emptyBarText(offlineNextWordEnabled()));
@@ -1976,10 +1988,20 @@ public final class RebornImeService extends InputMethodService {
         final boolean primarySentence=!options.isEmpty()
                 && SuggestionDisplayPolicy.longSentence(input,options.get(0));
         final int emphasizedIndex=primarySentence?0:1;
-        for (int i=0;i<options.size();i++) {
-            if(stableSentenceStrip && i>=1)break;
+        final int shownCount=stableSentenceStrip?1:options.size();
+        final String cellSignature="chips:"+shownCount+":"+input.isEmpty();
+        final int expectedChildren=shownCount+
+                (input.isEmpty()?Math.max(0,shownCount-1):Math.max(0,shownCount-3));
+        boolean reuseCells=cellSignature.equals(candidates.getTag()) &&
+                candidates.getChildCount()==expectedChildren;
+        if(!reuseCells) {
+            candidates.removeAllViews();
+            candidates.setTag(cellSignature);
+        }
+        for (int i=0;i<shownCount;i++) {
             String suggestion=options.get(i);
-            TextView option=new TextView(this);
+            int childIndex=input.isEmpty()?i*2:i+Math.max(0,i-2);
+            TextView option=reuseCells?(TextView)candidates.getChildAt(childIndex):new TextView(this);
             option.setText(suggestionCase(suggestion));
             option.setTextColor(suggestionTextColor);
             boolean fullSentenceChip=longPhrase && suggestion.indexOf(' ')>=0;
@@ -1998,6 +2020,7 @@ public final class RebornImeService extends InputMethodService {
                         android.widget.Toast.LENGTH_LONG).show();
                 return true;
             });
+            else option.setOnLongClickListener(null);
             // Subtle, theme-derived tint for suggestion chips. The first
             // candidate is visually distinct, but is NOT auto-committed:
             // rank alone does not establish sufficient correction confidence.
@@ -2007,9 +2030,13 @@ public final class RebornImeService extends InputMethodService {
                     Math.round(Color.red(suggestionBackground)*(1f-tint)+Color.red(keyBackground)*tint),
                     Math.round(Color.green(suggestionBackground)*(1f-tint)+Color.green(keyBackground)*tint),
                     Math.round(Color.blue(suggestionBackground)*(1f-tint)+Color.blue(keyBackground)*tint));
-            option.setBackground(feedbackBackground(tileColor));
-            if(!input.isEmpty() && i==emphasizedIndex)
-                option.setTypeface(null,android.graphics.Typeface.BOLD);
+            if(!(option.getTag() instanceof Integer) ||
+                    ((Integer)option.getTag())!=tileColor) {
+                option.setBackground(feedbackBackground(tileColor));
+                option.setTag(tileColor);
+            }
+            option.setTypeface(null,(!input.isEmpty() && i==emphasizedIndex)?
+                    android.graphics.Typeface.BOLD:android.graphics.Typeface.NORMAL);
             // Give long phrases almost the whole scrollable strip. A 1/3-
             // width chip hid most of the correction on the Galaxy S26 Ultra.
             LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(
@@ -2018,10 +2045,11 @@ public final class RebornImeService extends InputMethodService {
                     (!input.isEmpty() && i<3 ? Math.max(dp(70),(screenWidth-dp(30))/3) : -2),
                     fullSentenceChip?dp(48):dp(44));
             params.setMargins(dp(2),dp(2),dp(2),dp(2));
-            candidates.addView(option,params);
+            if(reuseCells)option.setLayoutParams(params);
+            else candidates.addView(option,params);
             final String expected=input;
             option.setOnClickListener(v->acceptSuggestion(v,expected,suggestion));
-            if(i<options.size()-1 && (input.isEmpty() || i>=2)) {
+            if(!reuseCells && i<shownCount-1 && (input.isEmpty() || i>=2)) {
                 View separator=new View(this);
                 separator.setBackgroundColor(borderColor);
                 LinearLayout.LayoutParams divider=new LinearLayout.LayoutParams(dp(1),dp(26));
