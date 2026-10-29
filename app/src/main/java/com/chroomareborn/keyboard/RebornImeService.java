@@ -223,6 +223,9 @@ public final class RebornImeService extends InputMethodService {
         }
     };
     private boolean deleteHeld = false;
+    // Guard deferred touch-release deletion against editor and view lifecycle
+    // changes. A stale callback must never delete in the next text field.
+    private long inputSessionGeneration = 0L;
     // Cancel the initial hold timer when a swipe wins or the editor closes.
     private Runnable deleteHoldPending;
     private final Runnable deleteRepeat = new Runnable() {
@@ -242,6 +245,11 @@ public final class RebornImeService extends InputMethodService {
             deleteHoldPending = null;
         }
         deleteHandler.removeCallbacks(deleteRepeat);
+    }
+    private void invalidateBackspaceGestureSession() {
+        inputSessionGeneration++;
+        stopDeleteRepeat();
+        freezeRiseDuringDelete = false;
     }
 
     private void stopSpacebarCursorGesture() {
@@ -535,12 +543,16 @@ public final class RebornImeService extends InputMethodService {
         key.setContentDescription("Delete. Hold to repeat, or slide left to delete words");
         key.setOnClickListener(v -> backspace()); // accessibility fallback
         final float[] touchStart={0f,0f};
+        final InputConnection[] gestureEditor={null};
+        final long[] gestureSession={0L};
         final boolean[] swiping={false}, repeating={false}, cancelled={false};
         final int[] swipeWords={0};
         key.setOnTouchListener((view,event)->{
             switch(event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN: {
                     stopDeleteRepeat();
+                    gestureEditor[0]=getCurrentInputConnection();
+                    gestureSession[0]=inputSessionGeneration;
                     touchStart[0]=event.getRawX();
                     touchStart[1]=event.getRawY();
                     swiping[0]=false;
@@ -588,6 +600,7 @@ public final class RebornImeService extends InputMethodService {
                         // Sliding back toward the original key cancels deletion.
                         swipeWords[0]=0;
                         key.setText("⌫");
+                        key.setContentDescription("Swipe deletion cancelled");
                     } else if(Math.abs(left)>dp(60) || Math.abs(vertical)>dp(60)) {
                         cancelled[0]=true;
                         stopDeleteRepeat();
@@ -600,12 +613,16 @@ public final class RebornImeService extends InputMethodService {
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL: {
+                    final InputConnection editor=gestureEditor[0];
+                    final long sessionAtDown=gestureSession[0];
+                    boolean sameSession=editor!=null &&
+                            editor==getCurrentInputConnection() &&
+                            sessionAtDown==inputSessionGeneration;
                     boolean shouldCommit=event.getActionMasked()==MotionEvent.ACTION_UP &&
-                            !cancelled[0];
+                            !cancelled[0] && sameSession;
                     int words=swiping[0]?swipeWords[0]:0;
                     boolean tap=shouldCommit && !swiping[0] && !repeating[0];
                     boolean swipe=shouldCommit && swiping[0] && words>0;
-                    InputConnection editor=getCurrentInputConnection();
                     stopDeleteRepeat();
                     freezeRiseDuringDelete=false;
                     key.setText("⌫");
@@ -616,10 +633,10 @@ public final class RebornImeService extends InputMethodService {
                     // Android 17 Build 287 crash: DO NOT change the view tree
                     // or editor while the Backspace touch event is dispatching.
                     suggestionHandler.post(()->{
-                        if(editor!=null && editor==getCurrentInputConnection()) {
-                            if(swipe)deleteSwipeWords(words);
-                            else if(tap)backspace();
-                        }
+                        if(editor==null || editor!=getCurrentInputConnection() ||
+                                sessionAtDown!=inputSessionGeneration)return;
+                        if(swipe)deleteSwipeWords(words);
+                        else if(tap)backspace();
                         showSuggestions();
                         refreshView();
                     });
@@ -902,7 +919,7 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onConfigurationChanged(Configuration newConfig) {
         invalidateEditingTicket();
         super.onConfigurationChanged(newConfig);
-        stopDeleteRepeat();
+        invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         setColors(getCurrentInputEditorInfo());
         refreshView();
@@ -910,7 +927,7 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onStartInput(EditorInfo info, boolean restarting) {
         invalidateEditingTicket();
         predictionDispatcher.cancel();
-        stopDeleteRepeat();
+        invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         super.onStartInput(info, restarting);
         composing = "";
@@ -940,6 +957,7 @@ public final class RebornImeService extends InputMethodService {
     }
     @Override public void onStartInputView(EditorInfo info, boolean restarting) {
         invalidateEditingTicket();
+        invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         super.onStartInputView(info, restarting);
         setColors(info);
@@ -949,7 +967,7 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onFinishInput() {
         invalidateEditingTicket();
         predictionDispatcher.cancel();
-        stopDeleteRepeat();
+        invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         currentFinish();
         super.onFinishInput();
@@ -957,14 +975,14 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onFinishInputView(boolean finishingInput) {
         invalidateEditingTicket();
         predictionDispatcher.cancel();
-        stopDeleteRepeat();
+        invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         super.onFinishInputView(finishingInput);
     }
     @Override public void onDestroy() {
         invalidateEditingTicket();
         predictionDispatcher.close();
-        stopDeleteRepeat();
+        invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         super.onDestroy();
     }
@@ -1622,7 +1640,10 @@ public final class RebornImeService extends InputMethodService {
         cancelCursorReleaseSuggestions();
         // A selected range should be deleted as a selection, not by guessing
         // text to its left. Never fetch/store the entire editor contents.
-        if(hasSelection()) {
+        // onUpdateSelection can lag the touch callback in third-party editors.
+        // Trust the editor's live selected text as well as our cached selection.
+        CharSequence selected=ic.getSelectedText(0);
+        if(hasSelection() || (selected!=null && selected.length()>0)) {
             currentFinish();
             ic.commitText("",1);
         } else {
