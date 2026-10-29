@@ -823,12 +823,30 @@ public final class RebornImeService extends InputMethodService {
         return new RippleDrawable(ColorStateList.valueOf(rippleColor),content,mask);
     }
     private String themeSource = "Neutral fallback";
+    private boolean themeDark = true;
+    private String themeDetails() {
+        int mode=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                .getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
+        return ThemeStatusLabel.details(AppPalette.modeName(mode),themeDark,
+                AppPalette.followsSystem(this),themeSource);
+    }
+    private void updateThemeStatus() {
+        if(paletteLabel==null)return;
+        int mode=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                .getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
+        paletteLabel.setText(ThemeStatusLabel.compact(
+                AppPalette.modeName(mode),themeDark));
+        paletteLabel.setTextColor(secondaryTextColor);
+        paletteLabel.setContentDescription(themeDetails()+". Tap for full theme information.");
+    }
     private void setColors(EditorInfo editor) {
         AppPalette.Result result=AppPalette.resolve(this,editor==null?null:editor.packageName);
         background=result.background;
         keyBackground=result.keyBackground;
         accent=result.accent;
         themeSource=result.label;
+        themeDark=result.dark;
+        updateThemeStatus();
         keyTextColor=result.keyTextColor;
         secondaryTextColor=result.secondaryTextColor;
         borderColor=result.borderColor;
@@ -869,7 +887,13 @@ public final class RebornImeService extends InputMethodService {
         paletteLabel = new TextView(this);
         paletteLabel.setTextColor(secondaryTextColor);
         paletteLabel.setSingleLine(true);
+        paletteLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
         paletteLabel.setTextSize(10);
+        // Small always-visible status. Tapping explains the full active mode
+        // and the applied light/dark source, without opening a modal overlay.
+        paletteLabel.setOnClickListener(v->
+                android.widget.Toast.makeText(this,themeDetails(),
+                        android.widget.Toast.LENGTH_LONG).show());
         paletteLabel.setPadding(dp(8), 0, dp(5), 0);
         paletteBar.addView(paletteLabel, new LinearLayout.LayoutParams(0, dp(32), 1f));
         paletteButton = new Button(this);
@@ -1234,13 +1258,8 @@ public final class RebornImeService extends InputMethodService {
         // Refresh collapsed status and expanded layout on every toggle,
         // including toggles performed without a keyboard-view rebuild.
         if(paletteLabel!=null) {
-            int mode=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
-                    .getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
-            paletteLabel.setText(AppPalette.modeName(mode)+" • "+
-                    NextWordControlLabels.buttonText(offlineNextWordEnabled()));
+            updateThemeStatus();
             paletteLabel.setVisibility(toolbarExpanded?View.GONE:View.VISIBLE);
-            paletteLabel.setContentDescription(
-                    NextWordControlLabels.contentDescription(offlineNextWordEnabled()));
         }
         if(splitModeButton!=null) {
             splitModeButton.setVisibility(toolbarExpanded?View.VISIBLE:View.GONE);
@@ -1260,7 +1279,10 @@ public final class RebornImeService extends InputMethodService {
             nextWordButton.setContentDescription(
                     NextWordControlLabels.contentDescription(enabled));
         }
-        if(paletteBar!=null)paletteBar.setVisibility(toolbarExpanded?View.VISIBLE:View.GONE);
+        // Preserve the compact selected-theme label and expand arrow at all
+        // times; the bar is a stable 34dp, so opening controls cannot shift
+        // the active keyboard touch rows or prediction strip.
+        if(paletteBar!=null)paletteBar.setVisibility(View.VISIBLE);
         if (paletteButton != null) paletteButton.setVisibility(toolbarExpanded ? View.VISIBLE : View.GONE);
         if (sizeButton != null) sizeButton.setVisibility(toolbarExpanded ? View.VISIBLE : View.GONE);
         if(animationSpeedButton!=null) {
@@ -1456,14 +1478,8 @@ public final class RebornImeService extends InputMethodService {
         if (paletteBar != null) paletteBar.setBackgroundColor(background);
         updateToolbar();
         if (paletteLabel != null) {
-            int mode=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
-                    .getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
-            paletteLabel.setText(AppPalette.modeName(mode)+" • "+
-                    NextWordControlLabels.buttonText(offlineNextWordEnabled()));
+            updateThemeStatus();
             paletteLabel.setVisibility(toolbarExpanded?View.GONE:View.VISIBLE);
-            paletteLabel.setContentDescription(
-                    NextWordControlLabels.contentDescription(offlineNextWordEnabled()));
-            paletteLabel.setTextColor(secondaryTextColor);
         }
         if(paletteButton!=null) {
             paletteButton.setTextColor(keyTextColor);
