@@ -656,11 +656,15 @@ public final class RebornImeService extends InputMethodService {
                             }
                             keyHaptic(key);
                         }
-                        swipeWords[0]=words;
-                        showSwipeDeletePreview(gestureEditor[0],words);
-                        key.setText("⌫"+words);
-                        key.setContentDescription("Delete "+words+
-                                (words==1?" word":" words")+" on release");
+                        // Avoid querying editor text/redrawing on every
+                        // motion frame: refresh only as the word count changes.
+                        if(swipeWords[0]!=words) {
+                            swipeWords[0]=words;
+                            showSwipeDeletePreview(gestureEditor[0],words);
+                            key.setText("⌫"+words);
+                            key.setContentDescription("Delete "+words+
+                                    (words==1?" word":" words")+" on release");
+                        }
                     } else if(swiping[0]) {
                         // Sliding back toward the original key cancels deletion.
                         swipeWords[0]=0;
