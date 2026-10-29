@@ -130,6 +130,9 @@ public final class RebornImeService extends InputMethodService {
     private int currentRowHeightDp=72;
     private String composing = "";
     private boolean sensitive, shift, symbols, capsLock;
+    // Prevent detaching a pressed letter key while its long-press symbol
+    // is committed. Refresh any changed Shift appearance after finger lift.
+    private boolean symbolHoldInProgress=false;
     private boolean extraSymbols=false;
 
     private boolean numericEditor=false;
@@ -1326,7 +1329,9 @@ public final class RebornImeService extends InputMethodService {
             if(!cancelled[0]&&key.isPressed()&&getCurrentInputConnection()!=null) {
                 triggered[0]=true;
                 keyHaptic(key);
-                type(hint);
+                symbolHoldInProgress=true;
+                try { type(hint); }
+                finally { symbolHoldInProgress=false; }
             }
         };
         key.setOnTouchListener((view,event)->{
@@ -1354,6 +1359,7 @@ public final class RebornImeService extends InputMethodService {
                     key.setPressed(false);
                     animateKeyPress(key,false);
                     if(!cancelled[0]&&!triggered[0])type(letter);
+                    else if(triggered[0])suggestionHandler.post(this::refreshView);
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                 case MotionEvent.ACTION_POINTER_DOWN:
@@ -1517,6 +1523,7 @@ public final class RebornImeService extends InputMethodService {
             updateSentenceShift();
         }
         if(value.matches("[A-Za-z]"))recordTypingRhythm();
+        boolean shiftAtStart=shift;
         boolean usedShift=shift && value.matches("[A-Za-z]");
         if (usedShift) { value = value.toUpperCase(); if(!capsLock)shift=false; }
         if (PunctuationSpacing.isClosingPunctuation(value)) {
@@ -1543,10 +1550,11 @@ public final class RebornImeService extends InputMethodService {
         }
         if (!value.matches("[A-Za-z]")) updateSentenceShift();
         showSuggestions();
-        // Symbol taps should not discard and rebuild the key view while a
-        // finger is still down. Mode/page toggles already refresh explicitly.
-        if (!numericEditor && !symbols &&
-                (usedShift || !value.matches("[A-Za-z]")) && !capsLock)
+        // Only Shift changes require re-rendering key labels. In particular,
+        // never detach the touched key while a symbol long-press is active.
+        // ?123 and symbol-page switches refresh explicitly on user activation.
+        if(!numericEditor && !capsLock && shiftAtStart!=shift &&
+                !symbolHoldInProgress)
             suggestionHandler.post(this::refreshView);
     }
     private void backspace() {
