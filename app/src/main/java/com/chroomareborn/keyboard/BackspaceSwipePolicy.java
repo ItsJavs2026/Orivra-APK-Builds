@@ -10,7 +10,10 @@ public final class BackspaceSwipePolicy {
     /** Return 0 for an ordinary tap/non-leftward gesture, otherwise 1..8 words. */
     public static int wordsForSwipe(float leftPx, float verticalPx,
                                    float thresholdPx, float additionalWordPx) {
-        if (thresholdPx <= 0 || leftPx < thresholdPx ||
+        // Malformed pointer coordinates must fail closed, never delete text.
+        if (!Float.isFinite(leftPx) || !Float.isFinite(verticalPx) ||
+                !Float.isFinite(thresholdPx) || !Float.isFinite(additionalWordPx) ||
+                thresholdPx <= 0 || leftPx < thresholdPx ||
                 leftPx < Math.abs(verticalPx) * 1.25f) return 0;
         float step = Math.max(1f, additionalWordPx);
         return Math.min(8, 1 + (int) ((leftPx - thresholdPx) / step));
