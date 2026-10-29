@@ -45,6 +45,7 @@ jobs:
           grep -Fq 'if(toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'SuggestionVisualStyle.chipColor(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'SuggestionVisualStyle.readableText(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'int black=0xff000000;' app/src/main/java/com/chroomareborn/keyboard/SuggestionVisualStyle.java
           grep -Fq 'TypingMotionPolicy.scale(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           if grep -Fq 'toolbarToggle' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
             echo 'Second collapse arrow must be removed'
@@ -142,6 +143,6 @@ jobs:
           script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
       - name: Clarify qualification level
         run: |
-          echo "14 Android 35 emulator tests including 16 palette state combinations and measured zero-height theme collapse; not Samsung QA."
+          echo "14 Android 35 emulator tests: all eight palettes in light/dark, WCAG contrast, theme collapse, Backspace and Safe Enter; not Samsung QA."
           echo "A temporary instrumented test APK is built by Gradle inside CI."
           echo "No release artifact is uploaded; no Samsung handset is tested."
