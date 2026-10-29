@@ -58,7 +58,7 @@ public final class BackspaceSwipePolicyTest {
         equal(0, BackspaceSwipePolicy.charsToDelete("heythere",0));
         equal(5, BackspaceSwipePolicy.charsToDelete("there",1));
         equal(9, BackspaceSwipePolicy.charsToDelete("heythere!",1));
-        equal(14, BackspaceSwipePolicy.charsToDelete("hey-there-again",1));
+        equal(15, BackspaceSwipePolicy.charsToDelete("hey-there-again",1));
 
         equal(6, BackspaceSwipePolicy.charsToDelete("hello world ",1));
         equal(4, BackspaceSwipePolicy.charsToDelete("a b ",2));
