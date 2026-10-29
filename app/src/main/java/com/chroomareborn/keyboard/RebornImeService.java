@@ -1670,6 +1670,7 @@ public final class RebornImeService extends InputMethodService {
                         Runnable hold=()->{
                             enterHoldPending=null;
                             if(cancelled[0] || !view.isPressed() ||
+                                    !view.isAttachedToWindow() ||
                                     !sameEnterSession(touchedSession[0],touchedEditor[0]))
                                 return;
                             armed[0]=true;
@@ -1722,7 +1723,8 @@ public final class RebornImeService extends InputMethodService {
                     // Build 287 showed that rebuilding a LinearLayout during touch
                     // dispatch can crash Android 17. Commit AFTER dispatch.
                     suggestionHandler.post(()->{
-                        if(!sameEnterSession(session,editor))
+                        if(!view.isAttachedToWindow() ||
+                                !sameEnterSession(session,editor))
                             return;
                         if(send) {
                             sendIfExplicitlySupported();
