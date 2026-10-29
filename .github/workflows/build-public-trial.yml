@@ -22,6 +22,12 @@ jobs:
           test -s third_party/swiftfloris/LICENSE
           test -s third_party/swiftfloris/NOTICE
           grep -Fq 'com.chroomareborn.keyboard.build291trial' app/build.gradle.kts
+          # Safety regression: ordinary Enter must never reach the app's
+          # submit/action handler or emit a synthetic KEYCODE_ENTER event.
+          grep -Fq 'EnterKeyPolicy.supportsNewline(info.inputType)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'EnterKeyPolicy.shouldSendOnRelease(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'this::enter' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then exit 1; fi
+          if grep -Fq 'sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then exit 1; fi
           if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
           if git ls-files | grep -Ei '(^research/|^evaluation/|^scripts/|^app/src/debug/|\.(jks|keystore|p12|pem|pfx|key)$)'; then exit 1; fi
       - name: Java 17 layout, haptics, suggestion and cursor regression tests
