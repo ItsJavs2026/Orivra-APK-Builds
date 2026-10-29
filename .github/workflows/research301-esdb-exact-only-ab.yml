@@ -1,0 +1,172 @@
+name: Orivra 301 - ESDB exact-only A/B vs phone-confirmed Candidate 300
+on:
+  push:
+    branches:
+      - research/build301-esdb-exact-only-ab-20261029
+    paths:
+      - .github/workflows/research301-esdb-exact-only-ab.yml
+      - app/src/main/java/com/chroomareborn/keyboard/ExactOnlyLanguagePack.java
+      - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowPackInjectedAudit.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-301-exact-only-a-b
+  cancel-in-progress: true
+jobs:
+  source-locked-synthetic-a-b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 25316b3c429c94b463d0a30db8367789c5ac8792
+          path: confirmed-candidate-300
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Protect phone-confirmed Keep fix, input behavior, app identity, and frozen QA
+        run: |
+          set -euo pipefail
+          for f in RebornImeService.java EditorSuggestionPrivacyPolicy.java SentenceRescue.java SentenceFlowEvidenceRanker.java LexiconFamilyExpander.java; do
+            cmp "confirmed-candidate-300/app/src/main/java/com/chroomareborn/keyboard/$f" "app/src/main/java/com/chroomareborn/keyboard/$f"
+          done
+          cmp confirmed-candidate-300/app/build.gradle.kts app/build.gradle.kts
+          cmp confirmed-candidate-300/app/src/main/AndroidManifest.xml app/src/main/AndroidManifest.xml
+          for f in SentenceFlowAccuracyBenchmark.java SentenceFlowHoldoutBenchmark.java SentenceFlowIndependentAudit.java SentenceFlowBlind297Audit.java; do
+            cmp "confirmed-candidate-300/app/src/testsupport/java/com/chroomareborn/keyboard/$f" "app/src/testsupport/java/com/chroomareborn/keyboard/$f"
+          done
+          test -s official-esdb/Copyright
+          grep -Fq 'Kevin Atkinson' official-esdb/Copyright
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+      - name: Generate official ASCII-filtered American English speller list outside APK
+        run: |
+          set -euo pipefail
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-60-A1.txt"
+          test -s "$RUNNER_TEMP/esdb-60-A1.txt"
+          sha256sum "$RUNNER_TEMP/esdb-60-A1.txt"
+          wc -lc "$RUNNER_TEMP/esdb-60-A1.txt"
+      - name: Compile true Candidate 300 and experimental predictor with SAME QA code
+        run: |
+          set -euo pipefail
+          for mode in baseline experimental; do
+            if [ "$mode" = baseline ]; then root=confirmed-candidate-300; else root=.; fi
+            mkdir -p "$RUNNER_TEMP/$mode"
+            files=(
+              "$root/app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java"
+              "$root/app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java"
+              "$root/app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java"
+              "$root/app/src/main/java/com/chroomareborn/keyboard/LexiconFamilyExpander.java"
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowPackInjectedAudit.java
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowHoldoutBenchmark.java
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowIndependentAudit.java
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowBlind297Audit.java
+            )
+            if [ "$mode" = experimental ]; then
+              files+=(app/src/main/java/com/chroomareborn/keyboard/ExactOnlyLanguagePack.java)
+            fi
+            javac -encoding UTF-8 -d "$RUNNER_TEMP/$mode" "${files[@]}"
+          done
+      - name: Run 667 locked synthetic cases on both engines
+        run: |
+          set -euo pipefail
+          for mode in baseline experimental; do
+            for suite in accuracy holdout independent blind; do
+              dictionary=none
+              if [ "$mode" = experimental ]; then
+                dictionary="$RUNNER_TEMP/esdb-60-A1.txt"
+              fi
+              timeout 210s java -Xmx1024m -ea -cp "$RUNNER_TEMP/$mode" \
+                com.chroomareborn.keyboard.SentenceFlowPackInjectedAudit \
+                "$dictionary" "$suite" > "$RUNNER_TEMP/$mode-$suite.txt"
+            done
+          done
+      - name: Compare recall and actual false-correction regressions
+        run: |
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import sys,re,pathlib
+          base=pathlib.Path(sys.argv[1])
+          suites=('accuracy','holdout','independent','blind')
+          groups={}
+          for suite in suites:
+            groups[suite]={}
+            for mode in ('baseline','experimental'):
+              raw=(base/f'{mode}-{suite}.txt').read_text()
+              values={}
+              for line in raw.splitlines():
+                m=re.match(r'^(?:GROUP|HOLDOUT|AUDIT)\s+(\w+)\s+n=\s*(\d+)\s+top1=\s*(\d+).*?top3=\s*(\d+)',line)
+                if m:values[m[1]]=tuple(int(m.group(i)) for i in (2,3,4))
+                if line.startswith('RESEARCH_PACK'):
+                  print(f'PACK {mode}/{suite}: {line}')
+              assert values,f'Missing benchmark metrics in {mode}/{suite}'
+              groups[suite][mode]=values
+            old,new=groups[suite]['baseline'],groups[suite]['experimental']
+            assert old.keys()==new.keys(),f'Category drift in {suite}: {old.keys()} vs {new.keys()}'
+            for name in old:
+              before,after=old[name],new[name]
+              assert before[0]==after[0],f'Case count changed {suite}/{name}'
+              print(f'{suite}/{name}: n={before[0]} top1={before[1]}->{after[1]} ({after[1]-before[1]:+d}) top3={before[2]}->{after[2]} ({after[2]-before[2]:+d})')
+          for suite,expected in (('independent',80),('blind',100)):
+            def cases(mode):
+              found={}
+              for line in (base/f'{mode}-{suite}.txt').read_text().splitlines():
+                if not line.startswith('CASE\t'):continue
+                f=line.split('\t')
+                assert len(f)==5,f'Malformed CASE row: {f}'
+                key=(f[1],f[2])
+                assert key not in found,f'Duplicate case: {key}'
+                found[key]=(f[3],f[4])
+              return found
+            a,b=cases('baseline'),cases('experimental')
+            assert len(a)==len(b)==expected and a.keys()==b.keys(),f'Case count drift {suite}: {len(a)}, {len(b)}'
+            win=loss=wrong_change=0
+            examples=[]
+            for key,(gold,pred) in a.items():
+              gold2,nextpred=b[key]
+              assert gold==gold2
+              correct=gold.casefold()==pred.casefold()
+              changed=gold.casefold()==nextpred.casefold()
+              if not correct and changed:win+=1;examples.append(('WIN',key,gold,pred,nextpred))
+              if correct and not changed:loss+=1;examples.append(('LOSS',key,gold,pred,nextpred))
+              if not correct and not changed and pred!=nextpred:wrong_change+=1
+            print(f'INDIVIDUAL {suite}: cases={expected} wins={win}, losses={loss}, changed_wrong={wrong_change}')
+            for item in examples[:25]:print('CHANGED',item)
+            # Do not merge/publish when previously correct words or sentences regress.
+            assert loss==0,f'{suite}: {loss} previous correct choices changed to wrong'
+          for suite in suites:
+            a,b=groups[suite]['baseline'],groups[suite]['experimental']
+            aggregate='ALL' if 'ALL' in a else None
+            if aggregate:
+              assert b[aggregate][1]>=a[aggregate][1],f'Overall top-one regression in {suite}'
+              assert b[aggregate][2]>=a[aggregate][2],f'Overall top-three regression in {suite}'
+            for key in a:
+              if key in ('known_words','stable_words','known_word','word_one_typo'):
+                assert b[key][1]>=a[key][1],f'Protected exact-word regression in {suite}/{key}'
+          print('PASS: 667 cases, all per-case quality gates satisfied. NO APK PUBLISHED.')
+          PY
+      - name: Preserve full research evidence even when quality gates reject experiment
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-301-Frozen-667-Case-A-B-Evidence
+          path: |
+            ${{ runner.temp }}/baseline-*.txt
+            ${{ runner.temp }}/experimental-*.txt
+            official-esdb/Copyright
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Scope
+        if: success()
+        run: echo "Source research only. Keep user-confirmed Candidate 300 unchanged; no APK generated."
