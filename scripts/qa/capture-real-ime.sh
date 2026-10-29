@@ -221,3 +221,32 @@ assert any('likethis heythereq' in x for x in texts), (
 print('PASS: actual Orivra key delivered Q to disposable editor')
 PY
 echo "PASS: real Orivra IME visible, theme expand/collapse and key touch"
+
+# An actual Android touch swipe across Orivra's Backspace key. The
+# disposable editor currently contains "likethis heythereq". Swipe-left
+# one word: it should become exactly "likethis " (including its space).
+# Capture during motion for subsequent visual inspection of the preview.
+back_x="$((screen_w-$(dp_px 22)))"
+back_y="$((collapsed_top+$(dp_px 222)))"
+release_x="$((back_x-$(dp_px 55)))"
+echo "Testing whole-word Backspace swipe from ($back_x,$back_y) to ($release_x,$back_y)"
+adb shell input swipe "$back_x" "$back_y" "$release_x" "$back_y" 1100 \
+  > "$OUT/backspace-swipe-command.txt" 2>&1 &
+swipe_pid=$!
+sleep 0.83
+screenshot backspace-preview
+wait "$swipe_pid"
+sleep 1
+verify_selected
+dump_ui backspace-result
+screenshot backspace-result
+python3 - "$OUT/backspace-result.xml" <<'PY'
+import sys,xml.etree.ElementTree as ET
+nodes=[n.attrib for n in ET.parse(sys.argv[1]).getroot().iter('node')]
+texts=[n.get('text','') for n in nodes]
+assert any(x=='likethis ' for x in texts),(
+    'Expected one swipe to delete heythereq as one connected word',texts[:30])
+print('PASS: real leftward Backspace swipe deleted the complete connected word')
+PY
+echo "Backspace highlight motion-frame screenshot saved as backspace-preview.png."
+
