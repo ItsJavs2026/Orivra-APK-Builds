@@ -30,6 +30,26 @@ public final class BackspaceSwipePolicy {
     }
 
     /**
+     * Non-destructive, privacy-local preview of the exact characters the
+     * existing word-boundary deletion policy would remove. It abbreviates
+     * the *display* only; the deletion range itself is unchanged.
+     */
+    public static String previewForSwipe(CharSequence beforeCursor,
+                                         int words, int maxCodePoints) {
+        int chars=charsToDelete(beforeCursor,words);
+        if(chars<=0 || maxCodePoints<=0)return "";
+        String fragment=beforeCursor.subSequence(beforeCursor.length()-chars,
+                beforeCursor.length()).toString();
+        // Keep the one-line preview readable without changing editor text.
+        fragment=fragment.replace("\r\n","↵").replace("\r","↵")
+                .replace("\n","↵").replace("\t","⇥");
+        int length=fragment.codePointCount(0,fragment.length());
+        if(length<=maxCodePoints)return fragment;
+        int start=fragment.offsetByCodePoints(0,length-maxCodePoints);
+        return "…"+fragment.substring(start);
+    }
+
+    /**
      * Return UTF-16 units before the cursor to remove, aligned to whitespace
      * boundaries. This avoids cutting surrogate pairs within a word.
      */
