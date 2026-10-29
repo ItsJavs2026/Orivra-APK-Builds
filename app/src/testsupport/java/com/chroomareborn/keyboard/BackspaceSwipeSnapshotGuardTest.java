@@ -34,6 +34,22 @@ public final class BackspaceSwipeSnapshotGuardTest {
     public static void main(String[] args) {
         accepts("heythere","","",false,1);
         accepts("likethis","","",false,1);
+        BackspaceSwipeSnapshotGuard.Ticket unspaced=
+                BackspaceSwipeSnapshotGuard.capture("likethis",null,"",false,1);
+        check("likethis".equals(BackspaceSwipeSnapshotGuard.previewText(unspaced,38)),
+                "unspaced highlighted preview must show full likethis word");
+        check("…this".equals(BackspaceSwipeSnapshotGuard.previewText(unspaced,4)),
+                "truncated highlight must preserve trailing context");
+        check(!BackspaceSwipeSnapshotGuard.previewsSelection(unspaced),
+                "unspaced word must not be displayed as selection");
+        check("".equals(BackspaceSwipeSnapshotGuard.previewText(null,38)),
+                "invalid snapshot must never reveal a preview");
+        BackspaceSwipeSnapshotGuard.Ticket selected=
+                BackspaceSwipeSnapshotGuard.capture("before ","like this"," after",true,1);
+        check(BackspaceSwipeSnapshotGuard.previewsSelection(selected),
+                "selected text must be marked as selection in preview");
+        check("like this".equals(BackspaceSwipeSnapshotGuard.previewText(selected,38)),
+                "selected multi-word phrase should be highlighted as a whole");
         accepts("hello world","","",false,1);
         accepts("hello ","world"," after",true,1);
         accepts("","heythere","",true,1);
@@ -71,6 +87,12 @@ public final class BackspaceSwipeSnapshotGuardTest {
             String trailing=random.nextBoolean()?"":" tail";
             int count=1+random.nextInt(8);
             accepts(before.toString(),"",trailing,false,count);
+            BackspaceSwipeSnapshotGuard.Ticket previewTicket=
+                    BackspaceSwipeSnapshotGuard.capture(before,null,trailing,false,count);
+            String expectedPreview=BackspaceSwipePolicy.previewForSwipe(before,count,38);
+            check(expectedPreview.equals(
+                    BackspaceSwipeSnapshotGuard.previewText(previewTicket,38)),
+                    "highlight preview differs from exact deletion snapshot");
             int delete=BackspaceSwipePolicy.safeCharsToDelete(before,last,count);
             check(delete>=last.length(),"unspaced token deletion cut short");
             // A text change during swipe must not apply a delayed deletion.
