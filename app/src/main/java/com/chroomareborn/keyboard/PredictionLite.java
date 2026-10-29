@@ -1158,7 +1158,18 @@ final class PredictionLite {
                     SentenceRescue.recover(raw,WORDS,NEXT,RECOVERY_CONTEXT);
             if(!recovered.isEmpty()) {
                 SentenceRescue.Proposal best=recovered.get(0);
-                if(best.coherence()>=0.67 && best.coherence()>oldCoherence+0.15) {
+                // A fully letter-matching top segmentation is a strong
+                // negative control. Do not replace it with a different
+                // sentence that requires additional letter edits merely
+                // because those words have common adjacent pairs. This
+                // protects correctly typed joined sentences from false
+                // "corrections" in the broader contextual rescue model.
+                String oldLetters=suggestions.isEmpty()?"":
+                        suggestions.get(0).toLowerCase(Locale.US)
+                        .replaceAll("[^a-z]","");
+                boolean alreadyLetterExact=oldLetters.equals(raw);
+                if(best.coherence()>=0.67 && best.coherence()>oldCoherence+0.15 &&
+                        (!alreadyLetterExact || best.totalEdits==0)) {
                     String corrected=caseDisplay(input,displayRecovered(best.text));
                     if(!corrected.equals(input)) {
                         suggestions.remove(corrected);
