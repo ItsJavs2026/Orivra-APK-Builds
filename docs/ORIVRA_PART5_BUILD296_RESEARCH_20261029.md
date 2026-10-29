@@ -21,7 +21,7 @@ Forked directly from integrated Candidate 295. No edits to RebornImeService, app
 - `SentenceFlowIndependentAudit.java`: 16 generic independent synthetic sentences x four typo profiles, plus 16 complete correctly spelled dictionary words for false-correction safety, with per-input raw comparison records. These cases are never added to the predictor dictionary or ranking rules.
 - `research296-context-gated-shortspan.yml`: pins untouched Candidate 295 at `73b71da9...`, compiles two offline Java predictors, runs the same 487 old+holdout examples and independent audit, compares protected top-one/top-three categories, and checks per-case wins/losses. Saves raw outputs as a CI artifact.
 - [First A/B run](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40954312865) PASS, zero aggregate gains or regressions across 487+64 cases. This experiment is **not** an accuracy improvement and should not be silently merged.
-- Follow-up workflow with complete-word and per-case loss checks is [here](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40954723033); inspect its final conclusion before citing as pass.
+- [Final per-case and complete-word A/B workflow](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40954723033) PASS. 487 old+holdout examples plus 80 independent cases: zero per-case wins, zero losses, zero wrong-to-wrong changes. Whole-word negative controls were 15/16 top-1 in BOTH 295 baseline and 296 research: an inherited weakness, not a new regression. No predictive accuracy gain, no merge, no APK.
 
 ## Unresolved and next major qualification
 
