@@ -60,3 +60,11 @@ Keep English production prediction until explicit user language choice and Andro
 ## What the user needs to supply
 
 **Nothing further for coding or GitHub CI.** For handset acceptance of a *separately packaged* Candidate 298: install it alongside existing versions and verify in a non-sensitive local editor, then share pass/fail observations and screenshots if possible. Do not repeat already completed earlier baseline tests. The user's S26 Ultra Android 17 is the primary real device; emulator screenshots and tests are not a substitute.
+
+
+## First experimental source implementation (2026-10-29)
+
+- `LanguageInputProfile.java` now classifies ASCII and Unicode Latin strings, NFC-normalizes a separate lookup copy, preserves original editor text, distinguishes `ñ` and Spanish accents, and rejects URL/email/number/emoji or malformed-surrogate inputs for future research paths.
+- `LanguageInputProfileTest.java` checks 28 pure Java assertions, including decomposed `café`, combined accents, mixed scripts, standalone symbols, punctuation, and offsets after normalization.
+- [Research-only GitHub CI](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40961495431): **PASS, 28 assertions**.
+- **Not wired to `RebornImeService`, `PredictionLite` or a handset APK**. This is an initial parser foundation, not language detection, automatic correction, or bilingual release functionality.
