@@ -45,7 +45,6 @@ public final class RebornImeService extends InputMethodService {
         predictionsExpanded=false;
         updatePredictionPanel();
     };
-    private static final long RISE_DISMISS_GRACE_MS=420L;
     private static final String SPLIT_PREDICTIONS_PREF="orivra_split_predictions";
     // Opt-in, download-free next-word seeds. No keystrokes are stored here.
     private static final String OFFLINE_NEXT_WORD_PREF="orivra_offline_next_word_v1";
@@ -700,16 +699,13 @@ public final class RebornImeService extends InputMethodService {
                     .putInt(ANIMATION_PREF,next).apply();
             updateToolbar();
             android.widget.Toast.makeText(this,
-                    next==400?"Prediction rise: Quick (400 ms)":
-                    next==600?"Prediction rise: Smooth (600 ms)":
-                    next==800?"Prediction rise: Relaxed (800 ms)":
-                            "Prediction rise: Ultra Smooth (1000 ms)",
+                    "Prediction panel hold: "+next+" ms (no fading)",
                     android.widget.Toast.LENGTH_SHORT).show();
         });
         // Double-duty diagnostic access: tap-and-hold the suggestion row
         // control to inspect learning statistics without exporting text.
         animationSpeedButton.setContentDescription(
-                "Prediction animation speed; long press toggles local learning");
+                "Prediction panel hold time; long press toggles local learning");
         // Long-press the rise control to opt into local learning.
         // Long-press again to disable; learned entries remain until cleared.
         animationSpeedButton.setOnLongClickListener(v -> {
@@ -1019,10 +1015,11 @@ public final class RebornImeService extends InputMethodService {
         if(animationSpeedButton!=null) {
             animationSpeedButton.setVisibility(toolbarExpanded?View.VISIBLE:View.GONE);
             int mode=riseMode();
-            animationSpeedButton.setText("Rise "+mode);
+            animationSpeedButton.setText("Hold "+mode);
             animationSpeedButton.setTextColor(keyTextColor);
             animationSpeedButton.setBackground(feedbackBackground(specialBackground));
-            animationSpeedButton.setContentDescription("Prediction rise animation speed");
+            animationSpeedButton.setContentDescription(
+                    "Prediction panel hold "+mode+" milliseconds; no fade animation");
         }
         if (toolbarToggle != null) {
             toolbarToggle.setText(toolbarExpanded ? "⌃" : "⌄");
@@ -1958,7 +1955,7 @@ public final class RebornImeService extends InputMethodService {
         // on every single character or in secure fields.
         if(input.isEmpty()) {
             if(!freezeRiseDuringDelete) {
-                if(predictionsExpanded)suggestionHandler.postDelayed(delayedRiseDismiss,RISE_DISMISS_GRACE_MS);
+                if(predictionsExpanded)suggestionHandler.postDelayed(delayedRiseDismiss,riseDurationMs());
                 else predictionsExpanded=false;
             }
             manuallyCollapsedPredictions=false;
@@ -1967,7 +1964,7 @@ public final class RebornImeService extends InputMethodService {
             predictionsExpanded=true;
         } else if(!freezeRiseDuringDelete && (options.isEmpty() || (splitPhrases.isEmpty() && options.size()<=3))
                 && !manuallyCollapsedPredictions) {
-            if(predictionsExpanded)suggestionHandler.postDelayed(delayedRiseDismiss,RISE_DISMISS_GRACE_MS);
+            if(predictionsExpanded)suggestionHandler.postDelayed(delayedRiseDismiss,riseDurationMs());
             else predictionsExpanded=false;
         }
         updatePredictionPanel();
