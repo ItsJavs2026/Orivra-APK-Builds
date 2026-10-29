@@ -55,6 +55,12 @@ public final class BackspaceSwipePolicyTest {
         // Reported regression: delete a single uninterrupted word such as
         // "heythere" (including a live composing word without spaces).
         equal(8, BackspaceSwipePolicy.charsToDelete("heythere",1));
+        equal(8, BackspaceSwipePolicy.charsToDelete("likethis",1));
+        equalText("likethis",BackspaceSwipePolicy.previewForSwipe("likethis",1,50));
+        equal(8, BackspaceSwipePolicy.safeCharsToDelete("likethis","likethis",1));
+        equal(8, BackspaceSwipePolicy.safeCharsToDelete("hello likethis","likethis",1));
+        equal(14, BackspaceSwipePolicy.safeCharsToDelete("hello likethis","likethis",2));
+        equal(0, BackspaceSwipePolicy.safeCharsToDelete("like this","likethis",1));
         equalText("heythere",BackspaceSwipePolicy.previewForSwipe("heythere",1,50));
         equalText("world",BackspaceSwipePolicy.previewForSwipe("hello world",1,50));
         equalText("hello world",BackspaceSwipePolicy.previewForSwipe("hello world",2,50));
