@@ -1,0 +1,83 @@
+name: Orivra - offline EN/ES prediction research and safeguards
+on:
+  push:
+    branches:
+      - candidate/build295-bilingual-offline-research-20261029
+    paths:
+      - .github/workflows/candidate295-bilingual-research.yml
+      - app/src/main/java/com/chroomareborn/keyboard/SpanishPredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/BilingualPredictionRouter.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SpanishPredictionResearchTest.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SpanishPredictionBenchmark.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-295-bilingual
+  cancel-in-progress: true
+jobs:
+  spanish-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve protected English-only baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 339bf7f63a67adaf3219d5e6c9c95552a0cc7da5
+          path: english-core
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify absolutely no English regression or production enablement
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp english-core/app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          cmp english-core/app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java
+          if grep -Fq 'BilingualPredictionRouter' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo 'Research must not enable itself in the IME before handset qualification'
+            exit 1
+          fi
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+      - name: Compile ENGLISH original and entirely local Spanish engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/es-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/es-tests" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java \
+            app/src/main/java/com/chroomareborn/keyboard/SpanishPredictionLite.java \
+            app/src/main/java/com/chroomareborn/keyboard/BilingualPredictionRouter.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SpanishPredictionResearchTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SpanishPredictionBenchmark.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PredictionSmokeTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/StarterLexiconConsistencyTest.java
+      - name: Run English invariance, 2500 Spanish fuzz and phrase diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in PredictionSmokeTest StarterLexiconConsistencyTest SpanishPredictionResearchTest; do
+            timeout 180s java -Xmx1g -ea -cp "$RUNNER_TEMP/es-tests" \
+              "com.chroomareborn.keyboard.$test"
+          done
+          timeout 300s java -Xmx1g -ea -cp "$RUNNER_TEMP/es-tests" \
+            com.chroomareborn.keyboard.SpanishPredictionBenchmark \
+            | tee "$RUNNER_TEMP/spanish-research.txt"
+          printf '## 180 Spanish synthetic diagnostics — not released\n\n' >> "$GITHUB_STEP_SUMMARY"
+          grep '^SPANISH ' "$RUNNER_TEMP/spanish-research.txt" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish research-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-295-Spanish-180-Case-Research
+          path: ${{ runner.temp }}/spanish-research.txt
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Scope
+        if: success()
+        run: echo "Research only. English IME unchanged, no bilingual APK released."
