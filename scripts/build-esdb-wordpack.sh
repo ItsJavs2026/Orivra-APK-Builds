@@ -22,7 +22,7 @@ make -C "$source_dir"
 (cd "$source_dir" && ./scowl word-list 60 A 1 --categories=) > "$temporary"
 printf '%s  %s\n' "$expected_sha" "$temporary" | sha256sum --check
 test "$(wc -c < "$temporary")" -eq 1022018
-asset="$root/app/src/main/assets/dictionaries/esdb-en-US-60.txt.gz"
+asset="$root/app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack"
 mkdir -p "$(dirname "$asset")"
 gzip -n -9 < "$temporary" > "$asset"
 gzip -t "$asset"
