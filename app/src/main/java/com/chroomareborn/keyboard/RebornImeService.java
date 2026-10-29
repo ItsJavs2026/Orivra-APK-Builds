@@ -2405,9 +2405,9 @@ public final class RebornImeService extends InputMethodService {
                 // A manually saved personal word is considered only for the
                 // matching prefix, never from ambient typing or editor history.
                 // This runs on the IME UI callback, reading at most 250 entries.
-                java.util.List<String> withPersonal=
-                        PersonalDictionaryPolicy.merge(input,options,
-                                PersonalDictionary.matching(this,input));
+                java.util.List<String> withPersonal=editorAllowsPersonalLearning
+                        ?PersonalDictionaryPolicy.merge(input,options,
+                                PersonalDictionary.matching(this,input)):options;
                 // Existing opt-in Learning v1 remains independent: only a
                 // twice-accepted explicit single-word correction may outrank.
                 String preferred=editorAllowsPersonalLearning ?
