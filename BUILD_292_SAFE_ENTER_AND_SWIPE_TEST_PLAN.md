@@ -24,6 +24,11 @@ User reported Build 291's Safe Enter fixed accidental sending in Google Messages
 - Swipe left: delete complete words on release; swipe longer for multiple words.
 - Unspaced "heythere" is ONE word; a left swipe should delete the whole 8-character token. It should NOT depend on spaces surrounding the word.
 - Swipe left then back to cancel: delete nothing.
+- While swiping, the prediction strip is temporarily replaced by a text preview. The pending deletion target is highlighted (accent-colored) and labelled with the selected word count. **This is a read-only visual in the keyboard, not an editor text selection.**
+- `heythere` (no spaces) should appear highlighted in full after one leftward swipe; releasing deletes that whole word.
+- Longer swipes update the target when the number of words changes, rather than reading editor text every motion frame.
+- If the user slides back, cancels, or switches text fields, the highlight disappears and ordinary predictions return.
+- The visual preview never edits, selects, logs, or uploads editor text; it does not appear for sensitive editors and is cleared immediately on gesture end.
 - Invalid swipe or editor switch: fail closed, never delete from a different editor.
 - The swipe uses word granularity, **not** partial letter-by-letter deletion inside a word. Implement that as an explicit different gesture only if requested.
 
@@ -33,14 +38,14 @@ User reported Build 291's Safe Enter fixed accidental sending in Google Messages
 - Check inputConnection.getTextBeforeCursor behavior when composing a fresh word and when editing existing text.
 
 ## Mandatory physical test matrix (use disposable text)
-1. In a safe local note, type **heythere** without spaces. Swipe left from Backspace; the entire word should disappear.
+1. In a safe local note, type **heythere** without spaces. Swipe left from Backspace; the entire word should **appear highlighted inside the keyboard prediction strip while held** and disappear from the editor only when your finger lifts.
 2. Type **hey** without spaces. Swipe left once; expect the entire word removed.
 3. Type **hello world**. Swipe once; expect `hello ` to remain.
 4. Type **one two three**. Longer swipe; delete multiple whole words.
 5. Type **heythere**. Tap Backspace once; expect `heyther`.
 6. Hold Backspace on unspaced **heythere**; expect character repetition only while held.
-7. Start swipe and slide back; no deletion.
-8. Select text, swipe delete; remove selection without adjacent words.
+7. Start swipe and slide back; the preview should clear and no deletion should occur.
+8. Select text, swipe delete; preview/highlight the selected phrase and remove selection without adjacent words on release.
 9. Type **hello** then **Enter** in multiline note; expect newline, never SEND.
 10. Test Google Messages in a **self-addressed draft**: tap Enter; must not send accidentally.
 11. In a safe self-addressed test, hold Enter until **Send** is displayed; release to intentionally send if supported.
@@ -54,3 +59,12 @@ User reported Build 291's Safe Enter fixed accidental sending in Google Messages
 - GitHub Actions validates Gradle compile, APK signature, package identity, permissions, and hash.
 - Do not mark Build 292 stable until it passes both CI and Samsung testing.
 - Do not overwrite Build 288, Build 289, Build 290, Build 291, or Preview #178.
+
+## New preview-specific checks
+- In a note type `heythere` and start swiping: the preview should say `Delete 1 word: heythere` with `heythere` highlighted.
+- In a note type `hello world`, then swipe left: the highlighted target should be `world`; swipe farther to include `hello world`.
+- A multiline example should display a visible ↵ marker instead of changing line height or wrapping.
+- Verify predictive suggestions return after release, cancellation, switching apps and keyboard restart.
+- Verify no preview of password/private-field content.
+- Rapid Backspace gestures must not crash Android's LinearLayout renderer.
+- Inspect that preview is visually readable in light/dark app palettes and across keyboard size settings.
