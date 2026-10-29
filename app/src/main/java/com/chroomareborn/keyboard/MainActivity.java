@@ -19,8 +19,48 @@ public final class MainActivity extends Activity {
     private final PredictionDispatcher previewDispatcher=new PredictionDispatcher();
     private int dp(float n) { return Math.round(getResources().getDisplayMetrics().density * n); }
 
+    /**
+     * Non-production visual QA surface: used by GitHub emulator screenshots.
+     * A fixed, non-sensitive text field keeps the REAL installed IME visible.
+     * Normal launcher use never enters this path.
+     */
+    private boolean openDebugImeCapture() {
+        boolean debuggable=(getApplicationInfo().flags &
+                android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0;
+        if(!debuggable || getIntent()==null ||
+                !getIntent().getBooleanExtra("orivra_ui_capture",false))return false;
+        LinearLayout panel=new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(12),dp(6),dp(12),dp(6));
+        TextView heading=new TextView(this);
+        heading.setText("Orivra emulator visual QA — test text only");
+        heading.setTextColor(Color.BLACK);
+        panel.addView(heading);
+        EditText field=new EditText(this);
+        field.setId(android.view.View.generateViewId());
+        field.setContentDescription("Orivra emulator keyboard screenshot test editor");
+        field.setSingleLine(false);
+        field.setMinLines(5);
+        field.setInputType(InputType.TYPE_CLASS_TEXT |
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        field.setText("likethis heythere");
+        field.setSelection(field.length());
+        panel.addView(field,new LinearLayout.LayoutParams(-1,dp(160)));
+        setContentView(panel);
+        field.requestFocus();
+        field.postDelayed(()->{
+            android.view.inputmethod.InputMethodManager manager=
+                    (android.view.inputmethod.InputMethodManager)
+                            getSystemService(Context.INPUT_METHOD_SERVICE);
+            if(manager!=null)manager.showSoftInput(
+                    field,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        },300L);
+        return true;
+    }
+
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if(openDebugImeCapture())return;
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18), dp(24), dp(18), dp(16));
