@@ -74,4 +74,39 @@ public final class BackspaceSwipePolicy {
         }
         return end - start;
     }
+
+    /**
+     * A slow swipe should not fall into the repeat-backspace timer merely
+     * because it has not crossed the larger whole-word swipe threshold yet.
+     * Invalid motion data also blocks an accidental tap/hold.
+     */
+    public static boolean beyondTapSlop(float horizontalPx, float verticalPx, float slopPx) {
+        return !Float.isFinite(horizontalPx) || !Float.isFinite(verticalPx) ||
+                !Float.isFinite(slopPx) || slopPx <= 0 ||
+                Math.abs(horizontalPx) > slopPx || Math.abs(verticalPx) > slopPx;
+    }
+
+    /**
+     * Compute a deletion range from the editor's FRESH text snapshot, after
+     * finishing any active composition. The suffix must still match the text
+     * that Orivra was composing, otherwise fail closed rather than delete
+     * another editor fragment. This method never stores or logs input text.
+     */
+    public static int safeCharsToDelete(CharSequence liveBeforeCursor,
+                                        CharSequence composingBeforeFinish, int words) {
+        if (liveBeforeCursor == null || words <= 0) return 0;
+        if (composingBeforeFinish != null && composingBeforeFinish.length() > 0) {
+            int offset = liveBeforeCursor.length() - composingBeforeFinish.length();
+            if (offset < 0) return 0;
+            for (int i = 0; i < composingBeforeFinish.length(); i++)
+                if (liveBeforeCursor.charAt(offset + i) != composingBeforeFinish.charAt(i))
+                    return 0;
+        }
+        int chars = charsToDelete(liveBeforeCursor, words);
+        // InputConnection.getTextBeforeCursor(2048) can truncate a giant
+        // uninterrupted word. Never blindly delete a potentially partial word.
+        if (liveBeforeCursor.length() >= 2048 && chars == liveBeforeCursor.length())
+            return 0;
+        return chars;
+    }
 }
