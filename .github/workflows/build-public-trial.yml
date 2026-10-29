@@ -1,4 +1,4 @@
-name: Orivra Build 289 Backspace Swipe - manual qualification
+name: Orivra Build 290 Swipe Safety - manual qualification
 on:
   workflow_dispatch:
 permissions:
@@ -21,7 +21,7 @@ jobs:
           test -s app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           test -s third_party/swiftfloris/LICENSE
           test -s third_party/swiftfloris/NOTICE
-          grep -Fq 'com.chroomareborn.keyboard.build289trial' app/build.gradle.kts
+          grep -Fq 'com.chroomareborn.keyboard.build290trial' app/build.gradle.kts
           if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
           if git ls-files | grep -Ei '(^research/|^evaluation/|^scripts/|^app/src/debug/|\.(jks|keystore|p12|pem|pfx|key)$)'; then exit 1; fi
       - name: Java 17 layout, haptics, suggestion and cursor regression tests
@@ -72,13 +72,13 @@ jobs:
           test -s "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs --verbose "$apk" | tee apk-signature.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 | tee apk-identity.txt
-          grep -Fq "package: name='com.chroomareborn.keyboard.build289trial' versionCode='289'" apk-identity.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build290trial' versionCode='290'" apk-identity.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | tee apk-permissions.txt
           if grep -Fq 'android.permission.INTERNET' apk-permissions.txt; then exit 1; fi
           sha256sum "$apk" | tee apk-sha256.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Orivra-Build289-Backspace-Swipe-Experimental-APK
+          name: Orivra-Build290-Swipe-Safety-Experimental-APK
           path: |
             app/build/outputs/apk/debug/*.apk
             apk-signature.txt
