@@ -1,7 +1,6 @@
 package com.chroomareborn.keyboard;
 
 import java.util.ArrayList;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -28,18 +27,18 @@ final class LexiconFamilyExpander {
         "friendship leadership membership ownership partnership "+
         "scholarship citizenship relationship neighborhood "+
         "postpone postponed postponing postpones thoughtful "+
-        "thoughtfully colorful colorfuls colorfulness carefulness "+
+        "thoughtfully colorful colorfulness carefulness "+
         "beautifully peaceful peacefulness helpfulness "+
         "wirelessly accurately accuracy responsibly responsible "+
         "confident confidently comfortable comfortably "+
         "interesting interestingly fascinating fascinatingly "+
-        "wonderfully wonderfully personal personally "+
+        "wonderfully personal personally "+
         "unexpected unexpectedly surprising surprisingly "+
         "convenient conveniently gradually quickly quietly "+
         "difficult difficulty difficulties knowledgeable "+
         "knowledgeable knowledgeably "+
         "batteries battery chargers charged charging "+
-        "customer customers colleagues colleagues "+
+        "customer customers colleague colleagues "+
         "documents document paperwork reports reporting "+
         "photography photographer photograph photographs "+
         "opportunity opportunities possibilities probability "+
