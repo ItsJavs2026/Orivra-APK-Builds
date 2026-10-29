@@ -26,3 +26,6 @@ This is a debug-signed experimental trial, NOT a production-stable release. Emul
 
 ## Unrelated research
 Independent Build 299 language work remains isolated on `research/build299-prediction-failure-attribution-20261029`. Frozen 100-case diagnostic attributed 60 cases to absent lexical coverage, and official ESDB/SCOWL size-60 source study found 88,662 ASCII-filtered words that would cover the missing 20 standalone word controls. **These wordpack tests have not been merged into Candidate 300.**
+
+## Samsung acceptance update (same day)
+The user installed and tested the Keep hotfix on their physical phone, then explicitly confirmed **"Fixed! Thanks!!"** after reporting that Google Keep had been hiding Orivra predictions. Treat this as **Google Keep compatibility accepted by the user on their Samsung S26 Ultra Android 17**, not as acceptance of every editor, language accuracy, or long-term stability. Do not reopen this particular issue without new contrary evidence. Candidate 300 remains the protected phone-tested baseline for subsequent research.
