@@ -1,0 +1,65 @@
+name: Orivra Candidate 294 - real Backspace swipe and theme screenshot emulator
+on:
+  push:
+    branches:
+      - candidate/build294-live-backspace-emulator-20261029
+    paths:
+      - .github/workflows/candidate294-live-backspace-gesture.yml
+      - scripts/qa/capture-real-ime.sh
+      - scripts/qa/inspect_ime_screens.py
+      - app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-live-ime-backspace
+  cancel-in-progress: true
+jobs:
+  real-ime-visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Confirm emulator QA is debug-only, offline, separate from stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build293trial' app/build.gradle.kts
+          grep -Fq 'FLAG_DEBUGGABLE' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          grep -Fq 'ThemePanelLayout.apply(themePanel,toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
+            exit 1
+          fi
+      - name: Make Android emulator acceleration available
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - name: Install pinned screenshot-image analyzer for emulator QA (not app)
+        run: python3 -m pip install --disable-pip-version-check Pillow==11.3.0
+      - name: Launch REAL installed Orivra IME, capture screens and tap controls
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash scripts/qa/capture-real-ime.sh
+      - name: Preserve screenshots and accessibility XML even on failed QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-294-Real-Backspace-Gesture-Screenshots
+          path: visual-qa/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Scope of result
+        if: success()
+        run: echo "Real Android 35 IME theme and Backspace gesture tested; Samsung Android 17 still not tested, no APK released."
