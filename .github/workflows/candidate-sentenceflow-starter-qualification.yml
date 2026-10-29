@@ -1,0 +1,80 @@
+name: Orivra SentenceFlow - starter lexicon A/B qualification
+on:
+  push:
+    branches:
+      - candidate/build294-sentenceflow-starter-lexicon-20261029
+    paths:
+      - .github/workflows/candidate-sentenceflow-starter-qualification.yml
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java
+      - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/StarterLexiconConsistencyTest.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-sentenceflow-starter
+  cancel-in-progress: true
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Guard runtime-only and privacy scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java
+          test -s app/src/testsupport/java/com/chroomareborn/keyboard/StarterLexiconConsistencyTest.java
+          grep -Fq 'for(String[] completions:FIRST_LETTER.values())' app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          grep -Fq 'No user typing or stored' app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          grep -Fq 'com.chroomareborn.keyboard.build293trial' app/build.gradle.kts
+      - name: Compile actual SentenceFlow predictor and independent quality harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/orivra-prediction"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/orivra-prediction" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PredictionSmokeTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/StarterLexiconConsistencyTest.java
+      - name: Test starter consistency and original known-word smoke regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 120s java -Xmx1g -ea \
+            -cp "$RUNNER_TEMP/orivra-prediction" \
+            com.chroomareborn.keyboard.StarterLexiconConsistencyTest
+          timeout 120s java -Xmx1g -ea \
+            -cp "$RUNNER_TEMP/orivra-prediction" \
+            com.chroomareborn.keyboard.PredictionSmokeTest
+      - name: Run candidate measurements (compare to untouched baseline run 40938466147)
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 900s java -Xmx1g -ea \
+            -cp "$RUNNER_TEMP/orivra-prediction" \
+            com.chroomareborn.keyboard.SentenceFlowAccuracyBenchmark \
+            | tee "$RUNNER_TEMP/sentenceflow-starter.txt"
+          printf '## SentenceFlow starter lexicon — same 147 synthetic fixtures\n\n' >> "$GITHUB_STEP_SUMMARY"
+          grep -E '^GROUP|^WALL_MS=|^FIXTURE_COUNT=' \
+            "$RUNNER_TEMP/sentenceflow-baseline.txt" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve accurate benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-SentenceFlow-Starter-Quality-Candidate
+          path: ${{ runner.temp }}/sentenceflow-baseline.txt
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Qualification statement
+        if: success()
+        run: echo "Synthetic benchmark and starter lexicon consistency tested. No APK assembled, uploaded or handset-tested."
