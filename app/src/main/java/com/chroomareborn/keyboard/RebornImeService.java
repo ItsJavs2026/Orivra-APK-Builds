@@ -36,7 +36,7 @@ public final class RebornImeService extends InputMethodService {
     private HorizontalScrollView suggestionScroll;
     private TextView swipeDeletePreview;
     private TextView paletteLabel;
-    private Button paletteButton, sizeButton, toolbarToggle, themeExpanderButton, predictionsToggle, animationSpeedButton, splitModeButton, nextWordButton;
+    private Button paletteButton, sizeButton, toolbarToggle, predictionsToggle, animationSpeedButton, splitModeButton, nextWordButton;
     private LinearLayout predictionHeader, expandedSuggestions;
     private boolean predictionsExpanded=false;
     private boolean freezeRiseDuringDelete = false;
@@ -908,12 +908,14 @@ public final class RebornImeService extends InputMethodService {
         paletteLabel.setPadding(dp(8), 0, dp(5), 0);
         paletteBar.addView(paletteLabel, new LinearLayout.LayoutParams(0, dp(28), 1f));
         paletteButton = new Button(this);
+        // The palette icon belongs to the expanded SETTINGS panel, not
+        // the prediction strip. The theme header shows mode and Light/Dark.
         paletteButton.setText("🎨");
-        paletteButton.setTextSize(10);
+        paletteButton.setTextSize(17);
         paletteButton.setAllCaps(false);
         paletteButton.setTextColor(keyTextColor);
         paletteButton.setPadding(0, 0, 0, 0);
-        LinearLayout.LayoutParams paletteParams = new LinearLayout.LayoutParams(dp(64), dp(34));
+        LinearLayout.LayoutParams paletteParams = new LinearLayout.LayoutParams(dp(45), dp(34));
         paletteParams.setMargins(dp(3), 0, dp(4), dp(2));
         paletteControls.addView(paletteButton, paletteParams);
         paletteButton.setVisibility(View.GONE);
@@ -1059,22 +1061,9 @@ public final class RebornImeService extends InputMethodService {
         predictionHeader=new LinearLayout(this);
         predictionHeader.setOrientation(LinearLayout.HORIZONTAL);
         predictionHeader.setGravity(Gravity.CENTER_VERTICAL);
-        // A single icon in the existing prediction row replaces the
-        // permanently reserved theme row in Candidate 293.
-        themeExpanderButton=new Button(this);
-        themeExpanderButton.setText("🎨");
-        themeExpanderButton.setAllCaps(false);
-        themeExpanderButton.setTextSize(15);
-        themeExpanderButton.setPadding(0,0,0,0);
-        themeExpanderButton.setOnClickListener(v -> suggestionHandler.post(
-                () -> setThemePanelExpanded(!toolbarExpanded)));
-        themeExpanderButton.setOnLongClickListener(v -> {
-            android.widget.Toast.makeText(this,themeDetails(),
-                    android.widget.Toast.LENGTH_LONG).show();
-            return true;
-        });
-        predictionHeader.addView(themeExpanderButton,
-                new LinearLayout.LayoutParams(dp(36),dp(44)));
+        // Suggestions occupy the full available prediction-strip width.
+        // A short tap on the existing right caret expands predictions; a
+        // long-press on that SAME caret expands/collapses settings.
         LinearLayout.LayoutParams stripParams=new LinearLayout.LayoutParams(0,dp(48),1f);
         predictionHeader.addView(suggestionScroll,stripParams);
         // Reuse a dedicated, initially hidden slot in the existing strip.
@@ -1096,11 +1085,12 @@ public final class RebornImeService extends InputMethodService {
         predictionsToggle.setAllCaps(false);
         predictionsToggle.setTextSize(17);
         predictionsToggle.setPadding(0,0,0,0);
-        predictionsToggle.setContentDescription("Expand sentence predictions");
+        predictionsToggle.setContentDescription("Tap to expand sentence predictions. Hold for theme and keyboard settings.");
         predictionHeader.addView(predictionsToggle,new LinearLayout.LayoutParams(dp(38),dp(44)));
         predictionsToggle.setOnClickListener(v->toggleRisePanel());
-        // Handle long presses explicitly. A normal Button long-click can be
-        // swallowed by the IME's fast-touch handling on some devices.
+        // Keep the existing right caret: short tap for sentence predictions,
+        // 500ms hold for settings. No dedicated icon steals prediction space.
+        // A normal Button long-click can be swallowed by fast IME touch handling.
         final boolean[] riseLongPressed={false};
         final Runnable riseHold=()->{
             riseLongPressed[0]=true;
@@ -1326,20 +1316,13 @@ public final class RebornImeService extends InputMethodService {
         ThemePanelLayout.apply(themePanel,toolbarExpanded);
         if(paletteBar!=null)paletteBar.setVisibility(View.VISIBLE);
         if(paletteControls!=null)paletteControls.setVisibility(View.VISIBLE);
-        if(themeExpanderButton!=null) {
-            themeExpanderButton.setText(toolbarExpanded?"🎨⌃":"🎨");
-            themeExpanderButton.setContentDescription(
-                    (toolbarExpanded?"Collapse":"Expand")+" theme information and controls. "
-                    +themeDetails());
-            themeExpanderButton.setTextColor(keyTextColor);
-            themeExpanderButton.setBackground(feedbackBackground(specialBackground));
-        }
         if (paletteButton != null) {
             paletteButton.setVisibility(toolbarExpanded ? View.VISIBLE : View.GONE);
             int selected=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
                     .getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
-            paletteButton.setText(ThemeStatusLabel.expandedChip(
-                    AppPalette.modeName(selected),themeDark));
+            // Mode and applied appearance remain in the adjacent theme
+            // header. This icon stays with settings, not with suggestions.
+            paletteButton.setText("🎨");
             paletteButton.setContentDescription(themeDetails()+
                     ". Tap to select the next theme. Hold for theme information.");
         }
