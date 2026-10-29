@@ -34,6 +34,17 @@ public final class BackspaceSwipePolicyTest {
         equal(0, BackspaceSwipePolicy.wordsForSwipe(100,0,32,Float.NaN));
         equal(0, BackspaceSwipePolicy.wordsForSwipe(100,0,0,75));
         equal(0, BackspaceSwipePolicy.wordsForSwipe(100,0,32,Float.POSITIVE_INFINITY));
+        equal(0, BackspaceSwipePolicy.wordsForSwipe(100,0,32,-75));
+        Object editorA=new Object();
+        Object editorB=new Object();
+        if(!BackspaceSwipePolicy.sameEditorSession(12,12,editorA,editorA))
+            throw new AssertionError("same-session editor rejected");
+        if(BackspaceSwipePolicy.sameEditorSession(12,13,editorA,editorA))
+            throw new AssertionError("editor change across input sessions accepted");
+        if(BackspaceSwipePolicy.sameEditorSession(12,12,editorA,editorB))
+            throw new AssertionError("different editor accepted");
+        if(BackspaceSwipePolicy.sameEditorSession(12,12,null,null))
+            throw new AssertionError("null editor accepted");
         equal(0, BackspaceSwipePolicy.charsToDelete("hello world",0));
         equal(5, BackspaceSwipePolicy.charsToDelete("hello world",1));
         equal(11, BackspaceSwipePolicy.charsToDelete("hello world",2));
