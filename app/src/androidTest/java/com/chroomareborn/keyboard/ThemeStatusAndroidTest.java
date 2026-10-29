@@ -25,6 +25,10 @@ public final class ThemeStatusAndroidTest {
                             .putBoolean(AppPalette.KEY_MANUAL_DARK,dark).commit();
                     AppPalette.Result applied=AppPalette.resolve(ctx,"com.example.orivrafixture");
                     assertEquals("manual appearance differs",dark,applied.dark);
+                    String chip=ThemeStatusLabel.expandedChip(
+                            AppPalette.modeName(mode),applied.dark);
+                    assertTrue(chip,chip.endsWith(dark?" D":" L"));
+                    assertTrue(chip,chip.length()<=10);
                     String status=ThemeStatusLabel.compact(
                             AppPalette.modeName(mode),applied.dark);
                     String details=ThemeStatusLabel.details(
