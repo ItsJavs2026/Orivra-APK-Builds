@@ -776,8 +776,7 @@ public final class RebornImeService extends InputMethodService {
                         if(!BackspaceSwipePolicy.sameEditorSession(
                                 sessionAtDown,inputSessionGeneration,
                                 editor,getCurrentInputConnection()))return;
-                        if(swipe && isSwipeDeleteTicketCurrent(editor,ticket,words))
-                            deleteSwipeWords(words);
+                        if(swipe)deleteSwipeWords(words,editor,ticket,sessionAtDown);
                         else if(tap)backspace();
                         // refreshView already updates the suggestion strip.
                         refreshView();
@@ -1790,40 +1789,61 @@ public final class RebornImeService extends InputMethodService {
                 !symbolHoldInProgress)
             suggestionHandler.post(this::refreshView);
     }
-    private void deleteSwipeWords(int words) {
-        InputConnection ic=getCurrentInputConnection();
-        if(ic==null || words<=0)return;
+    private void deleteSwipeWords(int words,InputConnection ic,
+            BackspaceSwipeSnapshotGuard.Ticket ticket,long downSession) {
+        if(ic==null || ticket==null || sensitive)return;
+        if(!BackspaceSwipePolicy.sameEditorSession(
+                downSession,inputSessionGeneration,ic,getCurrentInputConnection()))return;
+        // An Android editor can change selection or composing state during
+        // finishComposingText. Recheck the exact preview before AND after
+        // finalization, not only when the finger first touches Backspace.
+        final String composingAtStart=composing;
+        BackspaceSwipeEditorTransaction.Result outcome=
+                BackspaceSwipeEditorTransaction.apply(
+                new BackspaceSwipeEditorTransaction.Editor() {
+                    @Override public boolean sameSession() {
+                        return !sensitive && BackspaceSwipePolicy.sameEditorSession(
+                                downSession,inputSessionGeneration,ic,
+                                getCurrentInputConnection());
+                    }
+                    @Override public boolean selectionExpected() {
+                        return hasSelection();
+                    }
+                    @Override public CharSequence before(int count) {
+                        return ic.getTextBeforeCursor(count,0);
+                    }
+                    @Override public CharSequence selected() {
+                        return ic.getSelectedText(0);
+                    }
+                    @Override public CharSequence after(int count) {
+                        return ic.getTextAfterCursor(count,0);
+                    }
+                    @Override public void beginBatchEdit() {
+                        ic.beginBatchEdit();
+                    }
+                    @Override public boolean finishComposition() {
+                        if(!ic.finishComposingText())return false;
+                        composing="";
+                        return true;
+                    }
+                    @Override public boolean deleteBeforeCursor(int utf16Units) {
+                        return ic.deleteSurroundingText(utf16Units,0);
+                    }
+                    @Override public boolean deleteSelection() {
+                        return ic.commitText("",1);
+                    }
+                    @Override public void endBatchEdit() {
+                        ic.endBatchEdit();
+                    }
+                },ticket,words,composingAtStart);
+        if(outcome!=BackspaceSwipeEditorTransaction.Result.APPLIED) {
+            // Fail closed: never dispatch KEYCODE_DEL or retry a different
+            // range when the host editor rejected or changed the edit.
+            showSuggestions();
+            return;
+        }
         invalidateEditingTicket();
         cancelCursorReleaseSuggestions();
-        // A selected range should be deleted as a selection, not by guessing
-        // text to its left. Never fetch/store the entire editor contents.
-        // onUpdateSelection can lag the touch callback in third-party editors.
-        // Trust the editor's live selected text as well as our cached selection.
-        CharSequence selected=ic.getSelectedText(0);
-        boolean liveSelection=selected!=null ? selected.length()>0 : hasSelection();
-        if(liveSelection) {
-            currentFinish();
-            ic.commitText("",1);
-        } else {
-            // Composing text (e.g. freshly typed "heythere") may not have
-            // the same editor snapshot before and after finishComposingText().
-            // Finish FIRST, then compute a verified range against fresh text.
-            // An incomplete/mismatched editor response must delete nothing.
-            final String composingAtStart=composing;
-            ic.beginBatchEdit();
-            try {
-                // Preserve the original editor-finalization behavior even
-                // when Orivra's local composing buffer is empty.
-                currentFinish();
-                CharSequence liveBefore=ic.getTextBeforeCursor(2048,0);
-                int chars=BackspaceSwipePolicy.safeCharsToDelete(
-                        liveBefore,composingAtStart,words);
-                if(chars<=0)return;
-                ic.deleteSurroundingText(chars,0);
-            } finally {
-                ic.endBatchEdit();
-            }
-        }
         editingInMiddle=cursorHasTextAfter() || hasSelection();
         updateSentenceShift();
         showSuggestions();
