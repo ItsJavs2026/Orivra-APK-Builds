@@ -20,8 +20,8 @@ public final class BackspaceSwipePolicyTest {
         equal(4, BackspaceSwipePolicy.charsToDelete("test", 7));
         equal(0, BackspaceSwipePolicy.charsToDelete("", 2));
         equal(0, BackspaceSwipePolicy.charsToDelete(null, 2));
-        equal(3, BackspaceSwipePolicy.charsToDelete("a 😊", 1));
-        equal(5, BackspaceSwipePolicy.charsToDelete("a 😊", 2));
+        equal(2, BackspaceSwipePolicy.charsToDelete("a 😊", 1));
+        equal(4, BackspaceSwipePolicy.charsToDelete("a 😊", 2));
         System.out.println("BackspaceSwipePolicyTest passed");
     }
 }
