@@ -561,6 +561,33 @@ public final class RebornImeService extends InputMethodService {
         }
         if(suggestionScroll!=null)suggestionScroll.setVisibility(View.VISIBLE);
     }
+    private BackspaceSwipeSnapshotGuard.Ticket captureSwipeDeleteTicket(
+            InputConnection editor,int words) {
+        if(sensitive || editor==null || editor!=getCurrentInputConnection())return null;
+        try {
+            return BackspaceSwipeSnapshotGuard.capture(
+                    editor.getTextBeforeCursor(BackspaceSwipeSnapshotGuard.BEFORE_LIMIT,0),
+                    editor.getSelectedText(0),
+                    editor.getTextAfterCursor(BackspaceSwipeSnapshotGuard.AFTER_LIMIT,0),
+                    hasSelection(),words);
+        } catch(RuntimeException detachedEditor) {
+            return null;
+        }
+    }
+    private boolean isSwipeDeleteTicketCurrent(InputConnection editor,
+            BackspaceSwipeSnapshotGuard.Ticket ticket,int words) {
+        if(ticket==null || sensitive || editor==null ||
+                editor!=getCurrentInputConnection())return false;
+        try {
+            return BackspaceSwipeSnapshotGuard.isCurrent(ticket,
+                    editor.getTextBeforeCursor(BackspaceSwipeSnapshotGuard.BEFORE_LIMIT,0),
+                    editor.getSelectedText(0),
+                    editor.getTextAfterCursor(BackspaceSwipeSnapshotGuard.AFTER_LIMIT,0),
+                    hasSelection(),words);
+        } catch(RuntimeException detachedEditor) {
+            return false;
+        }
+    }
     private void showSwipeDeletePreview(InputConnection editor,int words) {
         if(editor==null || editor!=getCurrentInputConnection() || words<=0 ||
                 swipeDeletePreview==null || suggestionScroll==null || sensitive) {
@@ -569,10 +596,18 @@ public final class RebornImeService extends InputMethodService {
         }
         // This is a local visual preview only. It never moves the cursor or
         // selects/deletes text in the host app until ACTION_UP.
-        CharSequence selected=editor.getSelectedText(0);
+        CharSequence selected;
+        CharSequence preceding;
+        try {
+            selected=editor.getSelectedText(0);
+            boolean hasLiveSelection=selected!=null && selected.length()>0;
+            preceding=hasLiveSelection ? null :
+                    editor.getTextBeforeCursor(2048,0);
+        } catch(RuntimeException detachedEditor) {
+            hideSwipeDeletePreview();
+            return;
+        }
         boolean selectionAvailable=selected!=null && selected.length()>0;
-        CharSequence preceding=selectionAvailable ? null :
-                editor.getTextBeforeCursor(2048,0);
         String target=selectionAvailable ?
                 BackspaceSwipePolicy.formatPreviewText(selected,38) :
                 BackspaceSwipePolicy.previewForSwipe(preceding,words,38);
@@ -610,6 +645,7 @@ public final class RebornImeService extends InputMethodService {
         final long[] gestureSession={0L};
         final boolean[] swiping={false}, repeating={false}, cancelled={false}, moved={false};
         final int[] swipeWords={0};
+        final BackspaceSwipeSnapshotGuard.Ticket[] swipeTicket={null};
         key.setOnTouchListener((view,event)->{
             switch(event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN: {
@@ -624,6 +660,7 @@ public final class RebornImeService extends InputMethodService {
                     cancelled[0]=false;
                     moved[0]=false;
                     swipeWords[0]=0;
+                    swipeTicket[0]=null;
                     deleteHeld=true; // suppress key-view rebuild during gesture
                     key.setPressed(true);
                     animateKeyPress(key,true);
@@ -671,6 +708,7 @@ public final class RebornImeService extends InputMethodService {
                         // motion frame: refresh only as the word count changes.
                         if(swipeWords[0]!=words) {
                             swipeWords[0]=words;
+                            swipeTicket[0]=captureSwipeDeleteTicket(gestureEditor[0],words);
                             showSwipeDeletePreview(gestureEditor[0],words);
                             key.setText("⌫"+words);
                             key.setContentDescription("Delete "+words+
@@ -679,6 +717,7 @@ public final class RebornImeService extends InputMethodService {
                     } else if(swiping[0]) {
                         // Sliding back toward the original key cancels deletion.
                         swipeWords[0]=0;
+                        swipeTicket[0]=null;
                         hideSwipeDeletePreview();
                         key.setText("⌫");
                         key.setContentDescription("Swipe deletion cancelled");
@@ -691,6 +730,7 @@ public final class RebornImeService extends InputMethodService {
                 }
                 case MotionEvent.ACTION_POINTER_DOWN:
                     cancelled[0]=true;
+                    swipeTicket[0]=null;
                     stopDeleteRepeat();
                     hideSwipeDeletePreview();
                     return true;
@@ -707,12 +747,18 @@ public final class RebornImeService extends InputMethodService {
                             moved[0]=true;
                         int finalWords=BackspaceSwipePolicy.wordsForSwipe(
                                 left,vertical,dp(34),dp(78));
-                        if(finalWords>0) {
+                        if(finalWords>0 && !swiping[0]) {
+                            // Coalesced MOVE: a real swipe may first be visible
+                            // at release. No editor mutation happens here.
                             swiping[0]=true;
                             swipeWords[0]=finalWords;
-                        } else if(swiping[0]) {
-                            // Final finger position can cancel the preview.
+                            swipeTicket[0]=captureSwipeDeleteTicket(
+                                    gestureEditor[0],finalWords);
+                        } else if(swiping[0] && finalWords!=swipeWords[0]) {
+                            // Finger moved after the last preview. Never delete
+                            // an unpreviewed amount, even if it is larger.
                             swipeWords[0]=0;
+                            swipeTicket[0]=null;
                         }
                     }
                     final InputConnection editor=gestureEditor[0];
@@ -723,8 +769,10 @@ public final class RebornImeService extends InputMethodService {
                     boolean shouldCommit=event.getActionMasked()==MotionEvent.ACTION_UP &&
                             !cancelled[0] && sameSession;
                     int words=swiping[0]?swipeWords[0]:0;
+                    final BackspaceSwipeSnapshotGuard.Ticket ticket=swipeTicket[0];
                     boolean tap=shouldCommit && !swiping[0] && !repeating[0] && !moved[0];
-                    boolean swipe=shouldCommit && swiping[0] && words>0;
+                    boolean swipe=shouldCommit && swiping[0] && words>0 && ticket!=null;
+                    swipeTicket[0]=null; // transient content cannot outlive the gesture
                     stopDeleteRepeat();
                     freezeRiseDuringDelete=false;
                     hideSwipeDeletePreview();
@@ -739,7 +787,8 @@ public final class RebornImeService extends InputMethodService {
                         if(!BackspaceSwipePolicy.sameEditorSession(
                                 sessionAtDown,inputSessionGeneration,
                                 editor,getCurrentInputConnection()))return;
-                        if(swipe)deleteSwipeWords(words);
+                        if(swipe && isSwipeDeleteTicketCurrent(editor,ticket,words))
+                            deleteSwipeWords(words);
                         else if(tap)backspace();
                         // refreshView already updates the suggestion strip.
                         refreshView();
