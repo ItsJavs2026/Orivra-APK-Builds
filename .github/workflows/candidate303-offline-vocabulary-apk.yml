@@ -1,0 +1,396 @@
+name: Orivra Candidate 303 - gated offline English pack, Android QA and prerelease
+on:
+  push:
+    branches:
+      - candidate/build303-optin-language-trial-20261029
+    paths:
+      - .github/workflows/candidate303-offline-vocabulary-apk.yml
+      - app/build.gradle.kts
+      - app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+      - app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java
+      - app/src/main/java/com/chroomareborn/keyboard/ExactOnlyLanguagePack.java
+      - app/src/main/java/com/chroomareborn/keyboard/CompressedLanguagePack.java
+      - app/src/main/java/com/chroomareborn/keyboard/OfflineDictionaryActivationPolicy.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/OfflineDictionaryActivationPolicyTest.java
+      - app/src/androidTest/java/com/chroomareborn/keyboard/OfflineDictionaryActivationAndroidTest.java
+      - app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+      - app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+      - app/src/main/java/com/chroomareborn/keyboard/OfflineLanguagePackWorker.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/CompressedLanguagePackTest.java
+      - app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java
+      - app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+      - app/src/main/java/com/chroomareborn/keyboard/ExactOnlySegmentation.java
+      - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+      - app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java
+      - app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+      - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/LexiconFamilyExpander.java
+      - app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java
+      - app/src/main/java/com/chroomareborn/keyboard/SpanishPredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/BilingualPredictionRouter.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate-303-release
+  cancel-in-progress: true
+jobs:
+  java-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Pin qualified 297 language sources without rebuilding unstable experiments
+        uses: actions/checkout@v4
+        with:
+          ref: 0088d96548ad13fcbcfb093016e035e54504eb99
+          path: qualified-297
+          persist-credentials: false
+      - name: Verify no unqualified prediction or UI changes entered Candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in SentenceRescue.java SentenceFlowEvidenceRanker.java LexiconFamilyExpander.java SpanishPredictionLite.java BilingualPredictionRouter.java; do
+            cmp "qualified-297/app/src/main/java/com/chroomareborn/keyboard/$file" "app/src/main/java/com/chroomareborn/keyboard/$file"
+          done
+          cmp qualified-297/app/src/main/AndroidManifest.xml app/src/main/AndroidManifest.xml
+          test -s app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java
+          test -s app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/OfflineDictionaryActivationAndroidTest.java
+          grep -Fq 'reconcileOptionalDictionary();' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          # Compressed asset is intentionally generated only in the Android
+          # job; the Java source-only job must not require it at checkout.
+          ! grep -Fq 'OfflineLanguagePackWorker' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'EditorSuggestionPrivacyPolicy.decide(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'if(editorAllowsPersonalLearning)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'versionCode = 303' app/build.gradle.kts
+          grep -Fq 'com.chroomareborn.keyboard.build303trial' app/build.gradle.kts
+          grep -Fq 'Orivra Candidate 303' app/build.gradle.kts
+          grep -Fq 'Candidate 303' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          ! grep -Fq 'Candidate 293' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          ! grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+      - name: Verify phone-confirmed Keep hotfix is strictly unchanged
+        uses: actions/checkout@v4
+        with:
+          ref: 25316b3c429c94b463d0a30db8367789c5ac8792
+          path: qualified-candidate-300
+          persist-credentials: false
+      - name: Require exact editor, privacy and package parity with Candidate 300
+        run: |
+          set -euo pipefail
+          for file in EditorSuggestionPrivacyPolicy.java CandidateLatencyMetrics.java; do
+            cmp "qualified-candidate-300/app/src/main/java/com/chroomareborn/keyboard/$file" "app/src/main/java/com/chroomareborn/keyboard/$file"
+          done
+          # Candidate 303 is intentionally side-by-side installed.
+          # Only app identity/label/version may differ from protected 300.
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path('qualified-candidate-300/app/build.gradle.kts').read_text()
+          b=b.replace('com.chroomareborn.keyboard.build300trial',
+                      'com.chroomareborn.keyboard.build303trial')
+          b=b.replace('versionCode = 300','versionCode = 303')
+          b=b.replace('1.0.21-build300-keep-compatibility',
+                      '1.0.22-build303-offline-language-trial')
+          b=b.replace('Orivra Candidate 300','Orivra Candidate 303')
+          assert Path('app/build.gradle.kts').read_text()==b, 'Unexpected Gradle identity difference'
+          PY
+          cmp qualified-candidate-300/app/src/main/AndroidManifest.xml app/src/main/AndroidManifest.xml
+          grep -Fq 'EditorSuggestionPrivacyPolicy.Decision privacy=editorPrivacyDecision(info);' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'sensitive=privacy.sensitive;' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'editorAllowsPersonalLearning=privacy.allowPersonalLearning;' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'reconcileOptionalDictionary();' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'closeOptionalDictionary();' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'private boolean optionalDictionaryEnabled()' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'getBoolean(OfflineDictionaryActivationPolicy.KEY,false)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/OfflineDictionaryActivationPolicy.java
+          test -s app/src/testsupport/java/com/chroomareborn/keyboard/OfflineDictionaryActivationPolicyTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/OfflineDictionaryActivationAndroidTest.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/ExactOnlyLanguagePack.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/ExactOnlySegmentation.java
+      - name: Validate isolation, safe Enter and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build303trial' app/build.gradle.kts
+          grep -Fq 'EnterKeyPolicy.supportsNewline(info.inputType)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'EnterKeyPolicy.shouldSendOnRelease(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'BackspaceSwipeEditorTransaction.apply(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'BackspaceRepeatGuard.repeatAllowed(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'ThemeStatusLabel.compact(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'enterTouchActive' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'event.getRawX()-startX[0]' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'paletteButton.setText("🎨")' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'ThemePanelLayout.apply(themePanel,toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'base.addView(themePanel' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'paletteControls.addView(paletteButton' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'themeExpanderButton' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo "Redundant theme icon must not occupy prediction strip"
+            exit 1
+          fi
+          grep -Fq 'predictionHeader.addView(suggestionScroll,stripParams)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'if(toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'SuggestionVisualStyle.chipColor(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'SuggestionVisualStyle.readableText(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'int black=0xff000000;' app/src/main/java/com/chroomareborn/keyboard/SuggestionVisualStyle.java
+          grep -Fq 'TypingMotionPolicy.scale(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'SentenceFlowEvidenceRanker.rerank(' app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/SpanishPredictionLite.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/BilingualPredictionRouter.java
+          if grep -q 'BilingualPredictionRouter' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo 'Research Spanish must not be enabled before explicit language selection'
+            exit 1
+          fi
+          if grep -Fq 'toolbarToggle' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo 'Second collapse arrow must be removed'
+            exit 1
+          fi
+          if grep -Fq 'base.addView(paletteBar' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo "Old permanent theme row must not return"
+            exit 1
+          fi
+          grep -Fq 'ThemePanelLayout.apply(themePanel,false)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          if git ls-files | grep -Ei '(^research/|^evaluation/|^app/src/debug/|\.(jks|keystore|p12|pem|pfx|key)$)'; then exit 1; fi
+      - name: Run 19 Java suites including seeded suggestion color contrast, Safe Enter and typing motion
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/orivra-classes"
+          javac -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/KeyboardLayoutSpec.java \
+            app/src/main/java/com/chroomareborn/keyboard/KeyboardHapticStyle.java \
+            app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeEditorTransaction.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceRepeatGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/ThemeStatusLabel.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionVisualStyle.java \
+            app/src/main/java/com/chroomareborn/keyboard/TypingMotionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionStripLayoutPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PunctuationSpacing.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/SpacebarCursorGesture.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorSwipeBatch.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorMovementPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorFallbackBoundaryPolicy.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardLayoutSpecTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardHapticStyleTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipePolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipeEditorTransactionTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceRepeatGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ThemeStatusLabelTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SuggestionVisualStyleTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/TypingMotionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterReleaseBoundaryTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SuggestionStripLayoutPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PunctuationSpacingTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SpacebarCursorGestureTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorSwipeBatchTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorFallbackBoundaryPolicyTest.java
+          for suite in EnterKeyPolicyTest BackspaceSwipePolicyTest BackspaceSwipeSnapshotGuardTest BackspaceSwipeEditorTransactionTest BackspaceRepeatGuardTest ThemeStatusLabelTest SuggestionVisualStyleTest TypingMotionPolicyTest EnterReleaseBoundaryTest KeyboardLayoutSpecTest KeyboardHapticStyleTest SuggestionStripLayoutPolicyTest PunctuationSpacingTest CursorWordCorrectionPolicyTest SpacebarCursorGestureTest CursorSwipeBatchTest CursorReleaseSuggestionPolicyTest CursorFallbackBoundaryPolicyTest; do
+            java -ea -cp "$RUNNER_TEMP/orivra-classes" "com.chroomareborn.keyboard.$suite"
+          done
+      - name: Test 300 Keep exception and password/learning privacy matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java
+          java -ea -cp "$RUNNER_TEMP/orivra-classes" \
+            com.chroomareborn.keyboard.EditorSuggestionPrivacyPolicyTest
+      - name: Test pure-Java exact-word segmentation guard
+        run: |
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/ExactOnlyLanguagePack.java \
+            app/src/main/java/com/chroomareborn/keyboard/ExactOnlySegmentation.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ExactOnlySegmentationTest.java
+          java -ea -cp "$RUNNER_TEMP/orivra-classes" \
+            com.chroomareborn.keyboard.ExactOnlySegmentationTest
+      - name: Test bounded integrity-verified compressed dictionary fallback
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/ExactOnlyLanguagePack.java \
+            app/src/main/java/com/chroomareborn/keyboard/CompressedLanguagePack.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CompressedLanguagePackTest.java
+          java -Xmx128m -ea -cp "$RUNNER_TEMP/orivra-classes" \
+            com.chroomareborn.keyboard.CompressedLanguagePackTest
+      - name: Test default-OFF, protected-field and stale-callback activation gates
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/OfflineDictionaryActivationPolicy.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/OfflineDictionaryActivationPolicyTest.java
+          java -ea -cp "$RUNNER_TEMP/orivra-classes" \
+            com.chroomareborn.keyboard.OfflineDictionaryActivationPolicyTest
+      - name: Scope of pure Java checks
+        run: echo "Pure Java checks passed, native Android emulator and isolated APK checks follow."
+  panel-emulator:
+    needs: java-regressions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Generate reproducible gzip asset with pinned data and attribution
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          cmp <(tail -n 1 official-esdb/Copyright) <(tail -n 1 app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt)
+          grep -Fq 'Copyright 2000-2026 by Kevin Atkinson' app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en-US-60.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en-US-60.txt" | sha256sum --check
+          test "$(wc -c < "$RUNNER_TEMP/esdb-en-US-60.txt")" -eq 1022018
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en-US-60.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          gzip -t < app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          ls -lh app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          sha256sum app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Verify isolated package and app privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build303trial' app/build.gradle.kts
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/BackspaceSwipeAndroidEditorTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ThemeStatusAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/EnterReleaseMotionEventAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ThemePanelLayoutAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SuggestionVisualAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          grep -Fq 'LexiconFamilyExpander.enrich(WORDS);' app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/LexiconFamilyExpander.java
+      - name: Preflight APK asset contents before instrumented test
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug
+          apk=$(find app/build/outputs/apk/debug -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          echo "APK package and source asset inventory:"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -E 'assets/|^assets' | head -n 70
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+      - name: Enable hardware acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug
+            adb logcat -d -s OrivraWordpack302:I | tee "$RUNNER_TEMP/Orivra-302-Android35-Wordpack-Performance.txt"
+      - name: Confirm Candidate 303 opt-in stays off by default
+        run: |
+          grep -Fq 'getBoolean(OfflineDictionaryActivationPolicy.KEY,false)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'reconcileOptionalDictionary();' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'offlineExactDictionary.setOnClickListener' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          grep -Fq 'EditorSuggestionPrivacyPolicy.Decision privacy=editorPrivacyDecision(info)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+      - name: Confirm trial APK embeds asset and attribution
+        run: |
+          set -euo pipefail
+          apk=$(find app/build/outputs/apk/debug -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 | grep -Fq "com.chroomareborn.keyboard.build303trial"
+          ! "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | grep -Fq 'android.permission.INTERNET'
+          echo "Candidate 303 trial package, dictionary integrity and privacy checks passed."
+      - name: Verify final compiled identity, debug signer and package permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          mkdir -p dist
+          cp "$apk" dist/Orivra-Candidate-303.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" |
+            head -n 1 | tee dist/apk-identity.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build303trial' versionCode='303'" dist/apk-identity.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" |
+            tee dist/apk-signer.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" |
+            tee dist/apk-permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/apk-permissions.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+          cd dist
+          sha256sum Orivra-Candidate-303.apk > Orivra-Candidate-303.apk.sha256
+          cat Orivra-Candidate-303.apk.sha256
+      - name: Archive exactly verified Candidate 303 APK and integrity manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate-303-Qualified-APK
+          path: dist/
+          retention-days: 21
+          if-no-files-found: error
+      - name: Publish distinct debug-signed opt-in trial only after ALL regression gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/candidate303-notes.md" <<'ORIVRA_NOTES'
+          Orivra Candidate 303 — experimental opt-in English vocabulary trial.
+
+          This is NOT a production-stable version. Android 35 emulator qualification has passed. Actual Samsung S26 Ultra Android 17 acceptance is outstanding.
+          App ID: com.chroomareborn.keyboard.build303trial (versionCode 303). Separate from Candidate 300 and stable versions.
+          CI debug signing keys are ephemeral. Future replacement may require uninstalling ONLY this test trial.
+
+          Existing Candidate 300 English SentenceFlow, one-arrow UI, Safe Enter/Backspace and Google Keep compatibility are retained. IMPORTANT: the new 78,942-word dictionary feature is OFF by default.
+          To try it: open the Orivra Candidate 303 app settings, toggle "Experimental offline English dictionary" ON, then reopen the note editor. Compare the same joined sentences with OFF and ON. The additional dictionary helps recognize intact English words; it does not automatically fix every misspelling.
+          Use Samsung Notes or a disposable Google Keep note only. Never test with passwords, real account information or private messages.
+          Reopen the editor after changing the option. If unwanted suggestions or delays occur, toggle OFF and reopen to restore the original predictor. You can always switch back to Candidate 300.
+
+          Independent CI source checks: pinned licensed ESDB/SCOWL source and checksum, deterministic 280KB gzip wordpack, verified Android asset and included license, 41 opt-in policy checks, 43 Keep/privacy checks, original keyboard Java regressions, 23 Android 35 emulator tests, APK package/permission/debug-signing/hash checks.
+          No INTERNET permission, no typing telemetry and no clipboard or editor data collection in the optional loader.
+          ORIVRA_NOTES
+          gh release create candidate-303-20261029 \
+            dist/Orivra-Candidate-303.apk \
+            dist/Orivra-Candidate-303.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 303 — Experimental Offline Vocabulary" \
+            --notes-file "$RUNNER_TEMP/candidate303-notes.md" \
+            --prerelease
+          gh release view candidate-303-20261029 --repo "$GITHUB_REPOSITORY"
+
