@@ -1266,7 +1266,8 @@ public final class RebornImeService extends InputMethodService {
         }
         editingInMiddle=cursorHasTextAfter() || hasSelection();
     }
-    private EditorSuggestionPrivacyPolicy.Decision editorPrivacyDecision(EditorInfo info) {
+    // Exposed to package-scoped Android instrumentation, no editor text access.
+    static EditorSuggestionPrivacyPolicy.Decision editorPrivacyDecision(EditorInfo info) {
         if(info==null)
             return EditorSuggestionPrivacyPolicy.decide(null,false,true,true,true);
         int input=info.inputType;
