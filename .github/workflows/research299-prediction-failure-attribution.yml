@@ -1,0 +1,63 @@
+name: Orivra 299 - frozen 100-case failure attribution
+on:
+  push:
+    branches:
+      - research/build299-prediction-failure-attribution-20261029
+    paths:
+      - .github/workflows/research299-prediction-failure-attribution.yml
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowFailureAttribution.java
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-attribution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 2717ad8d01edc1a0854379c2a1e389bd64f57182
+          path: qualified-candidate-298
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Keep tested IME and frozen fixtures byte-identical to Candidate 298
+        run: |
+          set -euo pipefail
+          for file in PredictionLite.java SentenceRescue.java SentenceFlowEvidenceRanker.java LexiconFamilyExpander.java RebornImeService.java; do
+            cmp "qualified-candidate-298/app/src/main/java/com/chroomareborn/keyboard/$file" "app/src/main/java/com/chroomareborn/keyboard/$file"
+          done
+          cmp qualified-candidate-298/app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowBlind297Audit.java app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowBlind297Audit.java
+          cmp qualified-candidate-298/app/src/main/AndroidManifest.xml app/src/main/AndroidManifest.xml
+          if grep -q android.permission.INTERNET app/src/main/AndroidManifest.xml; then exit 1; fi
+      - name: Compile isolated synthetic failure profiler
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/attribution"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/attribution" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java \
+            app/src/main/java/com/chroomareborn/keyboard/LexiconFamilyExpander.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowBlind297Audit.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowFailureAttribution.java
+      - name: Generate ranked failure-cause and candidate-recall evidence
+        run: |
+          set -euo pipefail
+          timeout 180s java -ea -Xmx1g -cp "$RUNNER_TEMP/attribution" \
+            com.chroomareborn.keyboard.SentenceFlowFailureAttribution \
+            | tee "$RUNNER_TEMP/Orivra-299-Failure-Attribution.txt"
+      - name: Archive reproducible report only, no APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-299-100-Case-Failure-Attribution-No-Release
+          path: ${{ runner.temp }}/Orivra-299-Failure-Attribution.txt
+          retention-days: 21
+          if-no-files-found: warn
+      - name: Explicit release isolation
+        if: success()
+        run: echo "Analysis only. Does not update or replace Candidate 298. No APK."
