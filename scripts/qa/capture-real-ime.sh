@@ -195,10 +195,10 @@ screenshot expanded
 expanded_top="$(python3 scripts/qa/inspect_ime_screens.py "$OUT/expanded.png" --mode expanded --collapsed "$collapsed_top" --density "$density")"
 echo "PASS: Orivra real panel grew by $((collapsed_top-expanded_top)) px"
 
-# In the expanded two-row panel, the collapse arrow is at the right-hand
-# end of its own 28dp header immediately below the 48dp prediction strip.
-collapse_x="$((screen_w-$(dp_px 22)))"
-collapse_y="$((expanded_top+$(dp_px 48)+$(dp_px 14)))"
+# Single-arrow design: the SAME prediction-row caret collapses settings.
+# No second arrow should exist in the expanded 28dp theme header.
+collapse_x="$((screen_w-$(dp_px 20)))"
+collapse_y="$((expanded_top+$(dp_px 24)))"
 adb shell input tap "$collapse_x" "$collapse_y"
 sleep 2
 verify_selected
