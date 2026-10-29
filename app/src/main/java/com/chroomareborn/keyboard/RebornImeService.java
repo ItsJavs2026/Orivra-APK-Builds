@@ -902,15 +902,20 @@ public final class RebornImeService extends InputMethodService {
         paletteBar.addView(paletteLabel, new LinearLayout.LayoutParams(0, dp(32), 1f));
         paletteButton = new Button(this);
         paletteButton.setText("🎨");
-        paletteButton.setTextSize(16);
+        paletteButton.setTextSize(10);
         paletteButton.setAllCaps(false);
         paletteButton.setTextColor(keyTextColor);
         paletteButton.setPadding(0, 0, 0, 0);
-        LinearLayout.LayoutParams paletteParams = new LinearLayout.LayoutParams(dp(52), dp(34));
+        LinearLayout.LayoutParams paletteParams = new LinearLayout.LayoutParams(dp(64), dp(34));
         paletteParams.setMargins(dp(3), 0, dp(4), dp(2));
         paletteBar.addView(paletteButton, paletteParams);
         paletteButton.setVisibility(View.GONE);
         paletteButton.setContentDescription("Change keyboard color style");
+        paletteButton.setOnLongClickListener(v -> {
+            android.widget.Toast.makeText(this,themeDetails(),
+                    android.widget.Toast.LENGTH_LONG).show();
+            return true;
+        });
         paletteButton.setOnClickListener(v -> {
             int current = getSharedPreferences(AppPalette.PREFS, MODE_PRIVATE)
                     .getInt(AppPalette.KEY_MODE, AppPalette.DEFAULT);
@@ -1287,7 +1292,15 @@ public final class RebornImeService extends InputMethodService {
         // times; the bar is a stable 34dp, so opening controls cannot shift
         // the active keyboard touch rows or prediction strip.
         if(paletteBar!=null)paletteBar.setVisibility(View.VISIBLE);
-        if (paletteButton != null) paletteButton.setVisibility(toolbarExpanded ? View.VISIBLE : View.GONE);
+        if (paletteButton != null) {
+            paletteButton.setVisibility(toolbarExpanded ? View.VISIBLE : View.GONE);
+            int selected=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                    .getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
+            paletteButton.setText(ThemeStatusLabel.expandedChip(
+                    AppPalette.modeName(selected),themeDark));
+            paletteButton.setContentDescription(themeDetails()+
+                    ". Tap to select the next theme. Hold for theme information.");
+        }
         if (sizeButton != null) sizeButton.setVisibility(toolbarExpanded ? View.VISIBLE : View.GONE);
         if(animationSpeedButton!=null) {
             animationSpeedButton.setVisibility(toolbarExpanded?View.VISIBLE:View.GONE);
@@ -1489,7 +1502,8 @@ public final class RebornImeService extends InputMethodService {
         if(paletteButton!=null) {
             paletteButton.setTextColor(keyTextColor);
             paletteButton.setBackground(feedbackBackground(specialBackground));
-            paletteButton.setContentDescription("Color mode: "+themeSource);
+            paletteButton.setContentDescription(themeDetails()+
+                    ". Tap to select the next theme. Hold for theme information.");
         }
         final int heightMode=KeyboardSizing.normalize(
                 getSharedPreferences(KeyboardSizing.PREFS,MODE_PRIVATE)
