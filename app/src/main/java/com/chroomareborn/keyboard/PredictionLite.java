@@ -1166,7 +1166,7 @@ final class PredictionLite {
                         .toLowerCase(Locale.US).replaceAll("[^a-z]","");
                 boolean exactLetterSegmentation=originalLetters.equals(raw);
                 int editBudget=Math.max(2,(int)Math.ceil(raw.length()*.24));
-                double requiredGain=raw.length()>=16?.085:.15;
+                double requiredGain=raw.length()>=16?.055:.15;
                 if(best.coherence()>=0.67 &&
                         best.coherence()>oldCoherence+requiredGain &&
                         best.totalEdits<=editBudget &&
