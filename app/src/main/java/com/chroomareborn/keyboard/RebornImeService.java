@@ -227,6 +227,9 @@ public final class RebornImeService extends InputMethodService {
     // Physical Backspace contact and repeat arming are independent: a
     // cancelled swipe can stop repeating but still owns its touch target.
     private boolean backspaceTouchActive = false;
+    // Enter's touched key must also remain mounted until ACTION_UP/CANCEL.
+    // A composing/prediction callback may request refresh while SEND arms.
+    private boolean enterTouchActive = false;
     private InputConnection deleteRepeatEditor;
     private long deleteRepeatSession;
     // No Enter action is committed while a finger is still held down.
@@ -272,6 +275,7 @@ public final class RebornImeService extends InputMethodService {
     private void invalidateBackspaceGestureSession() {
         inputSessionGeneration++;
         backspaceTouchActive=false;
+        enterTouchActive=false;
         stopDeleteRepeat();
         stopEnterHold();
         freezeRiseDuringDelete = false;
@@ -1472,6 +1476,7 @@ public final class RebornImeService extends InputMethodService {
     }
     private void refreshView() {
         if (base == null || keys == null || spacebarTouchActive ||
+                enterTouchActive ||
                 !BackspaceRepeatGuard.mayRebuildKeys(backspaceTouchActive,deleteHeld))
             return;
         base.setBackgroundColor(background);
@@ -1967,6 +1972,7 @@ public final class RebornImeService extends InputMethodService {
                     startY[0]=event.getRawY();
                     touchedEditor[0]=getCurrentInputConnection();
                     touchedSession[0]=inputSessionGeneration;
+                    enterTouchActive=true;
                     view.setPressed(true);
                     animateKeyPress(view,true);
                     keyHaptic(view);
@@ -2015,11 +2021,21 @@ public final class RebornImeService extends InputMethodService {
                     final boolean support=info!=null &&
                             EnterKeyPolicy.supportsLongPressSend(info.imeOptions);
                     final boolean release=event.getActionMasked()==MotionEvent.ACTION_UP;
+                    // Android may coalesce the last MOVE into ACTION_UP. Check
+                    // final coordinates before deciding on SEND or newline.
+                    // Fail closed on NaN/out-of-bounds and large drags.
+                    if(!EnterKeyPolicy.gestureWithinSlop(
+                            event.getRawX()-startX[0],
+                            event.getRawY()-startY[0],dp(22))) {
+                        cancelled[0]=true;
+                        armed[0]=false;
+                    }
                     final boolean send=EnterKeyPolicy.shouldSendOnRelease(
                             release,armed[0],cancelled[0],sameSession,support);
                     final boolean newline=EnterKeyPolicy.shouldInsertNewline(
                             release,armed[0],cancelled[0],sameSession);
                     stopEnterHold();
+                    enterTouchActive=false;
                     key.setText("↵");
                     key.setContentDescription(
                             "Enter newline. Hold then release to send if supported");
