@@ -608,7 +608,7 @@ public final class RebornImeService extends InputMethodService {
         final float[] touchStart={0f,0f};
         final InputConnection[] gestureEditor={null};
         final long[] gestureSession={0L};
-        final boolean[] swiping={false}, repeating={false}, cancelled={false};
+        final boolean[] swiping={false}, repeating={false}, cancelled={false}, moved={false};
         final int[] swipeWords={0};
         key.setOnTouchListener((view,event)->{
             switch(event.getActionMasked()) {
@@ -622,6 +622,7 @@ public final class RebornImeService extends InputMethodService {
                     swiping[0]=false;
                     repeating[0]=false;
                     cancelled[0]=false;
+                    moved[0]=false;
                     swipeWords[0]=0;
                     deleteHeld=true; // suppress key-view rebuild during gesture
                     key.setPressed(true);
@@ -644,6 +645,16 @@ public final class RebornImeService extends InputMethodService {
                     if(cancelled[0] || repeating[0])return true;
                     float left=touchStart[0]-event.getRawX();
                     float vertical=event.getRawY()-touchStart[1];
+                    // Let a deliberate slow slide win over the 380ms hold
+                    // before it reaches the larger 34dp whole-word threshold.
+                    // A released gesture that moved beyond tap slop is not a tap.
+                    if(BackspaceSwipePolicy.beyondTapSlop(left,vertical,dp(12))) {
+                        moved[0]=true;
+                        if(deleteHoldPending!=null) {
+                            deleteHandler.removeCallbacks(deleteHoldPending);
+                            deleteHoldPending=null;
+                        }
+                    }
                     int words=BackspaceSwipePolicy.wordsForSwipe(
                             left,vertical,dp(34),dp(78));
                     if(words>0) {
@@ -685,6 +696,25 @@ public final class RebornImeService extends InputMethodService {
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL: {
+                    // Some hosts coalesce fast motion into the final UP event.
+                    // Check its coordinates without allowing a cancelled or
+                    // already repeating hold to turn into swipe deletion.
+                    if(event.getActionMasked()==MotionEvent.ACTION_UP &&
+                            !cancelled[0] && !repeating[0]) {
+                        float left=touchStart[0]-event.getRawX();
+                        float vertical=event.getRawY()-touchStart[1];
+                        if(BackspaceSwipePolicy.beyondTapSlop(left,vertical,dp(12)))
+                            moved[0]=true;
+                        int finalWords=BackspaceSwipePolicy.wordsForSwipe(
+                                left,vertical,dp(34),dp(78));
+                        if(finalWords>0) {
+                            swiping[0]=true;
+                            swipeWords[0]=finalWords;
+                        } else if(swiping[0]) {
+                            // Final finger position can cancel the preview.
+                            swipeWords[0]=0;
+                        }
+                    }
                     final InputConnection editor=gestureEditor[0];
                     final long sessionAtDown=gestureSession[0];
                     boolean sameSession=BackspaceSwipePolicy.sameEditorSession(
@@ -693,7 +723,7 @@ public final class RebornImeService extends InputMethodService {
                     boolean shouldCommit=event.getActionMasked()==MotionEvent.ACTION_UP &&
                             !cancelled[0] && sameSession;
                     int words=swiping[0]?swipeWords[0]:0;
-                    boolean tap=shouldCommit && !swiping[0] && !repeating[0];
+                    boolean tap=shouldCommit && !swiping[0] && !repeating[0] && !moved[0];
                     boolean swipe=shouldCommit && swiping[0] && words>0;
                     stopDeleteRepeat();
                     freezeRiseDuringDelete=false;
@@ -1365,7 +1395,7 @@ public final class RebornImeService extends InputMethodService {
         expandedSuggestions.setTranslationY(0f);
     }
     private void refreshView() {
-        if (base == null || keys == null || spacebarTouchActive) return;
+        if (base == null || keys == null || spacebarTouchActive || deleteHeld) return;
         base.setBackgroundColor(background);
         if (paletteBar != null) paletteBar.setBackgroundColor(background);
         updateToolbar();
@@ -1737,12 +1767,18 @@ public final class RebornImeService extends InputMethodService {
             currentFinish();
             ic.commitText("",1);
         } else {
-            CharSequence before=ic.getTextBeforeCursor(2048,0);
-            int chars=BackspaceSwipePolicy.charsToDelete(before,words);
-            if(chars<=0)return;
+            // Composing text (e.g. freshly typed "heythere") may not have
+            // the same editor snapshot before and after finishComposingText().
+            // Finish FIRST, then compute a verified range against fresh text.
+            // An incomplete/mismatched editor response must delete nothing.
+            final String composingAtStart=composing;
             ic.beginBatchEdit();
             try {
-                currentFinish();
+                if(!composingAtStart.isEmpty())currentFinish();
+                CharSequence liveBefore=ic.getTextBeforeCursor(2048,0);
+                int chars=BackspaceSwipePolicy.safeCharsToDelete(
+                        liveBefore,composingAtStart,words);
+                if(chars<=0)return;
                 ic.deleteSurroundingText(chars,0);
             } finally {
                 ic.endBatchEdit();
