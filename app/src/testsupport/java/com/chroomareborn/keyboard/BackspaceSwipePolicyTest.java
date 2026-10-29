@@ -126,6 +126,52 @@ public final class BackspaceSwipePolicyTest {
             if(current<lastWords || current>8)throw new AssertionError("non-monotonic gesture");
             lastWords=current;
         }
-        System.out.println("BackspaceSwipePolicyTest passed: 12000 deterministic input cases");
+
+        // Candidate qualification: composing-word snapshots are read AFTER
+        // finishComposingText, then checked against the expected composed suffix.
+        equal(8, BackspaceSwipePolicy.safeCharsToDelete("heythere","heythere",1));
+        equal(14, BackspaceSwipePolicy.safeCharsToDelete("hello heythere","heythere",2));
+        equal(0, BackspaceSwipePolicy.safeCharsToDelete("heyther","heythere",1));
+        equal(0, BackspaceSwipePolicy.safeCharsToDelete(null,"heythere",1));
+        equal(0, BackspaceSwipePolicy.safeCharsToDelete("heythere","heythere",0));
+        equal(5, BackspaceSwipePolicy.safeCharsToDelete("hello","",1));
+        equal(4, BackspaceSwipePolicy.safeCharsToDelete("👍🏽","👍🏽",1));
+        equal(0, BackspaceSwipePolicy.safeCharsToDelete("a".repeat(2048),"",1));
+        equal(1, BackspaceSwipePolicy.safeCharsToDelete("a".repeat(2048)+" b","",1));
+        if(BackspaceSwipePolicy.beyondTapSlop(5,5,12))
+            throw new AssertionError("steady Backspace tap falsely rejected");
+        if(!BackspaceSwipePolicy.beyondTapSlop(13,0,12) ||
+                !BackspaceSwipePolicy.beyondTapSlop(-13,0,12) ||
+                !BackspaceSwipePolicy.beyondTapSlop(0,13,12) ||
+                !BackspaceSwipePolicy.beyondTapSlop(Float.NaN,0,12) ||
+                !BackspaceSwipePolicy.beyondTapSlop(Float.POSITIVE_INFINITY,0,12) ||
+                !BackspaceSwipePolicy.beyondTapSlop(0,0,0))
+            throw new AssertionError("slow-swipe or invalid motion must block tap/hold");
+
+        Random composingRandom=new Random(293292L);
+        String[] components={"heythere","hello","café","中文","😊","👍🏽",
+                "abc","12345","one.two","hello_world",""};
+        String[] separators={" ","  ","\\n","\\t","\\r\\n"};
+        for(int sample=0;sample<30000;sample++) {
+            StringBuilder prefix=new StringBuilder();
+            int wordsBefore=composingRandom.nextInt(6);
+            for(int j=0;j<wordsBefore;j++)
+                prefix.append(components[composingRandom.nextInt(components.length)])
+                        .append(separators[composingRandom.nextInt(separators.length)]);
+            String composed=components[composingRandom.nextInt(components.length)];
+            String complete=prefix.toString()+composed;
+            int words=1+composingRandom.nextInt(8);
+            int safe=BackspaceSwipePolicy.safeCharsToDelete(complete,composed,words);
+            equal(BackspaceSwipePolicy.charsToDelete(complete,words),safe);
+            if(!composed.isEmpty()) {
+                equal(0,BackspaceSwipePolicy.safeCharsToDelete(
+                        complete+"x",composed,words));
+                String missing=complete.substring(0,complete.length()-composed.length());
+                if(!missing.endsWith(composed))
+                    equal(0,BackspaceSwipePolicy.safeCharsToDelete(
+                            missing,composed,words));
+            }
+        }
+        System.out.println("BackspaceSwipePolicyTest passed: 12000 boundary + 30000 composing scenarios");
     }
 }
