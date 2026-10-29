@@ -1,0 +1,133 @@
+name: Orivra 297 - offline evidence-backed lexicon A/B
+on:
+  push:
+    branches:
+      - research/build297-evidence-backed-lexicon-20261029
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-297-lexicon
+  cancel-in-progress: true
+jobs:
+  offline-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout frozen qualified Candidate 295
+        uses: actions/checkout@v4
+        with:
+          ref: 73b71da9eadcac125217cb8c7f8f145c58a2ab30
+          path: pinned-295
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Preserve installed IME and offline privacy
+        run: |
+          set -euo pipefail
+          cmp pinned-295/app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          cmp pinned-295/app/build.gradle.kts app/build.gradle.kts
+          cmp pinned-295/app/src/main/AndroidManifest.xml app/src/main/AndroidManifest.xml
+          cmp pinned-295/app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java
+          if grep -q android.permission.INTERNET app/src/main/AndroidManifest.xml; then exit 1; fi
+      - name: Compile independent predictors and exact same frozen benchmark source
+        run: |
+          set -euo pipefail
+          for mode in pinned experimental; do
+            mkdir -p "$RUNNER_TEMP/$mode"
+            if [ "$mode" = pinned ]; then root=pinned-295; else root=.; fi
+            args=(
+              "$root/app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java"
+              "$root/app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java"
+              "$root/app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java"
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowHoldoutBenchmark.java
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowIndependentAudit.java
+              app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowBlind297Audit.java
+            )
+            if [ "$mode" = experimental ]; then
+              args+=(app/src/main/java/com/chroomareborn/keyboard/LexiconFamilyExpander.java)
+              args+=(app/src/testsupport/java/com/chroomareborn/keyboard/LexiconFamilyExpanderTest.java)
+            fi
+            javac -encoding UTF-8 -d "$RUNNER_TEMP/$mode" "${args[@]}"
+          done
+      - name: Validate candidate morphology safety
+        run: timeout 45s java -Xmx512m -ea -cp "$RUNNER_TEMP/experimental" com.chroomareborn.keyboard.LexiconFamilyExpanderTest
+      - name: Run both predictors on 487 legacy, 80 dev and 100 frozen prospective QA cases
+        run: |
+          set -euo pipefail
+          for mode in pinned experimental; do
+            for suite in SentenceFlowAccuracyBenchmark SentenceFlowHoldoutBenchmark SentenceFlowIndependentAudit SentenceFlowBlind297Audit; do
+              timeout 480s java -Xmx1g -ea -cp "$RUNNER_TEMP/$mode" \
+                "com.chroomareborn.keyboard.$suite" > "$RUNNER_TEMP/$mode-$suite.txt"
+            done
+          done
+      - name: Compare full categories and individual negative controls
+        run: |
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import os,re,sys
+          root=sys.argv[1]
+          suites=('SentenceFlowAccuracyBenchmark','SentenceFlowHoldoutBenchmark',
+                  'SentenceFlowIndependentAudit','SentenceFlowBlind297Audit')
+          protected=('known_word','stable_words','word_one_typo',
+                     'word_typos','joined_exact','joined_0_typos','known_words')
+          def categories(mode,suite):
+              results={}
+              for line in open(os.path.join(root,f'{mode}-{suite}.txt'),encoding='utf-8'):
+                  m=re.match(r'^(?:GROUP|HOLDOUT|AUDIT)\s+(\w+)\s+n=\s*(\d+)\s+top1=\s*(\d+).*?top3=\s*(\d+).*?p95=([\d.]+)ms',line)
+                  if m:results[m[1]]=(int(m[2]),int(m[3]),int(m[4]),float(m[5]))
+              return results
+          changed=0
+          for suite in suites:
+              old,new=categories('pinned',suite),categories('experimental',suite)
+              assert old and old.keys()==new.keys(),f'Missing categories: {suite}'
+              for category,before in old.items():
+                  after=new[category]
+                  assert before[0]==after[0],f'Fixture count drift: {suite}/{category}'
+                  print(f'{suite}/{category}: n={after[0]} top1 {before[1]}->{after[1]} ({after[1]-before[1]:+d}) top3 {before[2]}->{after[2]} ({after[2]-before[2]:+d}) p95 {before[3]:.2f}->{after[3]:.2f}ms')
+                  if after[1]!=before[1]:changed+=1
+                  assert after[2]>=before[2],f'Top-three regression: {suite}/{category}'
+                  if category in protected:
+                      assert after[1]>=before[1],f'Protected top-one regression: {suite}/{category}'
+                  if category=='ALL':
+                      assert after[1]>=before[1],f'Overall regression: {suite}'
+                      assert after[3]<=max(150.,before[3]*5),f'Excessive p95: {suite}'
+          def cases(mode,suite):
+              rows={}
+              for line in open(os.path.join(root,f'{mode}-{suite}.txt'),encoding='utf-8'):
+                  fields=line.rstrip().split(chr(9))
+                  if len(fields)==5 and fields[0]=='CASE':
+                      rows[(fields[1],fields[2])]=(fields[3],fields[4])
+              return rows
+          for suite in ('SentenceFlowIndependentAudit','SentenceFlowBlind297Audit'):
+              old,new=cases('pinned',suite),cases('experimental',suite)
+              assert old and old.keys()==new.keys(),f'Case drift: {suite}'
+              wins=losses=other_changes=0
+              for key,(expected,first) in old.items():
+                  proposed_expected,proposed_first=new[key]
+                  assert expected==proposed_expected
+                  a=expected.lower()==first.lower()
+                  b=expected.lower()==proposed_first.lower()
+                  if a and not b:losses+=1
+                  if b and not a:wins+=1
+                  if not a and not b and first!=proposed_first:other_changes+=1
+              print(f'{suite} cases={len(old)}, wins={wins}, losses={losses}, changed-incorrect={other_changes}')
+              assert losses==0,f'{suite} individual false-correction regressions'
+          print(f'PASS: four A/B suites, changed category groups={changed}')
+          PY
+      - name: Preserve actual benchmark outputs even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orivra-297-english-lexicon-a-b
+          path: |
+            ${{ runner.temp }}/pinned-*.txt
+            ${{ runner.temp }}/experimental-*.txt
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Research only; never publish a trial APK
+        if: success()
+        run: echo "No APK created, no merge, no Samsung claims."
