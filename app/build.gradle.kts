@@ -3,16 +3,16 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.publictrial"
+        applicationId = "com.chroomareborn.keyboard.build287trial"
         minSdk = 26
         targetSdk = 35
-        versionCode = 286
-        versionName = "1.0.12-build286-publictrial"
-        manifestPlaceholders["appLabel"] = "Orivra Public Trial"
+        versionCode = 287
+        versionName = "1.0.13-build287-visualtrial"
+        manifestPlaceholders["appLabel"] = "Orivra Build 287 Trial"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Public Trial"
+            manifestPlaceholders["appLabel"] = "Orivra Build 287 Trial"
         }
     }
     compileOptions {
