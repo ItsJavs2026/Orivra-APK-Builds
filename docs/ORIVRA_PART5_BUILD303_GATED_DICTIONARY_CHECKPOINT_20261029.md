@@ -15,7 +15,7 @@ Date 2026-10-29. **Source-only research; no Candidate 303 APK has been published
 
 ## Qualification gate
 
-[Run 40974663679](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40974663679): Java job **success**; Android 35 emulator test job in progress at checkpoint creation. Verify final job conclusion, number of completed tests and asset integrity before upgrading status. Android 35 is not the user's Samsung Android 17 device. The Java language-engine 667-case A/B benchmark remains from previously qualified 301 work; the core predictor/segmentation code is unchanged in 303.
+[Run 40974663679](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40974663679) **SUCCESS**: Java regressions passed, including 41 activation-policy assertions and 43 Google Keep privacy assertions. The Android 35 Pixel 6 emulator built the pinned licensed compressed asset and logged **Starting 23 tests**, **Finished 23 tests**, **BUILD SUCCESSFUL**. The package and licensed compressed asset checks passed. These are Android 35 emulator results, not user phone acceptance. The Java language-engine 667-case A/B benchmark remains from previously qualified 301 work; the core predictor/segmentation code is unchanged in 303.
 
 ## Next steps
 
