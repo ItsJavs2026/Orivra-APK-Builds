@@ -36,7 +36,7 @@ public final class RebornImeService extends InputMethodService {
     private HorizontalScrollView suggestionScroll;
     private TextView swipeDeletePreview;
     private TextView paletteLabel;
-    private Button paletteButton, sizeButton, toolbarToggle, predictionsToggle, animationSpeedButton, splitModeButton, nextWordButton;
+    private Button paletteButton, sizeButton, predictionsToggle, animationSpeedButton, splitModeButton, nextWordButton;
     private LinearLayout predictionHeader, expandedSuggestions;
     private boolean predictionsExpanded=false;
     private boolean freezeRiseDuringDelete = false;
@@ -1028,18 +1028,10 @@ public final class RebornImeService extends InputMethodService {
         // Accessible through a long-press on the existing prediction toggle.
         // This displays only aggregate counts, never learned word pairs.
 
-        toolbarToggle = new Button(this);
-        toolbarToggle.setAllCaps(false);
-        toolbarToggle.setText("⌃");
-        toolbarToggle.setTextSize(18);
-        toolbarToggle.setPadding(0,0,0,0);
-        toolbarToggle.setContentDescription("Collapse theme information and controls");
-        LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(dp(38),dp(28));
-        toggleParams.setMargins(dp(2),0,dp(3),0);
-        paletteBar.addView(toolbarToggle,toggleParams);
-        // Long press cycles Off -> Light -> Standard -> Crisp -> Off.
-        // No additional permission and no intrusive new toolbar button.
-        toolbarToggle.setOnLongClickListener(v -> {
+        // One arrow in the prediction strip controls all expandable UI.
+        // Preserve haptic-style cycling on the theme header long-press,
+        // rather than keeping a redundant second collapse arrow.
+        paletteLabel.setOnLongClickListener(v -> {
             int current=hapticsEnabled()?hapticStyle():0;
             int next=KeyboardHapticStyle.next(current);
             getSharedPreferences("keyboard_feedback", MODE_PRIVATE).edit()
@@ -1050,10 +1042,6 @@ public final class RebornImeService extends InputMethodService {
                     "Key haptics "+KeyboardHapticStyle.label(next),
                     android.widget.Toast.LENGTH_SHORT).show();
             return true;
-        });
-        toolbarToggle.setOnClickListener(v -> {
-            // Defer changes until after the collapse button's touch dispatch.
-            suggestionHandler.post(() -> setThemePanelExpanded(false));
         });
         themePanel.addView(paletteBar,new LinearLayout.LayoutParams(-1,dp(28)));
         themePanel.addView(paletteControls,new LinearLayout.LayoutParams(-1,dp(36)));
@@ -1087,7 +1075,10 @@ public final class RebornImeService extends InputMethodService {
         predictionsToggle.setPadding(0,0,0,0);
         predictionsToggle.setContentDescription("Tap to expand sentence predictions. Hold for theme and keyboard settings.");
         predictionHeader.addView(predictionsToggle,new LinearLayout.LayoutParams(dp(38),dp(44)));
-        predictionsToggle.setOnClickListener(v->toggleRisePanel());
+        predictionsToggle.setOnClickListener(v->{
+            if(toolbarExpanded)suggestionHandler.post(()->setThemePanelExpanded(false));
+            else toggleRisePanel();
+        });
         // Keep the existing right caret: short tap for sentence predictions,
         // 500ms hold for settings. No dedicated icon steals prediction space.
         // A normal Button long-click can be swallowed by fast IME touch handling.
@@ -1106,7 +1097,12 @@ public final class RebornImeService extends InputMethodService {
                 case MotionEvent.ACTION_UP:
                     suggestionHandler.removeCallbacks(riseHold);
                     v.setPressed(false);
-                    if(!riseLongPressed[0])toggleRisePanel();
+                    if(!riseLongPressed[0]) {
+                        if(toolbarExpanded) {
+                            // A single short tap closes settings when open.
+                            suggestionHandler.post(()->setThemePanelExpanded(false));
+                        } else toggleRisePanel();
+                    }
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     suggestionHandler.removeCallbacks(riseHold);
@@ -1284,6 +1280,14 @@ public final class RebornImeService extends InputMethodService {
                 enterTouchActive || spacebarTouchActive) return;
         toolbarExpanded=expand;
         updateToolbar();
+        // The same arrow reports the current settings/prediction state.
+        if(predictionsToggle!=null) {
+            predictionsToggle.setText(toolbarExpanded?"⌄":predictionsExpanded?"⌄":"⌃");
+            predictionsToggle.setContentDescription(toolbarExpanded?
+                    "Close keyboard settings and return to predictions":
+                    (predictionsExpanded?"Collapse predictions":"Expand predictions")+
+                    ". Hold for keyboard settings");
+        }
     }
     private void updateToolbar() {
         // Refresh collapsed status and expanded layout on every toggle,
@@ -1336,12 +1340,7 @@ public final class RebornImeService extends InputMethodService {
             animationSpeedButton.setContentDescription(
                     "Prediction panel hold "+mode+" milliseconds; no fade animation");
         }
-        if (toolbarToggle != null) {
-            toolbarToggle.setText("⌃");
-            toolbarToggle.setTextColor(keyTextColor);
-            toolbarToggle.setBackground(feedbackBackground(specialBackground));
-            toolbarToggle.setContentDescription("Collapse theme information and controls");
-        }
+
     }
     private void toggleRisePanel() {
         suggestionHandler.removeCallbacks(delayedRiseDismiss);
@@ -1387,8 +1386,11 @@ public final class RebornImeService extends InputMethodService {
         // Preserve the expanded panel throughout a held backspace gesture.
         // Deletion still updates predictions; only panel motion is deferred.
         if(freezeRiseDuringDelete || riseChipPressed)return;
-        predictionsToggle.setText(predictionsExpanded?"⌄":"⌃");
-        predictionsToggle.setContentDescription((predictionsExpanded?"Collapse predictions":"Expand predictions")+". Hold to open keyboard controls");
+        predictionsToggle.setText(toolbarExpanded?"⌄":predictionsExpanded?"⌄":"⌃");
+        predictionsToggle.setContentDescription(toolbarExpanded?
+                "Close keyboard settings and return to predictions":
+                (predictionsExpanded?"Collapse predictions":"Expand predictions")+
+                ". Hold for keyboard settings");
         predictionsToggle.setTextColor(keyTextColor);
         // Avoid replacing the ripple drawable on every keystroke.
         if(!(predictionsToggle.getTag() instanceof Integer) ||
