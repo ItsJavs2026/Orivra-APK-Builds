@@ -1,0 +1,115 @@
+name: Orivra SentenceFlow - confidence-gated rescue A/B research
+on:
+  push:
+    branches:
+      - candidate/build294-sentenceflow-rescue-margin-20261029
+    paths:
+      - .github/workflows/candidate-sentenceflow-rescue-margin.yml
+      - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java
+      - app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowHoldoutBenchmark.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRankerTest.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-rescue-margin
+  cancel-in-progress: true
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Freeze untouched source and 340 holdout examples
+        uses: actions/checkout@v4
+        with:
+          ref: a87053b88d504bcd18b8fdc606db84de7a4edc63
+          path: frozen-starter
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify isolated, offline study
+        run: |
+          set -euo pipefail
+          grep -Fq 'SentenceFlowEvidenceRanker.rerank(' app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          grep -Fq 'com.chroomareborn.keyboard.build293trial' app/build.gradle.kts
+      - name: Compile pinned and experimental actual offline predictors
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pinned" "$RUNNER_TEMP/experiment"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/pinned" \
+            frozen-starter/app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
+            frozen-starter/app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java \
+            frozen-starter/app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java \
+            frozen-starter/app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowHoldoutBenchmark.java
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/experiment" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowHoldoutBenchmark.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRankerTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PredictionSmokeTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/StarterLexiconConsistencyTest.java
+      - name: Run 30k pure ranker scenarios and protected prediction smoke tests
+        run: |
+          set -euo pipefail
+          for test in SentenceFlowEvidenceRankerTest StarterLexiconConsistencyTest PredictionSmokeTest; do
+            timeout 120s java -Xmx1g -ea -cp "$RUNNER_TEMP/experiment" \
+              "com.chroomareborn.keyboard.$test"
+          done
+      - name: Test both variants on EXACTLY the same 487 fixtures
+        run: |
+          set -euo pipefail
+          for version in pinned experiment; do
+            for klass in SentenceFlowAccuracyBenchmark SentenceFlowHoldoutBenchmark; do
+              timeout 600s java -Xmx1g -ea -cp "$RUNNER_TEMP/$version" \
+                "com.chroomareborn.keyboard.$klass" \
+                > "$RUNNER_TEMP/$version-$klass.txt"
+            done
+          done
+      - name: Compare exact same test cases and reject quality regressions
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import sys,re,os
+          root=sys.argv[1]
+          for klass in ('SentenceFlowAccuracyBenchmark','SentenceFlowHoldoutBenchmark'):
+              def read(version):
+                  data={}
+                  for line in open(os.path.join(root,f'{version}-{klass}.txt'),encoding='utf-8'):
+                      m=re.match(r'^(GROUP|HOLDOUT)\s+([a-zA-Z0-9_]+)\s+n=\s*(\d+)\s+top1=\s*(\d+).*?top3=\s*(\d+).*?p95=([\d.]+)ms',line)
+                      if m:data[m.group(2)]=tuple(map(int,m.group(3,4,5)))+(float(m.group(6)),)
+                  return data
+              before,after=read('pinned'),read('experiment')
+              assert before and before.keys()==after.keys(),f'Missing A/B categories in {klass}'
+              print('\n'+klass+' — pinned baseline => experimental:')
+              for name,b in before.items():
+                  a=after[name]
+                  assert a[0]==b[0],f'Fixture count changed: {name}'
+                  print(f'{name:20s} n={a[0]:3d}: top1 {b[1]}->{a[1]} ({a[1]-b[1]:+d}), top3 {b[2]}->{a[2]} ({a[2]-b[2]:+d}), p95 {b[3]:.1f}->{a[3]:.1f}ms')
+                  if name in ('known_word','stable_words','word_one_typo','word_typos','joined_exact','joined_0_typos'):
+                      assert a[1]>=b[1],f'Easy or correct word regressed: {name}'
+                  assert a[2]>=b[2],f'Top-three coverage regressed: {name}'
+              assert after['ALL'][1]>=before['ALL'][1],f'Overall top-one regression: {klass}'
+              assert after['ALL'][3]<=max(150.0,before['ALL'][3]*5), 'Severe latency regression'
+          print('PASS: 147 baseline and independent 340-case holdout A/B quality gates')
+          PY
+      - name: Preserve raw evidence even when research fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-SentenceFlow-RescueMargin-487-Case-A-B
+          path: |
+            ${{ runner.temp }}/pinned-*.txt
+            ${{ runner.temp }}/experiment-*.txt
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Scope
+        if: success()
+        run: echo "Offline Java research only. No APK created, released, or tested on Samsung."
