@@ -615,9 +615,9 @@ public final class RebornImeService extends InputMethodService {
                 case MotionEvent.ACTION_CANCEL: {
                     final InputConnection editor=gestureEditor[0];
                     final long sessionAtDown=gestureSession[0];
-                    boolean sameSession=editor!=null &&
-                            editor==getCurrentInputConnection() &&
-                            sessionAtDown==inputSessionGeneration;
+                    boolean sameSession=BackspaceSwipePolicy.sameEditorSession(
+                            sessionAtDown,inputSessionGeneration,
+                            editor,getCurrentInputConnection());
                     boolean shouldCommit=event.getActionMasked()==MotionEvent.ACTION_UP &&
                             !cancelled[0] && sameSession;
                     int words=swiping[0]?swipeWords[0]:0;
@@ -633,11 +633,12 @@ public final class RebornImeService extends InputMethodService {
                     // Android 17 Build 287 crash: DO NOT change the view tree
                     // or editor while the Backspace touch event is dispatching.
                     suggestionHandler.post(()->{
-                        if(editor==null || editor!=getCurrentInputConnection() ||
-                                sessionAtDown!=inputSessionGeneration)return;
+                        if(!BackspaceSwipePolicy.sameEditorSession(
+                                sessionAtDown,inputSessionGeneration,
+                                editor,getCurrentInputConnection()))return;
                         if(swipe)deleteSwipeWords(words);
                         else if(tap)backspace();
-                        showSuggestions();
+                        // refreshView already updates the suggestion strip.
                         refreshView();
                     });
                     return true;
@@ -1643,7 +1644,8 @@ public final class RebornImeService extends InputMethodService {
         // onUpdateSelection can lag the touch callback in third-party editors.
         // Trust the editor's live selected text as well as our cached selection.
         CharSequence selected=ic.getSelectedText(0);
-        if(hasSelection() || (selected!=null && selected.length()>0)) {
+        boolean liveSelection=selected!=null ? selected.length()>0 : hasSelection();
+        if(liveSelection) {
             currentFinish();
             ic.commitText("",1);
         } else {
