@@ -10,21 +10,34 @@ gradle --no-daemon --stacktrace :app:assembleDebug
 APK=app/build/outputs/apk/debug/app-debug.apk
 test -s "$APK"
 adb install -r "$APK"
-# Fail with an actionable Android service listing, not an unexplained
-# pipefail when ime list/grep uses a different component-name spelling.
-adb shell ime list -s | tr -d '\r' | tee "$OUT/installed-imes.txt"
-IME="$(grep -F "$PKG/" "$OUT/installed-imes.txt" | grep -F 'RebornImeService' | head -n1 || true)"
+# Android's InputMethodManager may not index a newly installed keyboard
+# synchronously with package installation. Launch the debug-only fixture once
+# to resolve its process, then query all registered IMEs with retry.
+adb shell am start -W -n "${PKG}/com.chroomareborn.keyboard.MainActivity" \
+  --ez orivra_ui_capture true >/dev/null
+sleep 4
+IME=""
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  adb shell ime list -a -s | tr -d '\r' | tee "$OUT/installed-imes.txt"
+  IME="$(grep -F "$PKG/" "$OUT/installed-imes.txt" | grep -F 'RebornImeService' | head -n1 || true)"
+  if [[ -n "$IME" ]]; then break; fi
+  echo "Waiting for Android IME service registration, pass $attempt/10"
+  sleep 4
+done
 if [[ -z "$IME" ]]; then
-  echo "FAIL: Android did not report Candidate's InputMethodService in ime list"
+  echo "FAIL: Android still did not list Candidate's IME after registration retries"
   echo "--- package registrations ---"
   adb shell dumpsys package "$PKG" | grep -E -C 3 'RebornImeService|android.view.InputMethod|BIND_INPUT_METHOD' || true
-  echo "Packages containing Orivra:"
-  adb shell pm list packages | grep -F 'chroomareborn' || true
+  echo "--- Android input-method manager state ---"
+  adb shell dumpsys input_method | grep -E -C 2 'build293trial|RebornImeService|mMethodMap' | head -n 100 || true
   exit 1
 fi
 echo "Found IME $IME"
 adb shell ime enable "$IME"
 adb shell ime set "$IME"
+# Restart the temporary fixture AFTER selecting Orivra. This prompts Android
+# to build its actual IME window for the now-active editor.
+adb shell am force-stop "$PKG"
 adb shell am start -W -n "${PKG}/com.chroomareborn.keyboard.MainActivity" \
   --ez orivra_ui_capture true
 sleep 4
