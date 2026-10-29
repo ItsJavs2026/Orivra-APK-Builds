@@ -60,7 +60,8 @@ jobs:
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java
           test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
-          test -s app/src/main/assets/dictionaries/esdb-en-US-60.txt.gz
+          # Compressed asset is intentionally generated only in the Android
+          # job; the Java source-only job must not require it at checkout.
           ! grep -Fq 'OfflineLanguagePackWorker' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'EditorSuggestionPrivacyPolicy.decide(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
