@@ -3,7 +3,9 @@ package com.chroomareborn.keyboard;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 
 /**
@@ -135,19 +137,13 @@ public final class SentenceFlowAccuracyBenchmark {
     }
     public static void main(String[] argv){
         final List<Example> corpus=samples();
-        final List<Stats> groups=new ArrayList<>();
+        final Map<String,Stats> groups=new LinkedHashMap<>();
         Stats all=new Stats("ALL");
-        String last="";
-        Stats current=null;
         // Load dictionary before taking measurements.
         PredictionLite.suggestions("hello");
         long start=System.nanoTime();
         for(Example e:corpus) {
-            if(!last.equals(e.group)) {
-                current=new Stats(e.group);
-                groups.add(current);
-                last=e.group;
-            }
+            Stats current=groups.computeIfAbsent(e.group,Stats::new);
             long t0=System.nanoTime();
             List<String> output=PredictionLite.suggestions(e.input);
             long elapsed=System.nanoTime()-t0;
@@ -166,7 +162,7 @@ public final class SentenceFlowAccuracyBenchmark {
                     (output.isEmpty() || !eq(output.get(0),e.expected)))
                 throw new AssertionError("Protected verified word changed: "+e.input);
         }
-        for(Stats group:groups) {
+        for(Stats group:groups.values()) {
             System.out.println(group.summary());
             for(String missing:group.missedExamples)System.out.println("  MISS "+missing);
         }
