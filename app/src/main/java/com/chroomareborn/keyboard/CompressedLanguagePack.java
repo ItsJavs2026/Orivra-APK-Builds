@@ -22,7 +22,7 @@ import java.util.zip.GZIPInputStream;
  * Missing/corrupted pack must leave the original Candidate 300 engine intact.
  */
 final class CompressedLanguagePack {
-    static final String ASSET_PATH="dictionaries/esdb-en-US-60.txt.gz";
+    static final String ASSET_PATH="dictionaries/esdb-en-US-60.esdbpack";
     static final String EXPECTED_SOURCE_SHA256=
             "a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600";
     static final int MAX_UNCOMPRESSED_BYTES=1_350_000;
