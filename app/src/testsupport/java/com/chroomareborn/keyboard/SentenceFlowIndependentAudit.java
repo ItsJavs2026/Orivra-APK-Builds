@@ -78,6 +78,15 @@ public final class SentenceFlowIndependentAudit {
         return words;
     }
 
+    // Negative controls are complete dictionary words, not joined strings:
+    // no candidate-generation experiment may split or corrupt them.
+    private static final String[] COMPLETE_WORDS = {
+        "keyboard","prediction","language","sentence","question",
+        "suggestion","application","interesting","settings",
+        "wonderful","tomorrow","beautiful","correction",
+        "learning","attention","movement"
+    };
+
     public static void main(String[] args) {
         String[] groups={"joined_exact","two_words_one_each",
                          "one_long_word_two","one_short_word_two"};
@@ -113,5 +122,20 @@ public final class SentenceFlowIndependentAudit {
                     "AUDIT %s n=%d top1=%d top3=%d nonempty=%d p95=%.2fms%n",
                     group,count,top1,top3,nonEmpty,p95);
         }
+        int exactTop1=0,exactTop3=0;
+        for(String word:COMPLETE_WORDS){
+            List<String> candidates=PredictionLite.suggestions(word);
+            String first=candidates.isEmpty()?"":candidates.get(0);
+            if(first.equalsIgnoreCase(word))exactTop1++;
+            boolean found=false;
+            for(int i=0;i<Math.min(3,candidates.size());i++)
+                if(candidates.get(i).equalsIgnoreCase(word))found=true;
+            if(found)exactTop3++;
+            System.out.printf("CASE\tknown_words\t%s\t%s\t%s%n",
+                    word,word,first);
+        }
+        System.out.printf(Locale.ROOT,
+                "AUDIT known_words n=%d top1=%d top3=%d nonempty=%d p95=0.00ms%n",
+                COMPLETE_WORDS.length,exactTop1,exactTop3,COMPLETE_WORDS.length);
     }
 }
