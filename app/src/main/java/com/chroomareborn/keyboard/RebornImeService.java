@@ -2531,7 +2531,6 @@ public final class RebornImeService extends InputMethodService {
             String shownSuggestion=suggestionCase(suggestion);
             if(!TextUtils.equals(option.getText(),shownSuggestion))
                 option.setText(shownSuggestion);
-            option.setTextColor(suggestionTextColor);
             boolean fullSentenceChip=longPhrase && suggestion.indexOf(' ')>=0;
             option.setTextSize(SuggestionVisualStyle.textSizeSp(fullSentenceChip,
                     suggestion.codePointCount(0,suggestion.length())));
@@ -2559,6 +2558,8 @@ public final class RebornImeService extends InputMethodService {
                     input,suggestion,i,shownCount==1?0:emphasizedIndex);
             int tileColor=SuggestionVisualStyle.chipColor(
                     suggestionBackground,keyBackground,themeDark,emphasize);
+            option.setTextColor(SuggestionVisualStyle.readableText(
+                    suggestionTextColor,tileColor));
             if(!(option.getTag() instanceof Integer) ||
                     ((Integer)option.getTag())!=tileColor) {
                 option.setBackground(feedbackBackground(tileColor));
