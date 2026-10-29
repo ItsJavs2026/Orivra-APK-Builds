@@ -15,6 +15,14 @@ public final class EnterKeyPolicyTest {
         check(!EnterKeyPolicy.supportsLongPressSend(
                 4 | EnterKeyPolicy.IME_FLAG_NO_ENTER_ACTION),
                 "Editor requests plain Enter even when SEND is also advertised");
+        check(EnterKeyPolicy.supportsNewline(0x20001),
+                "multiline text input supports newline");
+        check(!EnterKeyPolicy.supportsNewline(0x1),
+                "single-line text must not submit through newline");
+        check(!EnterKeyPolicy.supportsNewline(0x2),
+                "numeric editor must not get newline");
+        check(!EnterKeyPolicy.supportsNewline(0),
+                "unspecified editor must fail closed");
         check(EnterKeyPolicy.gestureWithinSlop(3,4,18), "small thumb movement");
         check(!EnterKeyPolicy.gestureWithinSlop(30,1,18), "large horizontal drag");
         check(!EnterKeyPolicy.gestureWithinSlop(1,-30,18), "large vertical drag");
