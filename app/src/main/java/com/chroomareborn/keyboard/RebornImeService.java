@@ -1537,7 +1537,11 @@ public final class RebornImeService extends InputMethodService {
         }
         if (!value.matches("[A-Za-z]")) updateSentenceShift();
         showSuggestions();
-        if (!numericEditor && (usedShift || !value.matches("[A-Za-z]")) && !capsLock) suggestionHandler.post(this::refreshView);
+        // Symbol taps should not discard and rebuild the key view while a
+        // finger is still down. Mode/page toggles already refresh explicitly.
+        if (!numericEditor && !symbols &&
+                (usedShift || !value.matches("[A-Za-z]")) && !capsLock)
+            suggestionHandler.post(this::refreshView);
     }
     private void backspace() {
         invalidateEditingTicket();
