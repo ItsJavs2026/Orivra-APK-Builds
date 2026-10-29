@@ -1774,7 +1774,9 @@ public final class RebornImeService extends InputMethodService {
             final String composingAtStart=composing;
             ic.beginBatchEdit();
             try {
-                if(!composingAtStart.isEmpty())currentFinish();
+                // Preserve the original editor-finalization behavior even
+                // when Orivra's local composing buffer is empty.
+                currentFinish();
                 CharSequence liveBefore=ic.getTextBeforeCursor(2048,0);
                 int chars=BackspaceSwipePolicy.safeCharsToDelete(
                         liveBefore,composingAtStart,words);
