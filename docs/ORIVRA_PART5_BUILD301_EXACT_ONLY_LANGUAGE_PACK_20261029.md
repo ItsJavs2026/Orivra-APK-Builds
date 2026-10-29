@@ -40,7 +40,7 @@ In the 80+100 individually compared audit examples: **14 wrong-to-right, 0 right
 Measured research Java resource use: around **76–81 ms pack load** and approximately **5.2–5.4 MiB additional heap** on the GitHub Linux Java 17 runner. These are not Samsung keypress latency, frame time, background memory, Android APK size or startup performance.
 
 ## Android qualification and release boundary
-Source-only native Android 35 emulator regression workflow: [run 40970548089](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40970548089). **Verify final result before claiming Android pass.** The workflow compiles Android with the new Java classes, validates 18 instrumented tests and preserves `RebornImeService.java`, `EditorSuggestionPrivacyPolicy.java`, manifest and build application ID byte-identical to Candidate 300. It deliberately uploads and publishes **no APK**.
+Source-only native Android 35 emulator regression workflow: [run 40970548089](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40970548089) **SUCCESS**. The Java regression job passed, including 43 Keep/privacy assertions and 11 new exact-word segmentation assertions. The Android 35 Pixel 6 emulator log confirms **18 tests started, 18 tests finished, BUILD SUCCESSFUL in 1m53s**. The workflow compiles Android with the new classes and confirms `RebornImeService.java`, `EditorSuggestionPrivacyPolicy.java`, manifest, and app application ID byte-identical to Candidate 300. It deliberately uploads and publishes **no APK**. Physical Samsung acceptance of Build 301 has not happened.
 
 The ESDB data is **not bundled**, so even if Android CI passes, the standalone research source by itself does not add those 78,942 words to installed Orivra.
 
