@@ -269,6 +269,11 @@ final class PredictionLite {
             }
         }
 
+        // Build 297 research: add generic, verified offline vocabulary and
+        // inflections only when base+past+participle evidence already exists.
+        // Installed IME behavior, text-edit semantics and UI are unchanged.
+        LexiconFamilyExpander.enrich(WORDS);
+
         for(Map.Entry<String,Integer> entry:WORDS.entrySet()) {
             int length=entry.getKey().length();
             WORDS_BY_LENGTH.computeIfAbsent(length,k->new ArrayList<>()).add(entry);
