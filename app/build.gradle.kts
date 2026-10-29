@@ -3,16 +3,16 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build290trial"
+        applicationId = "com.chroomareborn.keyboard.build292trial"
         minSdk = 26
         targetSdk = 35
-        versionCode = 290
-        versionName = "1.0.16-build290-swipesafety"
-        manifestPlaceholders["appLabel"] = "Orivra Build 290 Trial"
+        versionCode = 292
+        versionName = "1.0.18-build292-enter-swipe"
+        manifestPlaceholders["appLabel"] = "Orivra Build 292 Trial"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Build 290 Trial"
+            manifestPlaceholders["appLabel"] = "Orivra Build 292 Trial"
         }
     }
     compileOptions {
