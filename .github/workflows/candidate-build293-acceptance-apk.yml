@@ -1,0 +1,171 @@
+name: Orivra Candidate 293 - Samsung acceptance APK
+on:
+  push:
+    branches:
+      - candidate/build293-samsung-acceptance-20261029
+    paths:
+      - .github/workflows/candidate-build293-acceptance-apk.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  java-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Validate isolation, safe Enter and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build293trial' app/build.gradle.kts
+          grep -Fq 'EnterKeyPolicy.supportsNewline(info.inputType)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'EnterKeyPolicy.shouldSendOnRelease(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'BackspaceSwipeEditorTransaction.apply(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'BackspaceRepeatGuard.repeatAllowed(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'ThemeStatusLabel.compact(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'enterTouchActive' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'event.getRawX()-startX[0]' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'ThemeStatusLabel.expandedChip(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'if(paletteBar!=null)paletteBar.setVisibility(View.VISIBLE)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          if git ls-files | grep -Ei '(^research/|^evaluation/|^scripts/|^app/src/debug/|\.(jks|keystore|p12|pem|pfx|key)$)'; then exit 1; fi
+      - name: Run 16 Java suites including 362k seeded Backspace, Enter, touch and theme cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/orivra-classes"
+          javac -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/KeyboardLayoutSpec.java \
+            app/src/main/java/com/chroomareborn/keyboard/KeyboardHapticStyle.java \
+            app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeEditorTransaction.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceRepeatGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/ThemeStatusLabel.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionStripLayoutPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PunctuationSpacing.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/SpacebarCursorGesture.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorSwipeBatch.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorMovementPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorFallbackBoundaryPolicy.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardLayoutSpecTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardHapticStyleTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipePolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipeEditorTransactionTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceRepeatGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ThemeStatusLabelTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterReleaseBoundaryTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SuggestionStripLayoutPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PunctuationSpacingTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SpacebarCursorGestureTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorSwipeBatchTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorFallbackBoundaryPolicyTest.java
+          for suite in EnterKeyPolicyTest BackspaceSwipePolicyTest BackspaceSwipeSnapshotGuardTest BackspaceSwipeEditorTransactionTest BackspaceRepeatGuardTest ThemeStatusLabelTest EnterReleaseBoundaryTest KeyboardLayoutSpecTest KeyboardHapticStyleTest SuggestionStripLayoutPolicyTest PunctuationSpacingTest CursorWordCorrectionPolicyTest SpacebarCursorGestureTest CursorSwipeBatchTest CursorReleaseSuggestionPolicyTest CursorFallbackBoundaryPolicyTest; do
+            java -ea -cp "$RUNNER_TEMP/orivra-classes" "com.chroomareborn.keyboard.$suite"
+          done
+  android-test-and-package:
+    needs: java-regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Verify isolated Samsung test identity and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build293trial' app/build.gradle.kts
+          grep -Fq 'versionCode = 293' app/build.gradle.kts
+          grep -Fq 'Orivra Candidate 293' app/build.gradle.kts
+          grep -Fq 'Orivra — Candidate 293 Test' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+      - name: Enable emulator hardware acceleration
+        shell: bash
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - name: Android 35 emulator tests and build the exact Candidate APK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug
+      - name: Validate actual APK package identity signature and requested permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 | tee /tmp/orivra-build293-identity.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build293trial' versionCode='293'" /tmp/orivra-build293-identity.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | tee /tmp/orivra-build293-permissions.txt
+          if grep -Fq 'android.permission.INTERNET' /tmp/orivra-build293-permissions.txt; then
+            echo "Unexpected network permission in test APK"
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$apk" dist/Orivra-Candidate-293.apk
+          cd dist
+          sha256sum Orivra-Candidate-293.apk | tee Orivra-Candidate-293.apk.sha256
+      - name: Upload tested APK and checksum as a GitHub Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate-293-Samsung-Test
+          path: |
+            dist/Orivra-Candidate-293.apk
+            dist/Orivra-Candidate-293.apk.sha256
+          retention-days: 21
+          if-no-files-found: error
+      - name: Publish public pre-release direct APK download after passing tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/candidate293-notes.md" <<'ORIVRA_NOTES'
+          Orivra Candidate 293 — Samsung Galaxy S26 Ultra acceptance build
+          
+          Pre-release trial keyboard. This APK is a GitHub Actions DEBUG-SIGNED APK, not a production release.
+          Separate application package: com.chroomareborn.keyboard.build293trial; it will not overwrite previous Orivra installs.
+          
+          Test: Backspace swipe delete of likethis / heythere, live highlighted preview, tap-versus-hold Backspace,
+          Safe Enter tap versus intentional held SEND in a multiline editor, selected theme name and Dark/Light status,
+          prediction stability and key responsiveness.
+          
+          Do not use for passwords or sensitive text; use a scratch test note and an unsent message.
+          Future Candidate upgrades may require uninstalling this test APK because CI creates an ephemeral debug signing key.
+          Never uninstall your stable Preview #178 / Build 262 as part of this Candidate test.
+          ORIVRA_NOTES
+          gh release create candidate-293-20261029 \
+            dist/Orivra-Candidate-293.apk \
+            dist/Orivra-Candidate-293.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 293 — Samsung Acceptance Test" \
+            --notes-file "$RUNNER_TEMP/candidate293-notes.md" \
+            --prerelease
+          gh release view candidate-293-20261029 --repo "$GITHUB_REPOSITORY"
