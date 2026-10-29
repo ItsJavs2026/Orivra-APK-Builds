@@ -27,7 +27,8 @@ final class AppPalette {
     static final int APP_MATCH = 1;
     static final int MATERIAL_AUTO = 2;
     static final int PURPLE = 3, TEAL = 4, ORANGE = 5, CLASSIC = 6;
-    static final int MODE_COUNT = 7;
+    static final int CLEAN_NEUTRAL = 7; // Gboard-inspired neutral appearance, original Orivra colors.
+    static final int MODE_COUNT = 8;
     static final int DEFAULT = APP_SHADED;
 
     static final class Result {
@@ -59,6 +60,7 @@ final class AppPalette {
             case TEAL: return "Teal";
             case ORANGE: return "Orange";
             case CLASSIC: return "Classic";
+            case CLEAN_NEUTRAL: return "Clean Neutral";
             default: return "App Match — Shaded";
         }
     }
@@ -79,6 +81,15 @@ final class AppPalette {
         int mode=normalized(ctx.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
                 .getInt(KEY_MODE,DEFAULT));
         if(mode==MATERIAL_AUTO) return material(ctx,dark);
+        if(mode==CLEAN_NEUTRAL) {
+            // High-contrast, clean keycaps reminiscent of the familiar
+            // neutral mobile-keyboard aesthetic. No third-party graphics.
+            return dark ?
+                    result(0xFF202124,0xFF383A40,0xFF4A4C52,0xFF8AB4F8,
+                            true,"Clean Neutral • Dark"):
+                    result(0xFFF1F3F4,0xFFFFFFFF,0xFFDDE1E6,0xFF1A73E8,
+                            false,"Clean Neutral • Light");
+        }
 
         Float hue=null;
         String source="";
