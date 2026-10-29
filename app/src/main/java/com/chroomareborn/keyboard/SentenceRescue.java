@@ -140,7 +140,12 @@ final class SentenceRescue {
                 &&Integer.bitCount(wordMask&~typedMask)<=limit;
     }
     private static int maxEdits(String f) {
-        int n=f.length();return n>=9?4:n>=7?3:n>=5?2:n>=2?1:0;
+        int n=f.length();
+        // Four-character fragments can hide two typing errors inside a
+        // longer joined sentence. Only strongly anchored 2-edit choices
+        // survive the filter in options(), so this is not broad fuzzy
+        // autocorrection of ordinary short words.
+        return n>=9?4:n>=7?3:n>=4?2:n>=2?1:0;
     }
     /**
      * Protect plausible long words whose multiple interior typos make them
@@ -182,6 +187,13 @@ final class SentenceRescue {
                 if(!maskCompatible(fragmentMask,entry.letterMask,limit))continue;
                 int edits=distance(fragment,word,limit);
                 if(edits>limit)continue;
+                // For short spans, two edits need two exact boundary anchors.
+                // Prevent a large cloud of unrelated 4-letter alternatives.
+                if(fragment.length()==4 && edits==2 &&
+                        (word.length()<4 ||
+                        word.charAt(0)!=fragment.charAt(0) ||
+                        word.charAt(word.length()-1)!=fragment.charAt(3)))
+                    continue;
                 double emission=Math.log(entry.frequency)*0.8-4.25*edits-3.65-
                         (word.length()<=2?0.5:0);
                 candidates.add(new Candidate(word,edits,emission));
