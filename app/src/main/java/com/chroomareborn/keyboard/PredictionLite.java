@@ -253,6 +253,22 @@ final class PredictionLite {
         extendPhrase("we","can","will","should","need");
 
 
+        // Any clean word we publicly offer as a FIRST-LETTER completion
+        // should also count as an ordinary correctly spelled whole word.
+        // Previously "q" suggested "question", but "question" itself
+        // could be split into unrelated smaller words because it was absent
+        // from WORDS. Share a single source of offline lexical truth rather
+        // than hardcoding corrections for individual screenshot fixtures.
+        // Skip contractions, hyphens and single-character shortcuts; the
+        // existing normalized-display and secure-field rules still apply.
+        for(String[] completions:FIRST_LETTER.values()) {
+            for(String option:completions) {
+                String lexical=option.toLowerCase(Locale.US);
+                if(lexical.matches("[a-z]{2,24}"))
+                    WORDS.putIfAbsent(lexical,18);
+            }
+        }
+
         for(Map.Entry<String,Integer> entry:WORDS.entrySet()) {
             int length=entry.getKey().length();
             WORDS_BY_LENGTH.computeIfAbsent(length,k->new ArrayList<>()).add(entry);
