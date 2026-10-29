@@ -1,22 +1,20 @@
-# Orivra — Public APK Build Channel
+# Orivra Build 286 — Clean Public Trial
 
-This repository is a **clean public build channel**, separate from the private `Chrooma-Reborn` development repository.
+This is a reviewed, clean snapshot of the private Build 286 candidate branch, NOT a fork or mirror of its history. It includes 36 Android Java source files, 13 selected synthetic regression tests, required Android resources, and the attributed SwiftFloris English bigram seed.
 
-**Current status:** infrastructure only. No Orivra source has been published here, and no APK from this repository has been built or approved.
+**WARNING:** Public GitHub upload makes every included source and asset accessible to others. No private signing key, production credentials, research dataset, screenshots, personal typing, private CI, or full Git history is included.
 
-## What is here
-- Manual-only GitHub Actions workflow: [Build Public Trial](../../actions/workflows/build-public-trial.yml)
-- Android Gradle 8.7.3/Gradle 8.9 configuration
-- Distinct trial Android package ID: `com.chroomareborn.keyboard.publictrial`
-- [Publication safeguards](PUBLICATION_GATE.md) and [source approval checklist](docs/PUBLIC_SOURCE_APPROVAL.md)
+## Upload safely
 
-## Source publication boundary
-The public build will eventually include **reviewed, build-required source files only**. They will be visible to everyone. It will never import or fork the private Git history or copy sensitive keys, user screenshots/typing, or experimental third-party datasets. Third-party license/NOTICE obligations must be preserved.
+1. Extract this ZIP and open the `Orivra_Build286_Public_Trial` directory.
+2. Open the public GitHub repository `ItsJavs2026/Orivra-APK-Builds`.
+3. Use **Add file > Upload files** and upload the **contents** of the extracted folder, preserving `.github/workflows/build-public-trial.yml` and all directories. GitHub's web upload can have trouble with nested folders/overwriting existing files. If it cannot preserve the structure, use GitHub Desktop or Git from a computer; do not upload a single ZIP as a repo file.
+4. Existing public repo contains older workflow/build files. Replace them with the files in this package. Check the GitHub diff before committing. Do not delete `PUBLICATION_GATE.md` or other safety docs unnecessarily.
+5. Go to Actions > **Orivra Build 286 Public Trial - manual qualification** > Run workflow.
+6. Only if CI is green, inspect APK ID/signature/permissions and download the artifact for separate device testing.
 
-## Install safety
-The public trial app has a separate package ID and cannot replace the existing `.candidate` or `.stablepreview` versions. GitHub-hosted debug keys are disposable; APK signing identities can change between public runs. Never uninstall a working Candidate or Preview #178 just to force an APK update.
+## Safety and signing
 
-Do not use a prototype keyboard for credentials or other sensitive entries. An Android build success does not prove phone behavior.
+Android package ID: `com.chroomareborn.keyboard.publictrial` (not `.candidate` or `.stablepreview`). Debug APKs from separate hosted runs may be signed with different ephemeral keys, so updates may require uninstalling *only the publictrial test app*. Never uninstall the working Orivra Candidate or Preview #178 to install this.
 
-## Next step
-Review and approve the *specific source snapshot* for publication, then run the first manual Actions build and inspect its logs, APK identity and signing certificate.
+**Status: Source package integrity verified, Android compilation NOT verified, Samsung Android 17 NOT verified.** No claim of full legal clearance or absence of bugs is made. See `PUBLICATION_REVIEW.md`.

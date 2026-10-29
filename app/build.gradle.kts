@@ -1,15 +1,13 @@
 plugins { id("com.android.application") }
-
 android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        // This separate trial package cannot replace any existing Orivra install.
         applicationId = "com.chroomareborn.keyboard.publictrial"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-publictrial"
+        versionCode = 286
+        versionName = "1.0.12-build286-publictrial"
         manifestPlaceholders["appLabel"] = "Orivra Public Trial"
     }
     buildTypes {

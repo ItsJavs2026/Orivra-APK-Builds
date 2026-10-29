@@ -1,15 +1,12 @@
 .gradle/
-build/
 **/build/
 .idea/
 *.iml
 local.properties
-*.keystore
 *.jks
+*.keystore
 *.p12
 *.pem
-*.pfx
 *.key
 .env
 .env.*
-.DS_Store

@@ -1,0 +1,430 @@
+package com.chroomareborn.keyboard;
+
+import android.app.Activity;
+import android.content.Context;
+import android.os.Bundle;
+import android.graphics.Color;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.ScrollView;
+
+public final class MainActivity extends Activity {
+    // Standalone preview worker: separate from the IME's own prediction queue.
+    // Does not persist or transmit entered strings or prediction results.
+    private final PredictionDispatcher previewDispatcher=new PredictionDispatcher();
+    private int dp(float n) { return Math.round(getResources().getDisplayMetrics().density * n); }
+
+    @Override public void onCreate(Bundle state) {
+        super.onCreate(state);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(18), dp(24), dp(18), dp(16));
+        root.setBackgroundColor(0xFFF6F7FA);
+
+        TextView title = new TextView(this);
+        title.setText("Orivra — SentenceFlow Alpha");
+        title.setTextColor(Color.BLACK);
+        title.setTextSize(22);
+        root.addView(title);
+
+        TextView notes = new TextView(this);
+        notes.setText("\nMaterial-inspired keys, phone light/dark switching, app-matched shaded colors, and starter predictions. App matching uses icon hues or system dynamic color, not screenshots. Spacebar cursor swiping is available; letter-to-letter swipe typing and Sentence Lab v0.9.2 are not yet fully integrated. Keep Gboard installed and avoid sensitive typing.\n");
+        notes.setTextColor(0xFF303846);
+        notes.setTextSize(15);
+        root.addView(notes);
+
+        Button settings = new Button(this);
+        settings.setText("1. Enable keyboard in Android settings");
+        settings.setOnClickListener(v -> startActivity(new android.content.Intent("android.settings.INPUT_METHOD_SETTINGS")));
+        root.addView(settings);
+
+        Button picker = new Button(this);
+        picker.setText("2. Choose Orivra SentenceFlow keyboard");
+        picker.setOnClickListener(v -> {
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showInputMethodPicker();
+        });
+        root.addView(picker);
+
+        Button theme = new Button(this);
+        int initialMode=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE).getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
+        theme.setText("3. Keyboard theme: "+AppPalette.modeName(initialMode));
+        theme.setOnClickListener(v -> {
+            int mode=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                    .getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
+            int next=AppPalette.nextMode(mode);
+            getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                    .edit().putInt(AppPalette.KEY_MODE,next).apply();
+            theme.setText("3. Keyboard theme: "+AppPalette.modeName(next));
+            android.widget.Toast.makeText(this,"Tap the palette icon on the keyboard to see changes immediately",android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(theme);
+
+        Button height=new Button(this);
+        int saved=getSharedPreferences(KeyboardSizing.PREFS,MODE_PRIVATE)
+                .getInt(KeyboardSizing.KEY_MODE,KeyboardSizing.DEFAULT);
+        height.setText("6. Keyboard height: "+KeyboardSizing.name(saved));
+        height.setOnClickListener(v -> {
+            int mode=getSharedPreferences(KeyboardSizing.PREFS,MODE_PRIVATE)
+                    .getInt(KeyboardSizing.KEY_MODE,KeyboardSizing.DEFAULT);
+            int next=KeyboardSizing.next(mode);
+            getSharedPreferences(KeyboardSizing.PREFS,MODE_PRIVATE)
+                    .edit().putInt(KeyboardSizing.KEY_MODE,next).apply();
+            height.setText("6. Keyboard height: "+KeyboardSizing.name(next));
+            android.widget.Toast.makeText(this,
+                    "Size saved. Reopen the keyboard or tap ↕ beside the palette.",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(height);
+
+        boolean follow=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                .getBoolean(AppPalette.KEY_FOLLOW_SYSTEM,true);
+        Button system=new Button(this);
+        system.setAllCaps(false);
+        system.setText("4. Follow Samsung Light/Dark: "+(follow?"ON":"OFF"));
+        root.addView(system);
+        system.setOnClickListener(v -> {
+            boolean old=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                    .getBoolean(AppPalette.KEY_FOLLOW_SYSTEM,true);
+            boolean next=!old;
+            getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE).edit()
+                    .putBoolean(AppPalette.KEY_FOLLOW_SYSTEM,next).apply();
+            system.setText("4. Follow Samsung Light/Dark: "+(next?"ON":"OFF"));
+        });
+        Button appearance=new Button(this);
+        appearance.setAllCaps(false);
+        boolean manualDark=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                .getBoolean(AppPalette.KEY_MANUAL_DARK,true);
+        appearance.setText("5. Manual Light/Dark (if follow OFF): "+(manualDark?"Dark":"Light"));
+        root.addView(appearance);
+        appearance.setOnClickListener(v -> {
+            boolean old=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                    .getBoolean(AppPalette.KEY_MANUAL_DARK,true);
+            boolean next=!old;
+            getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE).edit()
+                    .putBoolean(AppPalette.KEY_MANUAL_DARK,next).apply();
+            appearance.setText("5. Manual Light/Dark (if follow OFF): "+(next?"Dark":"Light"));
+        });
+        // Build 285 — explicit local vocabulary, separate from automatic
+        // correction learning. This screen never reads editor content.
+        TextView dictionaryTitle=new TextView(this);
+        dictionaryTitle.setText("\nPersonal dictionary (English single words only)");
+        dictionaryTitle.setTextSize(17);
+        dictionaryTitle.setTextColor(0xFF303846);
+        root.addView(dictionaryTitle);
+
+        TextView dictionaryInfo=new TextView(this);
+        dictionaryInfo.setText(PersonalDictionary.summary(this)
+                +"\nSave names or words you use often. Do not save passwords.");
+        dictionaryInfo.setTextColor(0xFF455263);
+        root.addView(dictionaryInfo);
+
+        EditText dictionaryWord=new EditText(this);
+        dictionaryWord.setSingleLine(true);
+        dictionaryWord.setInputType(InputType.TYPE_CLASS_TEXT|
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        dictionaryWord.setHint("Word to add or remove (2–24 letters)");
+        root.addView(dictionaryWord,new LinearLayout.LayoutParams(-1,dp(56)));
+
+        Button addDictionaryWord=new Button(this);
+        addDictionaryWord.setAllCaps(false);
+        addDictionaryWord.setText("Add word to my dictionary");
+        addDictionaryWord.setOnClickListener(v->{
+            PersonalDictionary.Add status=PersonalDictionary.add(this,
+                    dictionaryWord.getText().toString());
+            String message;
+            switch(status) {
+                case ADDED: message="Saved locally.";break;
+                case EXISTS: message="This word is already saved.";break;
+                case FULL: message="Personal dictionary is full (250 words).";break;
+                default: message="Use only 2–24 English letters, without spaces.";
+            }
+            android.widget.Toast.makeText(this,message,
+                    android.widget.Toast.LENGTH_SHORT).show();
+            dictionaryInfo.setText(PersonalDictionary.summary(this));
+        });
+        root.addView(addDictionaryWord);
+
+        Button removeDictionaryWord=new Button(this);
+        removeDictionaryWord.setAllCaps(false);
+        removeDictionaryWord.setText("Remove entered word");
+        removeDictionaryWord.setOnClickListener(v->{
+            boolean removed=PersonalDictionary.remove(this,
+                    dictionaryWord.getText().toString());
+            android.widget.Toast.makeText(this,
+                    removed?"Word removed.":"No matching saved word.",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            dictionaryInfo.setText(PersonalDictionary.summary(this));
+        });
+        root.addView(removeDictionaryWord);
+
+        Button inspectDictionary=new Button(this);
+        inspectDictionary.setAllCaps(false);
+        inspectDictionary.setText("View saved words");
+        inspectDictionary.setOnClickListener(v->{
+            java.util.List<String> words=PersonalDictionary.savedWords(this);
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("My saved words (on device)")
+                .setMessage(words.isEmpty()?"No saved words yet.":
+                        android.text.TextUtils.join("\n",words))
+                .setPositiveButton("Close",null)
+                .show();
+        });
+        root.addView(inspectDictionary);
+
+        // Learning controls belong to the Activity, not a modal IME window.
+        TextView learningTitle = new TextView(this);
+        learningTitle.setText("Orivra Learning v1 — on-device, single-word corrections");
+        learningTitle.setTextColor(0xFF303846);
+        learningTitle.setTextSize(16);
+        root.addView(learningTitle);
+
+        Button learning = new Button(this);
+        learning.setAllCaps(false);
+        learning.setText("Learning: " + (PersonalLearning.enabled(this) ? "ON" : "OFF"));
+        learning.setOnClickListener(v -> {
+            boolean next = !PersonalLearning.enabled(this);
+            PersonalLearning.setEnabled(this, next);
+            learning.setText("Learning: " + (next ? "ON" : "OFF"));
+        });
+        root.addView(learning);
+
+        TextView learningStats = new TextView(this);
+        learningStats.setText(PersonalLearning.diagnosticSummary(this));
+        learningStats.setTextColor(0xFF455263);
+        root.addView(learningStats);
+
+        Button refreshLearning = new Button(this);
+        refreshLearning.setAllCaps(false);
+        refreshLearning.setText("Refresh local learning statistics");
+        refreshLearning.setOnClickListener(v ->
+                learningStats.setText(PersonalLearning.diagnosticSummary(this)));
+        root.addView(refreshLearning);
+
+        Button reviewLearning = new Button(this);
+        reviewLearning.setAllCaps(false);
+        reviewLearning.setText("Review learned corrections (on this device)");
+        reviewLearning.setOnClickListener(v -> new android.app.AlertDialog.Builder(this)
+                .setTitle("Locally learned corrections")
+                .setMessage(PersonalLearning.learnedPairs(this))
+                .setPositiveButton("Close", null)
+                .show());
+        root.addView(reviewLearning);
+
+        Button resetLearning = new Button(this);
+        resetLearning.setAllCaps(false);
+        resetLearning.setText("Clear learned corrections (confirm)");
+        resetLearning.setOnClickListener(v -> new android.app.AlertDialog.Builder(this)
+                .setTitle("Clear Orivra learning?")
+                .setMessage("Delete all local learned corrections and disable learning?")
+                .setNegativeButton("Cancel", (dialog, which) -> {})
+                .setPositiveButton("Clear", (dialog, which) -> {
+                    PersonalLearning.clear(this);
+                    learning.setText("Learning: OFF");
+                    learningStats.setText(PersonalLearning.diagnosticSummary(this));
+                }).show());
+        root.addView(resetLearning);
+
+        // This entire panel is invisible to stable-preview and other packages.
+        // Opt-in lives only in process memory; no SharedPreferences or export.
+        if(CandidateLatencyMetrics.isCandidate(getPackageName())) {
+            TextView heading=new TextView(this);
+            heading.setText("\nCandidate-only performance lab (optional)");
+            heading.setTextSize(17);
+            heading.setTextColor(0xFF303846);
+            root.addView(heading);
+
+            TextView explanation=new TextView(this);
+            explanation.setText("Turn on, type in the test box below, then tap Refresh. "
+                    +"Only elapsed times are collected in memory. No typed text, "
+                    +"predictions, or screen content is recorded. Disabling clears results.");
+            explanation.setTextColor(0xFF455263);
+            root.addView(explanation);
+
+            Button latencyToggle=new Button(this);
+            latencyToggle.setAllCaps(false);
+            latencyToggle.setText("Latency recording: "
+                    +(CandidateLatencyMetrics.enabled(getPackageName())?"ON":"OFF"));
+            root.addView(latencyToggle);
+
+            TextView latencySummary=new TextView(this);
+            latencySummary.setTextColor(0xFF303846);
+            latencySummary.setTextIsSelectable(true);
+            latencySummary.setText(CandidateLatencyMetrics.summary(getPackageName()));
+            root.addView(latencySummary);
+
+            latencyToggle.setOnClickListener(v->{
+                boolean next=!CandidateLatencyMetrics.enabled(getPackageName());
+                CandidateLatencyMetrics.setEnabled(getPackageName(),next);
+                latencyToggle.setText("Latency recording: "+(next?"ON":"OFF"));
+                latencySummary.setText(CandidateLatencyMetrics.summary(getPackageName()));
+            });
+            Button refreshLatency=new Button(this);
+            refreshLatency.setAllCaps(false);
+            refreshLatency.setText("Refresh numeric latency report");
+            refreshLatency.setOnClickListener(v->
+                    latencySummary.setText(CandidateLatencyMetrics.summary(getPackageName())));
+            root.addView(refreshLatency);
+
+            Button clearLatency=new Button(this);
+            clearLatency.setAllCaps(false);
+            clearLatency.setText("Clear timing samples");
+            clearLatency.setOnClickListener(v->{
+                CandidateLatencyMetrics.clear(getPackageName());
+                latencySummary.setText(CandidateLatencyMetrics.summary(getPackageName()));
+            });
+            root.addView(clearLatency);
+        }
+
+        TextView cursorHelp=new TextView(this);
+        cursorHelp.setText("Cursor control: slide left or right across the spacebar to move through text. Tap the spacebar to insert a normal space. You can also hold, then slide. Try editing an earlier word in the box below.");
+        cursorHelp.setTextSize(15);
+        cursorHelp.setTextColor(0xFF303846);
+        cursorHelp.setPadding(dp(4),dp(12),dp(4),dp(12));
+        root.addView(cursorHelp);
+
+        EditText test = new EditText(this);
+        test.setSingleLine(false);
+        test.setMinLines(4);
+        test.setGravity(Gravity.TOP);
+        test.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        test.setHint("7. Test here: thisiscookbutitslaking, thsi, hel, or howareyoudoingtoday");
+        root.addView(test, new LinearLayout.LayoutParams(-1, dp(150)));
+        if(CandidateLatencyMetrics.isCandidate(getPackageName())) {
+            TextView previewTitle=new TextView(this);
+            previewTitle.setText("\nFull-sentence inspection (optional)");
+            previewTitle.setTextSize(17);
+            previewTitle.setTextColor(0xFF303846);
+            root.addView(previewTitle);
+
+            TextView previewHelp=new TextView(this);
+            previewHelp.setText("Type a non-sensitive, no-space phrase above, "
+                    +"optionally enter your intended sentence, then tap Inspect. Full predictions and exact-match ranks appear below "
+                    +"in model order. Inspect does not accept or insert text.");
+            previewHelp.setTextColor(0xFF455263);
+            root.addView(previewHelp);
+
+            EditText expected=new EditText(this);
+            expected.setSingleLine(false);
+            expected.setMinLines(2);
+            expected.setInputType(InputType.TYPE_CLASS_TEXT |
+                    InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+            expected.setHint("Optional intended sentence (spaces allowed; no sensitive text)");
+            root.addView(expected,new LinearLayout.LayoutParams(-1,dp(90)));
+
+            TextView previewOutput=new TextView(this);
+            previewOutput.setTextColor(0xFF303846);
+            previewOutput.setTextSize(15);
+            previewOutput.setPadding(dp(10),dp(12),dp(10),dp(12));
+            previewOutput.setTextIsSelectable(true);
+            previewOutput.setText("No prediction inspected yet.");
+            Button inspect=new Button(this);
+            inspect.setAllCaps(false);
+            inspect.setText("Inspect complete prediction candidates");
+            inspect.setOnClickListener(v->{
+                final String typed=test.getText().toString().trim();
+                final String intended=expected.getText().toString().trim();
+                if(!CandidatePreviewReport.supported(typed)
+                        || !CandidatePreviewReport.supportedExpected(intended)) {
+                    previewDispatcher.cancel();
+                    previewOutput.setText(CandidatePreviewReport.supported(typed)
+                            ? "Expected phrase must use 1–100 letters, spaces, or apostrophes."
+                            : CandidatePreviewReport.instructions());
+                    return;
+                }
+                previewOutput.setText("Analyzing locally…");
+                previewDispatcher.schedule(typed,(id,input,suggestions)->
+                        runOnUiThread(()->{
+                            if(!isFinishing() && !isDestroyed() &&
+                                    previewDispatcher.isCurrent(id) &&
+                                    input.equals(test.getText().toString().trim())
+                                    && intended.equals(expected.getText().toString().trim()))
+                                previewOutput.setText(
+                                        CandidatePreviewReport.format(input,suggestions,intended));
+                        }));
+            });
+            root.addView(inspect);
+            root.addView(previewOutput,new LinearLayout.LayoutParams(-1,-2));
+
+            TextView oneTapHeading=new TextView(this);
+            oneTapHeading.setText("\nOne-tap insertion check (Candidate only)");
+            oneTapHeading.setTextSize(17);
+            oneTapHeading.setTextColor(0xFF303846);
+            root.addView(oneTapHeading);
+
+            TextView oneTapHelp=new TextView(this);
+            oneTapHelp.setText("In the test box above, TYPE a no-space example using "
+                    +"Orivra Candidate (do not paste). Tap the first full-sentence "
+                    +"suggestion once. Enter the intended sentence above, then "
+                    +"press Check. Only the final text is compared locally; this "
+                    +"button cannot measure how many times you tapped.");
+            oneTapHelp.setTextColor(0xFF455263);
+            root.addView(oneTapHelp);
+
+            TextView oneTapStatus=new TextView(this);
+            oneTapStatus.setText("Not checked yet.");
+            oneTapStatus.setTextSize(15);
+            oneTapStatus.setTextColor(0xFF303846);
+            oneTapStatus.setTextIsSelectable(true);
+            oneTapStatus.setPadding(dp(10),dp(10),dp(10),dp(10));
+
+            Button verifyOneTap=new Button(this);
+            verifyOneTap.setAllCaps(false);
+            verifyOneTap.setText("Check actual one-tap insertion");
+            verifyOneTap.setOnClickListener(v->{
+                SentenceTapOutcome.Result outcome=SentenceTapOutcome.compare(
+                        test.getText().toString(),expected.getText().toString());
+                oneTapStatus.setText(SentenceTapOutcome.description(outcome)
+                        +"\nText comparison only. The tap count is not recorded.");
+            });
+            root.addView(verifyOneTap);
+            root.addView(oneTapStatus);
+
+            expected.addTextChangedListener(new android.text.TextWatcher(){
+                @Override public void beforeTextChanged(CharSequence s,int start,
+                        int count,int after){}
+                @Override public void onTextChanged(CharSequence s,int start,
+                        int before,int count) {
+                    previewDispatcher.cancel();
+                    previewOutput.setText("Intended sentence changed. Tap Inspect again.");
+                    oneTapStatus.setText("Not checked yet.");
+                }
+                @Override public void afterTextChanged(android.text.Editable s){}
+            });
+
+            test.addTextChangedListener(new android.text.TextWatcher(){
+                @Override public void beforeTextChanged(CharSequence s,int start,
+                        int count,int after){}
+                @Override public void onTextChanged(CharSequence s,int start,
+                        int before,int count) {
+                    previewDispatcher.cancel();
+                    previewOutput.setText("Text changed. Tap Inspect to view new candidates.");
+                    oneTapStatus.setText("Not checked yet.");
+                }
+                @Override public void afterTextChanged(android.text.Editable s){}
+            });
+        }
+
+        TextView privacy = new TextView(this);
+        privacy.setText("Offline, no network permission. Test only non-sensitive phrases.");
+        privacy.setTextColor(0xFF455263);
+        root.addView(privacy);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+    @Override protected void onStop() {
+        previewDispatcher.cancel();
+        super.onStop();
+    }
+    @Override protected void onDestroy() {
+        previewDispatcher.close();
+        super.onDestroy();
+    }
+}
