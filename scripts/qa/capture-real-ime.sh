@@ -35,12 +35,19 @@ fi
 echo "Found IME $IME"
 adb shell ime enable "$IME"
 adb shell ime set "$IME"
-# Restart the temporary fixture AFTER selecting Orivra. This prompts Android
-# to build its actual IME window for the now-active editor.
-adb shell am force-stop "$PKG"
+# Do NOT force-stop the package here: the InputMethodService runs in the
+# same package, and killing it can leave the editor displaying fallback Gboard.
+# Bring the already-open fixture to foreground, retaining the selected IME.
 adb shell am start -W -n "${PKG}/com.chroomareborn.keyboard.MainActivity" \
   --ez orivra_ui_capture true
 sleep 4
+selected="$(adb shell settings get secure default_input_method | tr -d '\r')"
+echo "Selected Android input method: $selected"
+if [[ "$selected" != "$IME" ]]; then
+  echo "FAIL: Orivra no longer selected (fallback keyboard likely)"
+  adb shell dumpsys input_method > "$OUT/input-method-fallback.txt" || true
+  exit 1
+fi
 
 # ADB's uiautomator dumps accessibility-visible Android views, including the
 # actual InputMethodService window, and provides screen bounds for touch.
