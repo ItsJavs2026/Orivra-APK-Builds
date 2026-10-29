@@ -1,0 +1,52 @@
+name: Orivra Safe Enter / theme / editor - Android emulator 10 tests
+on:
+  push:
+    branches:
+      - candidate/build292-safe-enter-theme-20261029
+    paths:
+      - .github/workflows/candidate-enter-theme-android-integration.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-editor-emulator
+  cancel-in-progress: true
+jobs:
+  editor-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Verify isolated package and app privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build292trial' app/build.gradle.kts
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/BackspaceSwipeAndroidEditorTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ThemeStatusAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/EnterReleaseMotionEventAndroidTest.java
+      - name: Enable hardware acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Clarify qualification level
+        run: |
+          echo "Android 35 emulator EditText + palette + MotionEvent tests only; not Samsung UI QA."
+          echo "A temporary instrumented test APK is built by Gradle inside CI."
+          echo "No release artifact is uploaded; no Samsung handset is tested."
