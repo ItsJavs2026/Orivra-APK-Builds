@@ -10,10 +10,16 @@ gradle --no-daemon --stacktrace :app:assembleDebug
 APK=app/build/outputs/apk/debug/app-debug.apk
 test -s "$APK"
 adb install -r "$APK"
-IME="$(adb shell ime list -s | tr -d '\r' | grep -F "${PKG}/com.chroomareborn.keyboard.RebornImeService" | head -n1)"
+# Fail with an actionable Android service listing, not an unexplained
+# pipefail when ime list/grep uses a different component-name spelling.
+adb shell ime list -s | tr -d '\r' | tee "$OUT/installed-imes.txt"
+IME="$(grep -F "$PKG/" "$OUT/installed-imes.txt" | grep -F 'RebornImeService' | head -n1 || true)"
 if [[ -z "$IME" ]]; then
-  echo "FAIL: installed Orivra input method missing"
-  adb shell ime list -s
+  echo "FAIL: Android did not report Candidate's InputMethodService in ime list"
+  echo "--- package registrations ---"
+  adb shell dumpsys package "$PKG" | grep -E -C 3 'RebornImeService|android.view.InputMethod|BIND_INPUT_METHOD' || true
+  echo "Packages containing Orivra:"
+  adb shell pm list packages | grep -F 'chroomareborn' || true
   exit 1
 fi
 echo "Found IME $IME"
