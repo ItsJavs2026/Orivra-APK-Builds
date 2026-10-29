@@ -20,6 +20,10 @@ public final class BackspaceSwipePolicyTest {
                 Character.isLowSurrogate(text.charAt(keep)))
             throw new AssertionError("surrogate pair split");
     }
+    private static void equalText(String expected, String actual) {
+        if(!expected.equals(actual))throw new AssertionError(
+                "expected ["+expected+"] but got ["+actual+"]");
+    }
     public static void main(String[] args) {
         equal(0, BackspaceSwipePolicy.wordsForSwipe(10,0,32,75));
         equal(0, BackspaceSwipePolicy.wordsForSwipe(-55,0,32,75));
@@ -51,6 +55,16 @@ public final class BackspaceSwipePolicyTest {
         // Reported regression: delete a single uninterrupted word such as
         // "heythere" (including a live composing word without spaces).
         equal(8, BackspaceSwipePolicy.charsToDelete("heythere",1));
+        equalText("heythere",BackspaceSwipePolicy.previewForSwipe("heythere",1,50));
+        equalText("world",BackspaceSwipePolicy.previewForSwipe("hello world",1,50));
+        equalText("hello world",BackspaceSwipePolicy.previewForSwipe("hello world",2,50));
+        equalText("…world",BackspaceSwipePolicy.previewForSwipe("hello world",2,5));
+        equalText("😊",BackspaceSwipePolicy.previewForSwipe("hey 😊",1,50));
+        equalText("…😊",BackspaceSwipePolicy.previewForSwipe("abc😊",1,1));
+        equalText("hello↵world",BackspaceSwipePolicy.previewForSwipe("hello\\nworld",2,50));
+        equalText("",BackspaceSwipePolicy.previewForSwipe("hello",0,50));
+        equalText("",BackspaceSwipePolicy.previewForSwipe(null,2,50));
+
         equal(8, BackspaceSwipePolicy.charsToDelete("heythere",2));
         equal(8, BackspaceSwipePolicy.charsToDelete("heythere",8));
         equal(3, BackspaceSwipePolicy.charsToDelete("hey",1));
