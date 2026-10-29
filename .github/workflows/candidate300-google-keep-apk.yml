@@ -1,0 +1,263 @@
+name: Orivra Candidate 300 - Google Keep predictions with security QA
+on:
+  push:
+    branches:
+      - hotfix/candidate300-google-keep-predictions-20261029
+    paths:
+      - .github/workflows/candidate300-google-keep-apk.yml
+      - app/build.gradle.kts
+      - app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+      - app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java
+      - app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+      - app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java
+      - app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+      - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/LexiconFamilyExpander.java
+      - app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java
+      - app/src/main/java/com/chroomareborn/keyboard/SpanishPredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/BilingualPredictionRouter.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-300-keep-apk
+  cancel-in-progress: true
+jobs:
+  java-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Pin qualified 297 language sources without rebuilding unstable experiments
+        uses: actions/checkout@v4
+        with:
+          ref: 0088d96548ad13fcbcfb093016e035e54504eb99
+          path: qualified-297
+          persist-credentials: false
+      - name: Verify no unqualified prediction or UI changes entered Candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in PredictionLite.java SentenceRescue.java SentenceFlowEvidenceRanker.java LexiconFamilyExpander.java SpanishPredictionLite.java BilingualPredictionRouter.java; do
+            cmp "qualified-297/app/src/main/java/com/chroomareborn/keyboard/$file" "app/src/main/java/com/chroomareborn/keyboard/$file"
+          done
+          cmp qualified-297/app/src/main/AndroidManifest.xml app/src/main/AndroidManifest.xml
+          test -s app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java
+          test -s app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          grep -Fq 'EditorSuggestionPrivacyPolicy.decide(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'if(editorAllowsPersonalLearning)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'versionCode = 300' app/build.gradle.kts
+          grep -Fq 'com.chroomareborn.keyboard.build300trial' app/build.gradle.kts
+          grep -Fq 'Orivra Candidate 300' app/build.gradle.kts
+          grep -Fq 'Candidate 300' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          ! grep -Fq 'Candidate 293' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          ! grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+      - name: Validate isolation, safe Enter and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build300trial' app/build.gradle.kts
+          grep -Fq 'EnterKeyPolicy.supportsNewline(info.inputType)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'EnterKeyPolicy.shouldSendOnRelease(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'BackspaceSwipeEditorTransaction.apply(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'BackspaceRepeatGuard.repeatAllowed(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'ThemeStatusLabel.compact(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'enterTouchActive' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'event.getRawX()-startX[0]' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'paletteButton.setText("🎨")' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'ThemePanelLayout.apply(themePanel,toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'base.addView(themePanel' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'paletteControls.addView(paletteButton' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'themeExpanderButton' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo "Redundant theme icon must not occupy prediction strip"
+            exit 1
+          fi
+          grep -Fq 'predictionHeader.addView(suggestionScroll,stripParams)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'if(toolbarExpanded)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'SuggestionVisualStyle.chipColor(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'SuggestionVisualStyle.readableText(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'int black=0xff000000;' app/src/main/java/com/chroomareborn/keyboard/SuggestionVisualStyle.java
+          grep -Fq 'TypingMotionPolicy.scale(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'SentenceFlowEvidenceRanker.rerank(' app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/SpanishPredictionLite.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/BilingualPredictionRouter.java
+          if grep -q 'BilingualPredictionRouter' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo 'Research Spanish must not be enabled before explicit language selection'
+            exit 1
+          fi
+          if grep -Fq 'toolbarToggle' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo 'Second collapse arrow must be removed'
+            exit 1
+          fi
+          if grep -Fq 'base.addView(paletteBar' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java; then
+            echo "Old permanent theme row must not return"
+            exit 1
+          fi
+          grep -Fq 'ThemePanelLayout.apply(themePanel,false)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          if git ls-files | grep -Ei '(^research/|^evaluation/|^app/src/debug/|\.(jks|keystore|p12|pem|pfx|key)$)'; then exit 1; fi
+      - name: Run 19 Java suites including seeded suggestion color contrast, Safe Enter and typing motion
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/orivra-classes"
+          javac -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/KeyboardLayoutSpec.java \
+            app/src/main/java/com/chroomareborn/keyboard/KeyboardHapticStyle.java \
+            app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeEditorTransaction.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceRepeatGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/ThemeStatusLabel.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionVisualStyle.java \
+            app/src/main/java/com/chroomareborn/keyboard/TypingMotionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionStripLayoutPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PunctuationSpacing.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/SpacebarCursorGesture.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorSwipeBatch.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorMovementPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorFallbackBoundaryPolicy.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardLayoutSpecTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyboardHapticStyleTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipePolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceSwipeEditorTransactionTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/BackspaceRepeatGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ThemeStatusLabelTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SuggestionVisualStyleTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/TypingMotionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterReleaseBoundaryTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SuggestionStripLayoutPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PunctuationSpacingTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SpacebarCursorGestureTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorSwipeBatchTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorFallbackBoundaryPolicyTest.java
+          for suite in EnterKeyPolicyTest BackspaceSwipePolicyTest BackspaceSwipeSnapshotGuardTest BackspaceSwipeEditorTransactionTest BackspaceRepeatGuardTest ThemeStatusLabelTest SuggestionVisualStyleTest TypingMotionPolicyTest EnterReleaseBoundaryTest KeyboardLayoutSpecTest KeyboardHapticStyleTest SuggestionStripLayoutPolicyTest PunctuationSpacingTest CursorWordCorrectionPolicyTest SpacebarCursorGestureTest CursorSwipeBatchTest CursorReleaseSuggestionPolicyTest CursorFallbackBoundaryPolicyTest; do
+            java -ea -cp "$RUNNER_TEMP/orivra-classes" "com.chroomareborn.keyboard.$suite"
+          done
+      - name: Test 300 Keep exception and password/learning privacy matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java
+          java -ea -cp "$RUNNER_TEMP/orivra-classes" \
+            com.chroomareborn.keyboard.EditorSuggestionPrivacyPolicyTest
+      - name: Scope of pure Java checks
+        run: echo "Pure Java checks passed, native Android emulator and isolated APK checks follow."
+  panel-emulator:
+    needs: java-regressions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Verify isolated package and app privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build300trial' app/build.gradle.kts
+          if grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then exit 1; fi
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/BackspaceSwipeAndroidEditorTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ThemeStatusAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/EnterReleaseMotionEventAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ThemePanelLayoutAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SuggestionVisualAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          grep -Fq 'LexiconFamilyExpander.enrich(WORDS);' app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/LexiconFamilyExpander.java
+      - name: Enable hardware acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug
+      - name: Verify the exact compiled APK, signer and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          mkdir -p dist
+          cp "$apk" dist/Orivra-Candidate-298.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 | tee dist/apk-identity.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build300trial' versionCode='300'" dist/apk-identity.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" | tee dist/apk-signer.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | tee dist/apk-permissions.txt
+          if grep -Fq 'android.permission.INTERNET' dist/apk-permissions.txt; then exit 1; fi
+          cd dist
+          sha256sum Orivra-Candidate-298.apk > Orivra-Candidate-298.apk.sha256
+          cat Orivra-Candidate-298.apk.sha256
+      - name: Archive installable test APK with hash and signature evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate-298-Android-35-Qualified
+          path: dist/
+          retention-days: 21
+          if-no-files-found: error
+      - name: Publish experimental APK as public prerelease after all checks pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/notes300.md" <<'ORIVRA_NOTES'
+          Orivra Candidate 300 — Google Keep prediction compatibility hotfix for Samsung Android 17 trial.
+          
+          This is a DEBUG-SIGNED experimental keyboard, not a production-stable release.
+          Separate application ID: com.chroomareborn.keyboard.build300trial (versionCode 298).
+          It cannot overwrite stable Preview #178, Build 262, Candidate 293 or Candidate 298.
+          
+          Same qualified English SentenceFlow and one-arrow UI as Candidate 298.
+          NEW: Google Keep normal note text fields may show offline predictions even when Keep flags NO_SUGGESTIONS.
+          The app override is narrowly scoped to exact package com.google.android.keep; password, visible password, email, URL and non-text fields remain private. No learning on NO_SUGGESTIONS/NO_PERSONALIZED_LEARNING input.
+          Spanish remains research-only, not enabled in the live IME. True glide typing remains incomplete.
+          
+          In a disposable Google Keep note: type a plain English word, verify prediction chips, tap a correction, then check text editing, spacebar, theme and Safe Enter. Test Google Keep title and body separately. If predictions are still off, capture the keyboard message so the editor flags can be diagnosed without logging the note.
+          Never test Send with a real recipient. This build is for ordinary nonsensitive text only.
+          
+          CI checks: pinned English predictor source versus qualified 297, 19 Java suites plus privacy policy assertions, 18 Android 35 emulator instrumented tests, APK package/signature/permission/hash validation. Samsung S26 Ultra Android 17 testing remains a user acceptance step.
+          CI debug signing keys are ephemeral. Future upgrade may require removing this *test* candidate only; keep stable installations.
+          ORIVRA_NOTES
+          gh release create candidate-300-20261029 \
+            dist/Orivra-Candidate-298.apk \
+            dist/Orivra-Candidate-298.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 300 — Google Keep Prediction Hotfix" \
+            --notes-file "$RUNNER_TEMP/notes300.md" \
+            --prerelease
+          gh release view candidate-300-20261029 --repo "$GITHUB_REPOSITORY"
+      - name: Clarify qualification level
+        run: |
+          echo "18 Android 35 emulator tests: all eight palettes in light/dark, WCAG contrast, theme collapse, Backspace and Safe Enter; not Samsung QA."
+          echo "A separate debug-signed Candidate 300 APK is published only after emulator, signer, permission and hash validation."
+          echo "No Samsung Android 17 handset test was performed in CI; actual phone acceptance is pending."
