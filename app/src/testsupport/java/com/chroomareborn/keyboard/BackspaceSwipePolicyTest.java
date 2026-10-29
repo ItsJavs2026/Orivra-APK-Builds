@@ -61,6 +61,18 @@ public final class BackspaceSwipePolicyTest {
         equalText("…world",BackspaceSwipePolicy.previewForSwipe("hello world",2,5));
         equalText("😊",BackspaceSwipePolicy.previewForSwipe("hey 😊",1,50));
         equalText("…😊",BackspaceSwipePolicy.previewForSwipe("abc😊",1,1));
+
+        // A user-selected span must be shown as a whole, not just its last
+        // whitespace-delimited token. All transformations are display-only.
+        equalText("hey there",BackspaceSwipePolicy.formatPreviewText("hey there",50));
+        equalText("…there",BackspaceSwipePolicy.formatPreviewText("hey there",5));
+        equalText("😊",BackspaceSwipePolicy.formatPreviewText("😊",1));
+        equalText("…🏽",BackspaceSwipePolicy.formatPreviewText("👍🏽",1));
+        equalText("a↵b",BackspaceSwipePolicy.formatPreviewText("a\\r\\nb",50));
+        equalText("a⇥b",BackspaceSwipePolicy.formatPreviewText("a\\tb",50));
+        equalText("",BackspaceSwipePolicy.formatPreviewText(null,50));
+        equalText("",BackspaceSwipePolicy.formatPreviewText("heythere",0));
+
         equalText("hello↵world",BackspaceSwipePolicy.previewForSwipe("hello\nworld",2,50));
         equalText("",BackspaceSwipePolicy.previewForSwipe("hello",0,50));
         equalText("",BackspaceSwipePolicy.previewForSwipe(null,2,50));
