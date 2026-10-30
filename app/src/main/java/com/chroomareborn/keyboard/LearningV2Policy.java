@@ -30,14 +30,22 @@ final class LearningV2Policy {
                 typed.length<2)return null;
         Pair changed=null;
         for(int i=0;i<typed.length;i++){
-            String a=EnglishApostrophePolicy.canonical(typed[i]);
-            String z=EnglishApostrophePolicy.canonical(accepted[i]);
+            String a=contextToken(typed[i]);
+            String z=contextToken(accepted[i]);
             if(a==null||z==null)return null;
             if(a.equals(z))continue;
-            if(changed!=null)return null;
+            // Single-letter "I" and "a" are legitimate unchanged context,
+            // but never stored as a learned correction pair.
+            if(a.length()<2||z.length()<2||changed!=null)return null;
             changed=new Pair(a,z);
         }
         return changed;
+    }
+
+    private static String contextToken(String value) {
+        String lowered=value.toLowerCase(java.util.Locale.ROOT);
+        if("i".equals(lowered)||"a".equals(lowered))return lowered;
+        return EnglishApostrophePolicy.canonical(value);
     }
 
     /** At least two explicit acceptances must agree before re-ranking. */
