@@ -23,7 +23,7 @@ final class NextWordTapTicket340 {
             CharSequence after,long session,int start,int end,
             boolean sensitive,boolean selected,boolean textAfterCaret) {
         if(sensitive || selected || textAfterCaret ||
-                before==null || after==null || start<0 || end<0 ||
+                before==null || after==null || ((start<0)!=(end<0)) ||
                 start!=end || before.length()>BEFORE_LIMIT ||
                 after.length()>1 || after.length()>0)
             return null;
