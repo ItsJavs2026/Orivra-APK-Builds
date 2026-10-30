@@ -7,8 +7,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Research-only serial-worker transaction: persist ONE already-verified,
- * successfully committed Space boundary. Never called by the release IME.
+ * Research 349 serial-worker transaction: persist ONE already-verified,
+ * successfully committed Space boundary. Used by the opt-in 347 IME;
  *
  * Unlike older model-snapshot MAX merging, each transaction reads the LATEST
  * private storage counts while holding the same monitor as the existing
@@ -88,15 +88,24 @@ final class TypedWordBoundaryStore346 {
                     TypedWordsConsent341.liveRevision()!=capturedLiveRevision)
                 return new Result(false,null);
 
+            // Candidate research 349: no O(vocabulary + pair-count)
+            // preference clear/repopulation after each confirmed Space.
+            // SharedPreferences may still serialize its XML file on commit,
+            // but the editor now mutates ONLY the verified changed entries.
+            // Our private-store monitor still serializes concurrent writers;
+            // all counts/pair anchors are prevalidated before mutation.
+            final boolean wordChanged=!words.get(next).equals(old.words.get(next));
+            final boolean pairChanged=pair!=null && pairs.containsKey(pair) &&
+                    !pairs.get(pair).equals(old.pairs.get(pair));
+            final TypedWordEvidenceStore341.Snapshot result=
+                    new TypedWordEvidenceStore341.Snapshot(words,pairs);
+            if(!wordChanged && !pairChanged)return new Result(true,result);
             SharedPreferences.Editor edit=c.getSharedPreferences(
-                    TypedWordEvidenceStore341.PREFS,Context.MODE_PRIVATE)
-                    .edit().clear();
-            for(Map.Entry<String,Integer> e:words.entrySet())
-                edit.putInt("w:"+e.getKey(),e.getValue());
-            for(Map.Entry<String,Integer> e:pairs.entrySet())
-                edit.putInt("p:"+e.getKey(),e.getValue());
+                    TypedWordEvidenceStore341.PREFS,Context.MODE_PRIVATE).edit();
+            if(wordChanged)edit.putInt("w:"+next,words.get(next));
+            if(pairChanged)edit.putInt("p:"+pair,pairs.get(pair));
             if(!edit.commit())return new Result(false,null);
-            return new Result(true,new TypedWordEvidenceStore341.Snapshot(words,pairs));
+            return new Result(true,result);
         }
     }
 }
