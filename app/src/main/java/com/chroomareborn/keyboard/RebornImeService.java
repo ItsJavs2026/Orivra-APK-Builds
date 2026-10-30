@@ -2360,8 +2360,22 @@ public final class RebornImeService extends InputMethodService {
         if (ic == null) return;
         final long typeSession340=inputSessionGeneration;
         final int beforeKeySelection342=lastSelectionStart;
+        // Reuse this existing punctuation sample for cursor recovery; do
+        // NOT add an editor IPC or dictionary read to the key's hot path.
+        final CharSequence beforeKey360=ic.getTextBeforeCursor(1,0);
         prepareCursorEdit(ic);
-        if (PunctuationSpacing.insertSpaceBeforeLetter(ic.getTextBeforeCursor(1, 0),
+        if(CommittedWordBoundary360.resumeWholeWordCorrection(
+                beforeKey360,composing,value,hasSelection(),
+                editingInMiddle,sensitive,editorAllowsSuggestions,
+                symbols,numericEditor)) {
+            // Previous text belongs to the host editor, not to our composing
+            // span. Commit precisely one new character; then the ordinary
+            // cursor-word predictor will inspect and suggest for WHOLE word.
+            // The state is reconsidered on every key and after Space; no
+            // global stuck mode or dictionary-dependent gating.
+            editingInMiddle=true;
+        }
+        if (PunctuationSpacing.insertSpaceBeforeLetter(beforeKey360,
                 value, sensitive, editingInMiddle, hasSelection(), cursorHasTextAfter())) {
             if (!composing.isEmpty()) currentFinish();
             ic.commitText(" ", 1);
