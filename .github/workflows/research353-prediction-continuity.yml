@@ -47,6 +47,7 @@ jobs:
           assert 'SuggestionContinuity353.resumeNextWordsAtDocumentEnd(' in service
           assert 'plan.replacement+plan.trailingSeparator' in service
           assert 'HintKeyPressOrder353 hintPressOrder353' in service
+          assert 'SuggestionContinuity353.splitNextWordsOnlyDuringLiveComposition(' in service
           assert 'hintPressOrder353.complete(' in service
           assert 'event.findPointerIndex(primaryPointer[0])' in service
           assert 'refreshAfterHint353=true' in service
@@ -170,6 +171,6 @@ jobs:
                   errors+=int(x.attrib.get('errors',0))
                   skipped+=int(x.attrib.get('skipped',0))
           print(f'Research 353 Android 35 emulator: {count} tests, {failed} failures, {errors} errors, {skipped} skips')
-          assert count>=181 and failed==0 and errors==0 and skipped==0,'Unqualified tests'
+          assert count>=182 and failed==0 and errors==0 and skipped==0,'Unqualified tests'
           PY
           echo 'PASS: Research 353 qualified. No APK published; Candidate 350 and 352 remain untouched.'
