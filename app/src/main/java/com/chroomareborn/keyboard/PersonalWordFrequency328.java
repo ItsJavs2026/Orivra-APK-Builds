@@ -50,6 +50,7 @@ final class PersonalWordFrequency328 {
         String raw=EnglishApostrophePolicy.prefix(prefix);
         if(raw==null)return List.of();
         Map<String,Integer> counts=new HashMap<>();
+        java.util.Set<String> personalWords=null;
         SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
         for(Map.Entry<String,?> e:p.getAll().entrySet()) {
             if(!e.getKey().startsWith(PREFIX) || !(e.getValue() instanceof Integer))
@@ -59,9 +60,22 @@ final class PersonalWordFrequency328 {
             if(score<1 || score>1000 ||
                     !AdaptivePrefixPolicy328.eligible(raw,word,score))
                 continue;
-            // Still validate the word on use: it may have been removed
-            // from the personal dictionary since recording.
-            if(approved(c,word))counts.put(word,score);
+            // Still validate manually saved words on every refresh, but
+            // load the capped dictionary only ONCE per suggestion update.
+            // Earlier code reread/sorted up to 250 words for each of 320
+            // frequency candidates. This must never slow the key-tap UI.
+            if(PredictionLite.publicWordForContext(word)) {
+                counts.put(word,score);
+            } else {
+                if(personalWords==null) {
+                    personalWords=new java.util.HashSet<>();
+                    for(String saved:PersonalDictionary.savedWords(c)) {
+                        String canonical=EnglishApostrophePolicy.canonical(saved);
+                        if(canonical!=null)personalWords.add(canonical);
+                    }
+                }
+                if(personalWords.contains(word))counts.put(word,score);
+            }
         }
         return AdaptivePrefixPolicy328.candidates(prefix,counts,limit);
     }
