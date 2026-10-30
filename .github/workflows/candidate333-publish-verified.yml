@@ -56,7 +56,7 @@ jobs:
           test -x "$aapt"
           test -x "$apksigner"
           "$aapt" dump badging "$apk" | head -n 1 | tee dist/reverified-package.txt
-          grep -Fq "package: name='com.chroomareborn.keyboard.build333trial' versionCode='327'" dist/reverified-package.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build333trial' versionCode='333'" dist/reverified-package.txt
           "$apksigner" verify --verbose --print-certs "$apk" > dist/reverified-signature.txt
           grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' dist/reverified-signature.txt
           "$aapt" dump permissions "$apk" > dist/reverified-permissions.txt
@@ -79,7 +79,7 @@ jobs:
           Orivra Candidate 333 — Android 35 emulator-qualified, debug-signed test APK.
 
           Verified 59/59 Android instrumentation tests in GitHub run 41062583313.
-          Separate application ID com.chroomareborn.keyboard.build333trial (versionCode 327).
+          Separate application ID com.chroomareborn.keyboard.build333trial (versionCode 333).
           Installing does NOT overwrite Candidate 319 or Build 310. Not yet Samsung Android 17 or real bank-app verified.
 
           New in this combined build:
