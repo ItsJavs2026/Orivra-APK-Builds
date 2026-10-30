@@ -8,11 +8,18 @@ public final class PersonalDictionaryPolicyTest {
     private static int n;
     private static void ok(boolean yes,String msg){n++;if(!yes)throw new AssertionError(msg);}
     public static void main(String[] args){
-        for(String rejected:new String[]{"","x","two words","1234","hello_world","it's",
+        for(String rejected:new String[]{"","x","two words","1234","hello_world","can't'",
             "éclair","hello!","word1","x".repeat(25)}) {
             ok(PersonalDictionaryPolicy.canonical(rejected)==null,"invalid manual word");
         }
         ok("orivra".equals(PersonalDictionaryPolicy.canonical(" Orivra ")),"case-fold");
+        ok("can't".equals(PersonalDictionaryPolicy.canonical("CAN’T")),"curly apostrophe canonical");
+        ok("ain't".equals(PersonalDictionaryPolicy.canonical("Ain't")),"contractions allowed");
+        ok("o'connor".equals(PersonalDictionaryPolicy.canonical("O’Connor")),"proper names with apostrophe");
+        ok(PersonalDictionaryPolicy.merge("can'",List.of("can"),
+                List.of("can't")).get(0).equals("can't"),"partial apostrophe completion");
+        ok(PersonalDictionaryPolicy.merge("can",List.of("can"),
+                List.of("can't")).contains("can't"),"saved contraction offered with prefix");
         ok("Orivra".equals(PersonalDictionaryPolicy.acceptedDisplay(" Orivra ")),"display case");
         ok(PersonalDictionaryPolicy.merge("hi",List.of("hi"),List.of("Orivra")).equals(List.of("hi")),
            "unrelated manual word cannot affect existing word");
