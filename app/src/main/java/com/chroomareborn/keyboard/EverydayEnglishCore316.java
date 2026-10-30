@@ -42,7 +42,7 @@ final class EverydayEnglishCore316 {
                 EVERYDAYACTIONS
         };
         for(String group:groups) for(String word:group.split(" ")) {
-            if(word.matches("[a-z]{2,20}"))words.putIfAbsent(word,8);
+            if(word.matches("[a-z]{2,20}"))words.putIfAbsent(word,1);
         }
     }
 }
