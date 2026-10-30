@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build363trial"
+        applicationId = "com.chroomareborn.keyboard.build365trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 363
-        versionName = "1.0.46-build363-short-joined-corrections"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 363"
+        versionCode = 365
+        versionName = "1.0.47-build365-caret-insertion-spacing"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 365"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 363"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 365"
         }
     }
     compileOptions {
