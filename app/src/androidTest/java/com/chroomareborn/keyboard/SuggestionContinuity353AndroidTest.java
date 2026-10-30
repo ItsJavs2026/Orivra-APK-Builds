@@ -54,6 +54,16 @@ public final class SuggestionContinuity353AndroidTest {
                 SuggestionContinuity353.centerCurrentWord("goign",
                         List.of("how's it going","going","goin")));
     }
+    @Test public void nextWordCandidatesNeverReplaceCommittedCursorWord(){
+        assertFalse(SuggestionContinuity353.splitNextWordsOnlyDuringLiveComposition(
+                false,false,true,true,false,false));
+        assertFalse(SuggestionContinuity353.splitNextWordsOnlyDuringLiveComposition(
+                true,false,true,true,true,false));
+        assertFalse(SuggestionContinuity353.splitNextWordsOnlyDuringLiveComposition(
+                true,false,true,true,false,true));
+        assertTrue(SuggestionContinuity353.splitNextWordsOnlyDuringLiveComposition(
+                true,false,true,true,false,false));
+    }
     @Test public void oldEndOfLongDocumentStateResumesPredictions(){
         assertTrue(SuggestionContinuity353.resumeNextWordsAtDocumentEnd(
                 true,true,false,false,""));
