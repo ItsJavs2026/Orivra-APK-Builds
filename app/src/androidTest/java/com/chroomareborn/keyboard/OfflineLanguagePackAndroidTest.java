@@ -32,7 +32,7 @@ public final class OfflineLanguagePackAndroidTest {
         String pkg=ctx().getPackageName();
         String[] found=ctx().getAssets().list("dictionaries");
         Log.i(TAG,"targetPackage="+pkg+" assetList="+Arrays.toString(found));
-        assertEquals("com.chroomareborn.keyboard.build361trial",pkg);
+        assertEquals("com.chroomareborn.keyboard.build363trial",pkg);
         try(InputStream stream=ctx().getAssets().open(CompressedLanguagePack.ASSET_PATH)){
             return CompressedLanguagePack.readVerified(stream);
         }
