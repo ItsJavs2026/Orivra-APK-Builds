@@ -1686,12 +1686,21 @@ public final class RebornImeService extends InputMethodService {
         // Preserve the expanded panel throughout a held backspace gesture.
         // Deletion still updates predictions; only panel motion is deferred.
         if(freezeRiseDuringDelete || riseChipPressed)return;
-        predictionsToggle.setText(toolbarExpanded?"⌄":predictionsExpanded?"⌄":"⌃");
-        predictionsToggle.setContentDescription(toolbarExpanded?
+        // This arrow shares the normal suggestion header. setText() and
+        // setTextColor() on EVERY predictor callback cause redundant header
+        // invalidation even when the arrow remains visually identical.
+        // Keep automatic Rise behavior unchanged; only update actual changes.
+        String arrow345=toolbarExpanded?"⌄":predictionsExpanded?"⌄":"⌃";
+        if(!TextUtils.equals(predictionsToggle.getText(),arrow345))
+            predictionsToggle.setText(arrow345);
+        String arrowDescription345=toolbarExpanded?
                 "Close keyboard settings and return to predictions":
                 (predictionsExpanded?"Collapse predictions":"Expand predictions")+
-                ". Hold for keyboard settings");
-        predictionsToggle.setTextColor(keyTextColor);
+                ". Hold for keyboard settings";
+        if(!TextUtils.equals(predictionsToggle.getContentDescription(),arrowDescription345))
+            predictionsToggle.setContentDescription(arrowDescription345);
+        if(predictionsToggle.getCurrentTextColor()!=keyTextColor)
+            predictionsToggle.setTextColor(keyTextColor);
         // Avoid replacing the ripple drawable on every keystroke.
         if(!(predictionsToggle.getTag() instanceof Integer) ||
                 ((Integer)predictionsToggle.getTag())!=specialBackground) {
@@ -3339,7 +3348,7 @@ public final class RebornImeService extends InputMethodService {
             else predictionsExpanded=false;
         }
         updatePredictionPanel();
-        candidates.setAlpha(1f);
+        if(candidates.getAlpha()!=1f)candidates.setAlpha(1f);
         if(suggestionScroll!=null && suggestionScroll.getScrollX()!=0)
             suggestionScroll.scrollTo(0,0);
         if(options.isEmpty() && !input.isEmpty() && !sensitive &&
