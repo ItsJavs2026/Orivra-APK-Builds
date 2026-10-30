@@ -43,7 +43,7 @@ public final class CommittedWordBoundary360AndroidTest {
 
     @Test public void betweenWordsCursorRemainsCommittableWithWholeWord() {
         // Move between words, edit one word at its edge, return to end.
-        BaseInputConnection ic=fresh("instakke mistake",7);
+        BaseInputConnection ic=fresh("instakke mistake",8);
         assertEquals("e",ic.getTextBeforeCursor(1,0).toString());
         assertEquals(" ",ic.getTextAfterCursor(1,0).toString());
         assertFalse(CommittedWordBoundary360.resumeWholeWordCorrection(
