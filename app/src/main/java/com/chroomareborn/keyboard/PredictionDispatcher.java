@@ -20,7 +20,17 @@ final class PredictionDispatcher implements AutoCloseable {
     interface Predictor {
         List<String> predict(String input, boolean editing);
     }
-    private static final long DEBOUNCE_MS = 40;
+    // Candidate 350: reduce a guaranteed 40 ms wait before EVERY async
+    // prediction. Short everyday words take the fast lane; expensive long
+    // sentence reconstruction retains a longer delay to avoid overworking
+    // the phone during continuous rapid typing.
+    static long debounceMillisFor(String input,boolean editing) {
+        if(editing)return 14L;
+        int length=input==null?0:input.length();
+        if(length<=12)return 12L;
+        if(length<=28)return 20L;
+        return 28L;
+    }
     private final Predictor predictor;
     private final ScheduledThreadPoolExecutor worker;
     private final AtomicLong generation = new AtomicLong();
@@ -30,6 +40,13 @@ final class PredictionDispatcher implements AutoCloseable {
         this((input, editing) -> editing
                 ? PredictionLite.editingSuggestions(input)
                 : PredictionLite.suggestions(input));
+        // Only a known PUBLIC, non-user word is used. Prepare the offline
+        // lexicon on the background worker when the keyboard service starts,
+        // not on the first letter's UI thread. No suggestions are displayed
+        // and no user data is retained or sent anywhere.
+        worker.execute(()->{
+            if(!closed)PredictionLite.publicWordForContext("hello");
+        });
     }
     PredictionDispatcher(Predictor predictor) {
         if (predictor == null) throw new IllegalArgumentException("Predictor required");
@@ -37,7 +54,10 @@ final class PredictionDispatcher implements AutoCloseable {
         worker = new ScheduledThreadPoolExecutor(1, r -> {
             Thread t = new Thread(r, "ChroomaOfflinePredictor");
             t.setDaemon(true);
-            t.setPriority(Thread.MIN_PRIORITY);
+            // MIN_PRIORITY may starve full predictions while the IME is
+            // rendering fast taps. Keep this BELOW the UI priority but
+            // sufficiently scheduled on Android when the user pauses.
+            t.setPriority(Thread.NORM_PRIORITY-1);
             return t;
         });
         worker.setRemoveOnCancelPolicy(true);
@@ -59,7 +79,7 @@ final class PredictionDispatcher implements AutoCloseable {
             if (!isCurrent(id)) return;
             List<String> choices = predictor.predict(snapshot, editing);
             if (isCurrent(id)) listener.onResult(id, snapshot, choices);
-        }, DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+        }, debounceMillisFor(snapshot,editing), TimeUnit.MILLISECONDS);
         return id;
     }
     boolean isCurrent(long id) {
