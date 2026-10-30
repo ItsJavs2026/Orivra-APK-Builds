@@ -30,7 +30,7 @@ jobs:
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/NumericKeypad323AndroidTest.java
           grep -Fq 'renderNumericKeypad323(heightMode,landscape)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/AdaptiveUsedWord321AndroidTest.java
-          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ContextBackupFormat322Test.java
+          test -s app/src/testsupport/java/com/chroomareborn/keyboard/ContextBackupFormat322Test.java
           grep -Fq 'PersonalContextLearning319.recordUsed(this' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           python3 - <<'PY'
           from pathlib import Path
@@ -58,7 +58,7 @@ jobs:
               assert 'build324trial' in (root/key).read_text()
               assert 'build310trial' not in (root/key).read_text()
           assert 'Candidate 324' in (root/'src/main/java/com/chroomareborn/keyboard/MainActivity.java').read_text()
-          print('PASS: version 323 isolated candidate identity, no extra permissions')
+          print('PASS: version 324 isolated candidate identity, no extra permissions')
           PY
       - uses: actions/setup-java@v4
         with:
