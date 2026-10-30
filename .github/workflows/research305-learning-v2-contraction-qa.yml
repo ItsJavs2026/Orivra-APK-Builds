@@ -208,6 +208,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/orivra-classes"
           javac -d "$RUNNER_TEMP/orivra-classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
             app/src/main/java/com/chroomareborn/keyboard/KeyboardLayoutSpec.java \
             app/src/main/java/com/chroomareborn/keyboard/KeyboardHapticStyle.java \
             app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java \
