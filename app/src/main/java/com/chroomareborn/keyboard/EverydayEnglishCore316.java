@@ -24,7 +24,7 @@ final class EverydayEnglishCore316 {
     private static final String TECHNOLOGYANDAPPS =
             "web site sites click clicked clicking network networks mobile digital media technology technical security login register logged account accounts online search browser browse browsing settings option options profile profiles status version versions hardware software server servers screen screens device devices model models file files directory directories application applications app apps tools tool support supported supporting update updates privacy storage database databases device link links downloaded uploads upload download downloaded wireless power electronics settings text typing keyboard";
     private static final String INFORMATIONANDMEASUREMENT =
-            "state states fact facts general research analysis result results method methods study studies studies type types data information info reference details explanation descriptions design designs based basis category categories section sections size sizes level levels amount amounts total totals per percent percentage period periods previous next following major minor average value values figure figures effect effects condition conditions requirements requirement necessary possible process series history category change changes";
+            "state states fact facts general research analysis result results method methods study studies studies type types data information info reference details explanation descriptions design designs based basis category categories section sections size sizes level levels amount amounts total totals per percent percentage period periods previous related next following major minor average value values figure figures effect effects condition conditions requirements requirement necessary possible process series history category change changes";
     private static final String SOCIALCULTURE =
             "human people person personal individual individuals public private community society family families friends friend groups sports sport game games music movie movies audio radio photo photos video videos art arts activity activities event events club clubs language english spanish english learning teaching reading writing news blog blogs article articles story stories special usual normal ordinary natural";
     private static final String EVERYDAYACTIONS =
@@ -42,7 +42,7 @@ final class EverydayEnglishCore316 {
                 EVERYDAYACTIONS
         };
         for(String group:groups) for(String word:group.split(" ")) {
-            if(word.matches("[a-z]{2,20}"))words.putIfAbsent(word,14);
+            if(word.matches("[a-z]{2,20}"))words.putIfAbsent(word,8);
         }
     }
 }
