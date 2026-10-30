@@ -140,8 +140,12 @@ public final class RebornImeService extends InputMethodService {
     }
     private void scheduleStableWord329() {
         cancelStableWord329();
+        // Some editors (including custom chat/search controls) commit each
+        // keystroke instead of keeping an Android composing span. The live
+        // word-under-caret supplies the same bounded, snapshot-verified input.
+        String visible=composing.isEmpty()?wordAtCursor():composing;
         String expected=StableWordUsagePolicy329.candidate(
-                composing,PersonalLearning.enabled(this),
+                visible,PersonalLearning.enabled(this),
                 editorAllowsPersonalLearning,sensitive,editingInMiddle,
                 hasSelection(),cursorHasTextAfter(),symbols,numericEditor);
         if(expected==null || (expected.equals(stableWordCounted329) &&
@@ -155,8 +159,9 @@ public final class RebornImeService extends InputMethodService {
                     sensitive || editingInMiddle || hasSelection() ||
                     cursorHasTextAfter() || symbols || numericEditor)return;
             try {
+                String stillVisible=composing.isEmpty()?wordAtCursor():composing;
                 if(StableWordUsagePolicy329.sameVisibleWord(expected,
-                        composing,editor.getTextBeforeCursor(64,0),
+                        stillVisible,editor.getTextBeforeCursor(64,0),
                         editor==getCurrentInputConnection(),
                         session==inputSessionGeneration)) {
                     PersonalWordFrequency328.recordCommitted(this,expected);
