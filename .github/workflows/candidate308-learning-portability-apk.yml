@@ -1,0 +1,216 @@
+name: Orivra Candidate 308 - Portable Learning and Learning V2.1 Android prerelease
+on:
+  push:
+    branches:
+      - candidate/build308-learning-portability-trial-20261029
+    paths:
+      - .github/workflows/candidate308-learning-portability-apk.yml
+      - app/**
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate308-release
+  cancel-in-progress: true
+jobs:
+  source-and-java:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 486d51fed0da7166d2f39d459c266cb1d92daf89
+          path: qualified-307
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Require exact Build 307 source except isolated package/label
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('qualified-307/app')
+          actual=Path('app')
+          for p in (root/'src/main/java').rglob('*.java'):
+              rel=p.relative_to(root)
+              if rel.as_posix() in (
+                  'src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+                  'src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java'):
+                  continue
+              assert p.read_bytes()==(actual/rel).read_bytes(),f'Protected IME/source drift: {rel}'
+          for p in (root/'src/testsupport').rglob('*.java'):
+              rel=p.relative_to(root)
+              assert p.read_bytes()==(actual/rel).read_bytes(),f'Testsupport drift: {rel}'
+          for p in (root/'src/androidTest').rglob('*.java'):
+              rel=p.relative_to(root)
+              if rel.name=='OfflineLanguagePackAndroidTest.java':
+                  transformed=p.read_text().replace('build305trial','build308trial')
+                  assert (actual/rel).read_text()==transformed,'Unexpected Android identity QA change'
+              else:
+                  assert p.read_bytes()==(actual/rel).read_bytes(),f'Android security/UI test drift: {rel}'
+          assert (root/'src/main/AndroidManifest.xml').read_bytes()==(actual/'src/main/AndroidManifest.xml').read_bytes()
+          old=(root/'build.gradle.kts').read_text()
+          old=old.replace('build305trial','build308trial').replace(
+              'versionCode = 305','versionCode = 308').replace(
+              '1.0.24-build305-learning-v2-contractions',
+              '1.0.25-build308-learning-export-import').replace(
+              'Orivra Candidate 305','Orivra Candidate 308')
+          assert (actual/'build.gradle.kts').read_text()==old,'APK build/permission drift'
+          p='src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java'
+          original=(root/p).read_text().replace('build305trial','build308trial')
+          assert (actual/p).read_text()==original,'Unexpected candidate metric change'
+          p='src/main/java/com/chroomareborn/keyboard/MainActivity.java'
+          original=(root/p).read_text().replace('Candidate 305','Candidate 308').replace(
+              'Candidate 308: Learning V2 now supports',
+              'Candidate 308: Export and Import manually saved words and learned corrections via the Android document picker, with preview, approval, and safe merge. Learning V2 supports')
+          assert (actual/p).read_text()==original,'Unexpected MainActivity change'
+          print('PASS: complete Build 307 baseline byte integrity, only isolated package/label edits')
+          PY
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          grep -Fq 'orivra_personal_learning_v1' app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java
+          grep -Fq 'LearningTransferStore.importConfirmed(this,parsed)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          grep -Fq '.setPositiveButton("Import locally"' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          grep -Fq 'OfflineDictionaryActivationPolicy.KEY,false' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'editorAllowsPersonalLearning' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+      - name: Re-run 401 synthetic learning, contraction and transfer assertions
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PersonalDictionaryPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningTransferCodec.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningV21ConflictTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningTransferCodecTest.java
+          java -ea -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.EnglishApostropheAndLearningV2Test
+          java -ea -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.LearningV21ConflictTest
+          java -ea -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.LearningTransferCodecTest
+  android-35-emulator:
+    needs: source-and-java
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Build verified offline source and include ESDB license
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          gzip -t < app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Verify independent package before emulator testing
+        run: |
+          set -euo pipefail
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/LearningTransferStoreAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PersonalLearningV2AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/IdleSuggestionCenterAndroidTest.java
+          grep -Fq 'com.chroomareborn.keyboard.build308trial' app/build.gradle.kts
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          gradle --no-daemon --stacktrace :app:assembleDebug
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 |
+            grep -Fq "package: name='com.chroomareborn.keyboard.build308trial' versionCode='308'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+      - name: Enable KVM
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -euo pipefail
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug 2>&1 | tee candidate308-android35.log
+            grep -F 'Finished 35 tests' candidate308-android35.log
+      - name: Verify tested APK identity, signer, permissions, licensed asset and SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          cp "$apk" dist/Orivra-Candidate-308.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" |
+            head -n 1 | tee dist/package.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build308trial' versionCode='308'" dist/package.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" |
+            tee dist/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" |
+            tee dist/permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/permissions.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+          cd dist
+          sha256sum Orivra-Candidate-308.apk > Orivra-Candidate-308.apk.sha256
+          cat Orivra-Candidate-308.apk.sha256
+      - name: Preserve verified Candidate 308 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate-308-Android35-Passed
+          path: dist/
+          retention-days: 21
+          if-no-files-found: error
+      - name: Publish isolated debug prerelease only after all Android tests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/notes.md" <<'ORIVRA_308'
+          Orivra Candidate 308 — Learning V2.1 + optional portable learning backups.
+
+          This is a DEBUG-SIGNED experimental prerelease, not production stable. Android 35 emulator qualification and 35/35 instrumentation tests passed. Samsung S26 Ultra Android 17 approval is not yet available.
+          App ID com.chroomareborn.keyboard.build308trial, versionCode 308. This installs separately alongside phone-tested Candidate 304 and CI-qualified Candidate 305. The ephemeral CI debug signature may prevent future in-place upgrades of this test package.
+
+          Existing prediction, Google Keep compatibility fix, centered idle suggestions, Safe Enter/Backspace, offline 78,942-word opt-in vocabulary, English contractions with straight/curly apostrophes and Learning V2 are retained. Learning V2.1 now requires a clear winner between conflicting accepted corrections, respects uppercase and initial capital, and never arbitrarily picks a tied result. Learning is OFF by default.
+
+          NEW: Orivra's launcher Settings contains “Export my saved words + learned corrections” and “Import previous Orivra learning backup.” Both use the Android system document picker. Import validates the entire UTF-8 backup, previews counts and requires explicit approval; a second import will not inflate counts. No full notes, passwords, raw typing history or clipboard records are backed up. The exported file is PLAIN TEXT and can contain personal saved names, so use only trusted locations and files.
+          Import NEVER changes the Learning ON/OFF setting.
+
+          IMPORTANT: older isolated Candidate 304 and 305 packages do not have this exporter. Candidate 308 cannot silently or automatically copy their private stored words or learned history. Start with synthetic, non-sensitive sample words for verification.
+
+          Test: in a disposable Notes/Keep note, verify three idle suggestions center; straight/curly can't, ain't, don't, we're contractions remain tappable; verify Google Keep prediction, Safe Enter and Backspace. Open the Candidate 308 app, add a non-sensitive custom word, explicitly accept a synthetic correction (with Learning enabled), export a test backup, then import the same file. Check no duplicates. Do not test with real private data.
+
+          Release is source pinned to qualified Build 307, offline, includes full ESDB attribution, and has NO INTERNET permission. If issues occur, switch back to Candidate 304.
+          ORIVRA_308
+          gh release create candidate-308-20261029 \
+            dist/Orivra-Candidate-308.apk dist/Orivra-Candidate-308.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 308 — Learning V2.1 & Portable Backups" \
+            --notes-file "$RUNNER_TEMP/notes.md" --prerelease
+          gh release view candidate-308-20261029 --repo "$GITHUB_REPOSITORY"
