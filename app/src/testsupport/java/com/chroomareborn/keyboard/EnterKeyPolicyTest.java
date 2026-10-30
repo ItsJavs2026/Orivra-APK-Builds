@@ -15,6 +15,35 @@ public final class EnterKeyPolicyTest {
         check(EnterKeyPolicy.supportsLongPressSend(
                 4 | EnterKeyPolicy.IME_FLAG_NO_ENTER_ACTION),
                 "Dedicated hold may send even when inline Send is forbidden");
+        // Build 310: Search/Go must NOT insert a newline, even if a custom
+        // web search field incorrectly also declares MULTI_LINE.
+        check(EnterKeyPolicy.tapEditorAction(EnterKeyPolicy.IME_ACTION_SEARCH)
+                ==EnterKeyPolicy.IME_ACTION_SEARCH,"SEARCH on a normal tap");
+        check(EnterKeyPolicy.tapEditorAction(EnterKeyPolicy.IME_ACTION_GO)
+                ==EnterKeyPolicy.IME_ACTION_GO,"GO on a normal tap");
+        check(EnterKeyPolicy.tapEditorAction(0x10000000 |
+                EnterKeyPolicy.IME_ACTION_SEARCH)==EnterKeyPolicy.IME_ACTION_SEARCH,
+                "unrelated editor flags do not suppress explicit SEARCH");
+        for(int action:new int[]{0,1,4,5,6,7,0xFF}) {
+            check(EnterKeyPolicy.tapEditorAction(action)==0,
+                    "Never implicitly send/chat/submit arbitrary editor: "+action);
+        }
+        for(int action:new int[]{EnterKeyPolicy.IME_ACTION_SEARCH,
+                EnterKeyPolicy.IME_ACTION_GO,EnterKeyPolicy.IME_ACTION_SEND}) {
+            check(EnterKeyPolicy.tapEditorAction(
+                    action|EnterKeyPolicy.IME_FLAG_NO_ENTER_ACTION)==0,
+                    "IME_FLAG_NO_ENTER_ACTION forbids search/go tap action");
+        }
+        check("⌕".equals(EnterKeyPolicy.keyLabel(
+                EnterKeyPolicy.IME_ACTION_SEARCH)),"Search icon visible");
+        check("Go".equals(EnterKeyPolicy.keyLabel(
+                EnterKeyPolicy.IME_ACTION_GO)),"Go label visible");
+        check("↵".equals(EnterKeyPolicy.keyLabel(
+                EnterKeyPolicy.IME_ACTION_SEND)),"chat remains normal Enter");
+        check("↵".equals(EnterKeyPolicy.keyLabel(
+                EnterKeyPolicy.IME_ACTION_SEARCH|
+                EnterKeyPolicy.IME_FLAG_NO_ENTER_ACTION)),
+                "NO_ENTER_ACTION keeps neutral Enter label");
         check(EnterKeyPolicy.supportsNewline(0x20001),
                 "multiline text input supports newline");
         check(!EnterKeyPolicy.supportsNewline(0x1),
