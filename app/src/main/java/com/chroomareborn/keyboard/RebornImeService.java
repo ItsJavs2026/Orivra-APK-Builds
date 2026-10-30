@@ -82,6 +82,20 @@ public final class RebornImeService extends InputMethodService {
     private String riseRenderedSignature="";
     private boolean manuallyCollapsedPredictions=false;
     private List<String> latestOptions=java.util.Collections.emptyList();
+    private NextWordTapTicket340 idleWordTicket340;
+    private boolean nextWordTicketCurrent340(InputConnection ic) {
+        if(ic==null || ic!=getCurrentInputConnection() ||
+                idleWordTicket340==null || editingInMiddle || hasSelection() ||
+                cursorHasTextAfter() || sensitive || numericEditor ||
+                !editorAllowsSuggestions)return false;
+        try {
+            return idleWordTicket340.current(
+                    ic.getTextBeforeCursor(NextWordTapTicket340.BEFORE_LIMIT,0),
+                    ic.getTextAfterCursor(1,0),
+                    inputSessionGeneration,lastSelectionStart,lastSelectionEnd,
+                    hasSelection(),sensitive);
+        } catch(RuntimeException detachedEditor) { return false; }
+    }
     private String latestSnapshot="";
     private String manualCollapseSnapshot="";
     private boolean toolbarExpanded = false;
@@ -1351,6 +1365,7 @@ public final class RebornImeService extends InputMethodService {
         predictionDispatcher.cancel();
         personalPrefixCache340.clear();
         splitSnapshot340=null;
+        idleWordTicket340=null;
         tappedSequence340.clear();
         clearTapSequence340();
         invalidateBackspaceGestureSession();
@@ -2794,6 +2809,12 @@ public final class RebornImeService extends InputMethodService {
         // Empty-bar choices are NEXT-WORD insertions, not corrections to a
         // composing span. Never call setComposingText with an empty expected span.
         if (expected.isEmpty()) {
+            // Never insert a stale idle chip into a moved caret or new field.
+            if(!nextWordTicketCurrent340(ic)) {
+                predictionDispatcher.cancel();
+                showSuggestions();
+                return;
+            }
             final long tapSession340=inputSessionGeneration;
             final boolean learnThisTap340=editorAllowsPersonalLearning &&
                     PersonalLearning.enabled(this) && !sensitive &&
@@ -3164,7 +3185,22 @@ public final class RebornImeService extends InputMethodService {
     }
     private void renderSuggestions(String input,List<String> options) {
         visibleEditingTicket=null;
+        idleWordTicket340=null;
         if(candidates==null)return;
+        if(input.isEmpty() && !sensitive && !numericEditor &&
+                !editingInMiddle && !hasSelection() &&
+                !cursorHasTextAfter() && editorAllowsSuggestions) {
+            try {
+                InputConnection ic=getCurrentInputConnection();
+                if(ic!=null)idleWordTicket340=NextWordTapTicket340.capture(
+                        ic.getTextBeforeCursor(NextWordTapTicket340.BEFORE_LIMIT,0),
+                        ic.getTextAfterCursor(1,0),inputSessionGeneration,
+                        lastSelectionStart,lastSelectionEnd,sensitive,
+                        hasSelection(),cursorHasTextAfter());
+            } catch(RuntimeException detachedEditor) {
+                idleWordTicket340=null;
+            }
+        }
         if(manuallyCollapsedPredictions && !input.equals(manualCollapseSnapshot))
             manuallyCollapsedPredictions=false;
         latestSnapshot=input;
