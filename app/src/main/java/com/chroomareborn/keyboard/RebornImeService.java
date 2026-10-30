@@ -177,7 +177,58 @@ public final class RebornImeService extends InputMethodService {
         if(stableDelayMs>0)
             suggestionHandler.postDelayed(candidate,stableDelayMs);
     }
+    // A synchronous InputConnection callback must not tear down the very
+    // composing edit currently being verified. Selection changes initiated
+    // by the user still follow onUpdateSelection's normal checks.
+    private boolean composingTransaction340=false;
     private String composing = "";
+    private void appendComposing340(InputConnection ic,String addition) {
+        final long session=inputSessionGeneration;
+        final String previous=composing;
+        ComposingMutation340.Result outcome;
+        composingTransaction340=true;
+        try {
+            outcome=ComposingMutation340.append(
+                    new ComposingMutation340.Editor() {
+                @Override public boolean sameSession() {
+                    return session==inputSessionGeneration &&
+                            ic==getCurrentInputConnection();
+                }
+                @Override public CharSequence before() {
+                    return ic.getTextBeforeCursor(
+                            ComposingMutation340.READ_WINDOW,0);
+                }
+                @Override public boolean setComposing(String next) {
+                    return ic.setComposingText(next,1);
+                }
+                @Override public boolean finishComposing() {
+                    return ic.finishComposingText();
+                }
+                @Override public boolean commit(String text) {
+                    return ic.commitText(text,1);
+                }
+            },previous,addition);
+        } finally {
+            composingTransaction340=false;
+        }
+        if(outcome==ComposingMutation340.Result.COMPOSING) {
+            composing=previous+addition;
+        } else {
+            // A false-but-applied remote commit is NOT retried. In particular
+            // it must not add another highlighted word or character.
+            composing="";
+            if(outcome==ComposingMutation340.Result.PRECONDITION &&
+                    session==inputSessionGeneration &&
+                    ic==getCurrentInputConnection()) {
+                // A caret move detached the previous composing word. The
+                // user's current key still belongs at the new caret, once.
+                ic.finishComposingText();
+                if(session==inputSessionGeneration &&
+                        ic==getCurrentInputConnection())
+                    ic.commitText(addition,1);
+            }
+        }
+    }
     private boolean sensitive, shift, symbols, capsLock;
     // NO_SUGGESTIONS is not a password marker in Google Keep note editors.
     // Honor NO_PERSONALIZED_LEARNING separately even when suggestions appear.
@@ -1356,7 +1407,7 @@ public final class RebornImeService extends InputMethodService {
             invalidateEditingTicket();
         lastSelectionStart=newSelStart;
         lastSelectionEnd=newSelEnd;
-        if(singleBackspaceMutation338)return;
+        if(singleBackspaceMutation338 || composingTransaction340)return;
         // Suppress per-character prediction work while the finger is moving.
         if(cursorSwipeNavigating || cursorReleaseSuggestionsPending)return;
         if(composing.isEmpty()) {
@@ -2092,20 +2143,14 @@ public final class RebornImeService extends InputMethodService {
                 ic.endBatchEdit();
             }
         } else if (apostropheInsideWord) {
-            // Keep a contraction or possessive as ONE composing span.
-            // The normal symbol-page apostrophe previously ended composing.
-            composing+=value;
-            if(!ic.setComposingText(composing,1)) {
-                ic.commitText(value,1);
-                composing="";
-            }
+            // Verify the host's live result before ever retrying insertion.
+            appendComposing340(ic,value);
         } else if (editingInMiddle || sensitive || !editorAllowsSuggestions ||
                 symbols || !value.matches("[A-Za-z]")) {
             if (!composing.isEmpty()) currentFinish();
             ic.commitText(value, 1);
         } else {
-            composing += value;
-            if (!ic.setComposingText(composing, 1)) { ic.commitText(value, 1); composing = ""; }
+            appendComposing340(ic,value);
         }
         if (!value.matches("[A-Za-z]")) updateSentenceShift();
         showSuggestions();
