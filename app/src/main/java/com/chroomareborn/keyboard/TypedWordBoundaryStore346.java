@@ -32,6 +32,18 @@ final class TypedWordBoundaryStore346 {
     static Result record(Context c,String verifiedWord,String precedingCommitted,
             boolean editorAllowsLearning,boolean successfulSpace,
             long capturedConsentGeneration) {
+        return record(c,verifiedWord,precedingCommitted,
+                editorAllowsLearning,successfulSpace,capturedConsentGeneration,
+                TypedWordsConsent341.liveRevision());
+    }
+
+    /** The extra process-local revision is captured when the keypress is
+     * queued, NOT when this worker begins writing. This prevents a queued
+     * word from surviving a quick disable->erase->enable transition.
+     */
+    static Result record(Context c,String verifiedWord,String precedingCommitted,
+            boolean editorAllowsLearning,boolean successfulSpace,
+            long capturedConsentGeneration,long capturedLiveRevision) {
         if(c==null)throw new IllegalArgumentException("Missing app context");
         if(Looper.getMainLooper()!=null &&
                 Thread.currentThread()==Looper.getMainLooper().getThread())
@@ -41,7 +53,8 @@ final class TypedWordBoundaryStore346 {
         if(next==null)return new Result(false,null);
         synchronized(TypedWordEvidenceStore341.class) {
             if(!TypedWordsConsent341.mayRemember(c,editorAllowsLearning) ||
-                    TypedWordsConsent341.generation(c)!=capturedConsentGeneration)
+                    TypedWordsConsent341.generation(c)!=capturedConsentGeneration ||
+                    TypedWordsConsent341.liveRevision()!=capturedLiveRevision)
                 return new Result(false,null);
 
             TypedWordEvidenceStore341.Snapshot old=TypedWordEvidenceStore341.read(c);
@@ -71,7 +84,8 @@ final class TypedWordBoundaryStore346 {
             // Both privacy gates are checked inside the consent/store lock,
             // immediately before committing a single private prefs file.
             if(!TypedWordsConsent341.mayRemember(c,editorAllowsLearning) ||
-                    TypedWordsConsent341.generation(c)!=capturedConsentGeneration)
+                    TypedWordsConsent341.generation(c)!=capturedConsentGeneration ||
+                    TypedWordsConsent341.liveRevision()!=capturedLiveRevision)
                 return new Result(false,null);
 
             SharedPreferences.Editor edit=c.getSharedPreferences(
