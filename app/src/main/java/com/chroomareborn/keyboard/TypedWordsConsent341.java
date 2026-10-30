@@ -11,6 +11,13 @@ final class TypedWordsConsent341 {
     // Every consent toggle invalidates queued events from earlier sessions,
     // including rapid off -> erase -> on. Default is generation zero.
     private static final String GENERATION="consent_generation_346";
+    // Process-local, lock-free visibility gate. The Activity and IME share
+    // one app process. Unlike persisted generation, this invalidates cached
+    // suggestion snapshots immediately after permissions change.
+    private static final java.util.concurrent.atomic.AtomicLong LIVE_REVISION=
+            new java.util.concurrent.atomic.AtomicLong(0L);
+    static long liveRevision() { return LIVE_REVISION.get(); }
+    static void invalidateLiveSessions() { LIVE_REVISION.incrementAndGet(); }
     private TypedWordsConsent341(){}
 
     static boolean enabled(Context c) {
@@ -37,8 +44,10 @@ final class TypedWordsConsent341 {
                     PREFS,Context.MODE_PRIVATE);
             long previous=prefs.getLong(GENERATION,0L);
             long next=previous==Long.MAX_VALUE?0L:previous+1L;
-            return prefs.edit().putBoolean(KEY,enabled)
+            boolean saved=prefs.edit().putBoolean(KEY,enabled)
                     .putLong(GENERATION,next).commit();
+            if(saved)invalidateLiveSessions();
+            return saved;
         }
     }
 }
