@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build352trial"
+        applicationId = "com.chroomareborn.keyboard.build354trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 352
-        versionName = "1.0.42-build352-selected-caret-safety"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 352"
+        versionCode = 354
+        versionName = "1.0.43-build354-predictions-multitouch"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 354"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 352"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 354"
         }
     }
     compileOptions {
