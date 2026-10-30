@@ -28,22 +28,28 @@ public final class EnterKeyPolicyTest {
             check(EnterKeyPolicy.tapEditorAction(action)==0,
                     "Never implicitly send/chat/submit arbitrary editor: "+action);
         }
+        // Android's TextView may automatically add NO_ENTER_ACTION to a
+        // multiline-capable search editor. An EXPLICIT SEARCH/GO still wins.
         for(int action:new int[]{EnterKeyPolicy.IME_ACTION_SEARCH,
-                EnterKeyPolicy.IME_ACTION_GO,EnterKeyPolicy.IME_ACTION_SEND}) {
+                EnterKeyPolicy.IME_ACTION_GO}) {
             check(EnterKeyPolicy.tapEditorAction(
-                    action|EnterKeyPolicy.IME_FLAG_NO_ENTER_ACTION)==0,
-                    "IME_FLAG_NO_ENTER_ACTION forbids search/go tap action");
+                    action|EnterKeyPolicy.IME_FLAG_NO_ENTER_ACTION)==action,
+                    "Explicit Search/Go intent wins over generic multiline flag");
         }
+        check(EnterKeyPolicy.tapEditorAction(
+                EnterKeyPolicy.IME_ACTION_SEND|
+                EnterKeyPolicy.IME_FLAG_NO_ENTER_ACTION)==0,
+                "Even with NO_ENTER_ACTION, SEND is strictly held");
         check("⌕".equals(EnterKeyPolicy.keyLabel(
                 EnterKeyPolicy.IME_ACTION_SEARCH)),"Search icon visible");
         check("Go".equals(EnterKeyPolicy.keyLabel(
                 EnterKeyPolicy.IME_ACTION_GO)),"Go label visible");
         check("↵".equals(EnterKeyPolicy.keyLabel(
                 EnterKeyPolicy.IME_ACTION_SEND)),"chat remains normal Enter");
-        check("↵".equals(EnterKeyPolicy.keyLabel(
+        check("⌕".equals(EnterKeyPolicy.keyLabel(
                 EnterKeyPolicy.IME_ACTION_SEARCH|
                 EnterKeyPolicy.IME_FLAG_NO_ENTER_ACTION)),
-                "NO_ENTER_ACTION keeps neutral Enter label");
+                "Explicit Search key remains recognizable even in multiline editor");
         check(EnterKeyPolicy.supportsNewline(0x20001),
                 "multiline text input supports newline");
         check(!EnterKeyPolicy.supportsNewline(0x1),
