@@ -35,6 +35,11 @@ final class PersonalContextLearning319 {
     }
     private static boolean approvedTarget(Context c,String normalized) {
         if(PredictionLite.publicWordForContext(normalized))return true;
+        // Punctuation-normalized public contractions are safe too; reject
+        // arbitrary possessive names, since only a known base can qualify.
+        if(normalized.indexOf('\'')>=0 &&
+                PredictionLite.publicWordForContext(normalized.replace("'","")))
+            return true;
         // A previously unknown word is eligible only after the user manually
         // saved it, so the context store does not silently collect names.
         for(String saved:PersonalDictionary.savedWords(c)) {

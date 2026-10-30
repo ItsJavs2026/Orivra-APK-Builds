@@ -27,6 +27,9 @@ jobs:
           grep -Fq 'personalDataVariation' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           grep -Fq 'TYPE_TEXT_VARIATION_POSTAL_ADDRESS' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PersonalContextLearning319AndroidTest.java
+          grep -Fq 'PersonalContextLearning319.record(this' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'PersonalContextLearning319.suggest(' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           mkdir -p "$RUNNER_TEMP/classes"
           javac -encoding UTF-8 -sourcepath app/src/main/java:app/src/testsupport/java -d "$RUNNER_TEMP/classes" \
             app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
