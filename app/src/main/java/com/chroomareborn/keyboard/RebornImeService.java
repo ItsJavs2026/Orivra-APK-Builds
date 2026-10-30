@@ -2545,11 +2545,13 @@ public final class RebornImeService extends InputMethodService {
         // for the strictly opt-in worker; no disk writes or ranking work here.
         // Null means a pasted/edited/unverified word and breaks word pairs.
         if(typedWords347!=null && typedWordsSession347==session) {
-            String verified347=ic==getCurrentInputConnection() &&
-                    session==inputSessionGeneration && !sensitive &&
-                    editorAllowsPersonalLearning && !editingInMiddle &&
-                    !hasSelection() && !cursorHasTextAfter() ?
-                    tappedWord340:null;
+            String verified347=VerifiedSpacePolicy347.verifiedToken(
+                    tappedWord340,ic==getCurrentInputConnection(),
+                    session==inputSessionGeneration,
+                    editorAllowsPersonalLearning && PersonalLearning.enabled(this),
+                    sensitive || numericEditor || symbols,
+                    editingInMiddle || hasSelection(),
+                    cursorHasTextAfter(),true);
             typedWords347.committedSpace(verified347,session,true,true);
         }
         // New words can be learned as in-memory bigrams/trigrams after
