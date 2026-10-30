@@ -37,10 +37,37 @@ public final class EditorSuggestionPrivacyPolicyTest {
             check(!secret.allowPersonalLearning,"Passwords must never learn");
             check(!secret.keepCompatibility,"Never bypass password protections");
         }
-        for(String otherPkg:new String[]{"com.bank.secure","com.example.notes","com.google.android.keepx",null,""}) {
-            EditorSuggestionPrivacyPolicy.Decision other=decide(otherPkg,true,false,true,false);
-            check(other.sensitive,"NO_SUGGESTIONS respected outside exact Keep");
-            check(!other.allowPersonalLearning,"Other apps NO_SUGGESTIONS never learn");
+        for(String otherPkg:new String[]{
+                "com.google.android.googlequicksearchbox","com.android.chrome",
+                "com.example.search","com.bank.secure","com.example.notes",
+                "com.google.android.keepx",null,""}) {
+            EditorSuggestionPrivacyPolicy.Decision other=decide(
+                    otherPkg,true,false,true,false);
+            check(!other.sensitive,
+                    "NO_SUGGESTIONS alone is not a credential marker: "+otherPkg);
+            check(!other.allowPersonalLearning,
+                    "NO_SUGGESTIONS must not write learned words: "+otherPkg);
+            check(!other.keepCompatibility,
+                    "Keep compatibility is scoped to exact Keep package");
+            // With normal text, Backspace swipe and spacebar cursor movement
+            // must no longer be blocked by the prediction UI preference.
+            check(CursorReleaseSuggestionPolicy.classify("Search", "",
+                    false,other.sensitive).mode==
+                    CursorReleaseSuggestionPolicy.Mode.CORRECT_WORD,
+                    "ordinary search caret remains eligible for cursor controls");
+            check(BackspaceSwipeSnapshotGuard.capture("some search words",null,
+                    "",false,1)!=null,
+                    "noSuggestions must not block a safe snapshot");
+        }
+        for(String pkg:new String[]{
+                keep,"com.google.android.googlequicksearchbox",
+                "com.example.search","com.bank.secure",null
+        })for(boolean noSuggest:new boolean[]{false,true})
+          for(boolean noLearn:new boolean[]{false,true}) {
+            EditorSuggestionPrivacyPolicy.Decision d=decide(
+                    pkg,true,true,noSuggest,noLearn);
+            check(d.sensitive,"credential types remain private in every app");
+            check(!d.allowPersonalLearning,"credential types never learn");
         }
         for(String nonTextPkg:new String[]{keep,"com.bank.secure",null}) {
             EditorSuggestionPrivacyPolicy.Decision bad=decide(nonTextPkg,false,false,true,false);
