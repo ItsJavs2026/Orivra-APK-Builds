@@ -27,6 +27,6 @@ Branch `research/build309-ambiguous-contraction-candidates-20261029` forked from
 
 ## QA and eventual delivery
 - Run: https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/41001117856
-- **Java source and regression gate passed**. Android 35 emulator job must complete before claiming qualification. Do not invent its result.
+- **Final research qualification SUCCESS**: https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/41001117856 . Pure Java tests passed: 95 inherited contraction/Learning V2 assertions; 75,035 cursor snapshot safety checks; 105 new tap-only spelling/PII/cursor assertions. Android 35 Pixel 6 emulator **38/38 instrumentation tests passed** (Starting 38, Finished 38, BUILD SUCCESSFUL). These include three new true Android EditText/InputConnection cases. No user release from research CI, no Samsung 309 acceptance yet.
 - After passing emulator, build a separate `com.chroomareborn.keyboard.build309trial` APK with a dedicated CI release gate, and leave installed Candidate 308 unchanged.
 - Required manual Samsung acceptance: type `Were` (see both `Were` and `We're`); type `Hello there. hows` (see literal + `how's` even with punctuation context); test case and all-caps; verify no silent changes and tap-only replacement; check Google Keep, idle centering, Safe Enter and Backspace. Keep Candidate 308 as safe fallback if anything fails.
