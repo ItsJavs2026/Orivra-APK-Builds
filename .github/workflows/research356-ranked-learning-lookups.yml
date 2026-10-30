@@ -1,0 +1,68 @@
+name: Orivra Research 356 - offline personalized lookup parity (NO APK)
+on:
+  push:
+    branches:
+      - research/build356-ranked-learning-lookups-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research356
+  cancel-in-progress: true
+jobs:
+  verified-word-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enforce research-only changes against published Candidate 354
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="378af284207b02c3fb50bbeab273aaede6648837"
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          expected={
+              "app/src/main/java/com/chroomareborn/keyboard/LearnedSuggestionIndex356.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/LearnedSuggestionIndex356Research.java",
+              "docs/ORIVRA_EXTERNAL_KEYBOARD_ENGINEERING_RESEARCH_20261030.md",
+              ".github/workflows/research356-ranked-learning-lookups.yml",
+          }
+          assert changed==expected, f"Unexpected changes: {changed ^ expected}"
+          service=Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          assert "LearnedSuggestionIndex356" not in service
+          index=Path("app/src/main/java/com/chroomareborn/keyboard/LearnedSuggestionIndex356.java").read_text()
+          assert "TypedSequenceArchive341.verifyRawEvidence(words,pairs)" in index
+          assert "SharedPreferences" not in index
+          assert "android.permission.INTERNET" not in Path("app/src/main/AndroidManifest.xml").read_text()
+          gradle=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build354trial"' in gradle
+          print("PASS: no Candidate 354 IME or production APK modifications")
+          PY
+      - name: Compile actual reference policy and pre-ranked index
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/TypedSequenceArchive341.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearnedSuggestionIndex356.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearnedSuggestionIndex356Research.java
+      - name: Regression against Candidate 354 suggestions, random stress, corruption
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.LearnedSuggestionIndex356Research
+          echo "Pass is pure Java research only; no APK, no Android emulator, no Samsung result."
