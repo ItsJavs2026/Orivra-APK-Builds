@@ -73,7 +73,9 @@ public final class SearchEditorActionsAndroidTest {
                     EditorInfo.IME_FLAG_NO_ENTER_ACTION);
             EditorInfo restricted=new EditorInfo();
             assertNotNull(field.onCreateInputConnection(restricted));
-            assertEquals(0,EnterKeyPolicy.tapEditorAction(restricted.imeOptions));
+            assertEquals("Even multiline-host NO_ENTER_ACTION must not suppress an explicit Search",
+                    EditorInfo.IME_ACTION_SEARCH,
+                    EnterKeyPolicy.tapEditorAction(restricted.imeOptions));
         });
     }
 
