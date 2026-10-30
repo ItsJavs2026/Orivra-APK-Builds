@@ -155,23 +155,17 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            bash -euo pipefail -c '
-              if gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug > build310-android35.log 2>&1; then
-                cat build310-android35.log
-              else
-                code=$?
-                cat build310-android35.log
-                echo "Android instrumented tests FAILED. Refusing build qualification."
-                exit "$code"
-              fi
-              grep -F "Finished 44 tests" build310-android35.log
-              grep -F "BUILD SUCCESSFUL" build310-android35.log
-              if grep -Eq "([1-9][0-9]* failure\\(s\\)|[[:space:]]FAILED[[:space:]]|Tests on .* failed)" build310-android35.log; then
-                echo "Unexpected test-failure marker; refusing qualification"
-                exit 1
-              fi
-            '
+          # The emulator action executes script through /bin/sh -c. Keep this
+          # as one folded shell command; unquoted multiline scripts can give
+          # false-green test results when only the last grep succeeds.
+          script: >-
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug > build310-android35.log 2>&1;
+            code=$?;
+            cat build310-android35.log;
+            test "$code" -eq 0 &&
+            grep -F "Finished 44 tests" build310-android35.log &&
+            grep -F "BUILD SUCCESSFUL" build310-android35.log &&
+            ! grep -E "([1-9][0-9]* failure\\(s\\)|[[:space:]]FAILED[[:space:]]|Tests on .* failed)" build310-android35.log
       - name: Mark research qualified only after green Gradle and all 44 tests
         if: success()
         run: echo "44 Android emulator tests passed with BUILD SUCCESSFUL, no user APK released."
