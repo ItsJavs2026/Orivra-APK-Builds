@@ -27,6 +27,7 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_EXPORT_LEARNING=3071;
     private static final int REQUEST_IMPORT_LEARNING=3072;
     private static final int REQUEST_EXPORT_CONTEXT=3073;
+    private static final int REQUEST_EXPORT_FREQUENCY=3074;
     private TextView learningStatsView;
     private TextView dictionaryInfoView;
     private int dp(float n) { return Math.round(getResources().getDisplayMetrics().density * n); }
@@ -417,6 +418,25 @@ public final class MainActivity extends Activity {
                     .show());
         root.addView(exportContext);
 
+        Button exportFrequentWords=new Button(this);
+        exportFrequentWords.setAllCaps(false);
+        exportFrequentWords.setText("Export all learning + frequent words (V3)");
+        exportFrequentWords.setOnClickListener(v->
+                new android.app.AlertDialog.Builder(this)
+                .setTitle("Export frequent-word learning?")
+                .setMessage("This user-selected plaintext V3 file saves "+
+                        "the V1 dictionary, V2 context patterns, and individual "+
+                        "word use counts. It may reveal your habits. Older "+
+                        "Orivra versions cannot read V3. Keep a V1 backup "+
+                        "separately for rollback.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Choose location",(dialog,which)->
+                        startActivityForResult(
+                                LearningTransferDocumentIO.createFrequencyIntent(),
+                                REQUEST_EXPORT_FREQUENCY))
+                .show());
+        root.addView(exportFrequentWords);
+
         Button importLearning=new Button(this);
         importLearning.setAllCaps(false);
         importLearning.setText("Import previous Orivra learning backup");
@@ -621,13 +641,16 @@ public final class MainActivity extends Activity {
             return;
         final Uri selected=result.getData();
         if(requestCode==REQUEST_EXPORT_LEARNING ||
-                requestCode==REQUEST_EXPORT_CONTEXT){
+                requestCode==REQUEST_EXPORT_CONTEXT ||
+                requestCode==REQUEST_EXPORT_FREQUENCY){
             final boolean portable=requestCode==REQUEST_EXPORT_CONTEXT;
+            final boolean includeFrequencies=requestCode==REQUEST_EXPORT_FREQUENCY;
             learningTransferIo.execute(()->{
                 boolean saved=false;
                 try{
-                    String content=portable?
-                            LearningTransferStore.exportV2(this):
+                    String content=includeFrequencies?
+                            LearningTransferStore.exportV3(this):
+                            portable?LearningTransferStore.exportV2(this):
                             LearningTransferStore.exportText(this);
                     LearningTransferDocumentIO.write(this,selected,content);
                     saved=true;
@@ -645,10 +668,10 @@ public final class MainActivity extends Activity {
             });
         }else if(requestCode==REQUEST_IMPORT_LEARNING){
             learningTransferIo.execute(()->{
-                final ContextBackupFormat322.Data parsed;
+                final FrequencyBackupFormat330.Data parsed;
                 try{
                     String file=LearningTransferDocumentIO.read(this,selected);
-                    parsed=ContextBackupFormat322.decode(file);
+                    parsed=FrequencyBackupFormat330.decode(file);
                 }catch(Exception malformed){
                     runOnUiThread(()->{
                         if(isFinishing()||isDestroyed())return;
@@ -661,7 +684,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(()->{
                     if(isFinishing()||isDestroyed())return;
                     final LearningTransferStore.Preview preview;
-                    try{preview=LearningTransferStore.previewV2(this,parsed);}
+                    try{preview=LearningTransferStore.previewV3(this,parsed);}
                     catch(IllegalArgumentException atCapacity){
                         android.widget.Toast.makeText(this,
                                 "Not enough space in personal learning for this backup.",
@@ -671,9 +694,10 @@ public final class MainActivity extends Activity {
                     new android.app.AlertDialog.Builder(this)
                         .setTitle("Review local learning import")
                         .setMessage("Validated backup: "+
-                                parsed.legacy.words.size()+" saved words, "+
-                                parsed.legacy.learnedPairs.size()+" correction pairs and "+
-                                parsed.contexts.size()+" context patterns.\n"+
+                                parsed.earlier.legacy.words.size()+" saved words, "+
+                                parsed.earlier.legacy.learnedPairs.size()+" correction pairs, "+
+                                parsed.earlier.contexts.size()+" context patterns and "+
+                                parsed.frequencies.size()+" learned word frequencies.\n"+
                                 "Will add "+preview.newWords+" words, "+preview.newPairs+
                                 " corrections and strengthen "+preview.strongerPairs+
                                 " previous correction counts. Context patterns merge "+
@@ -686,7 +710,7 @@ public final class MainActivity extends Activity {
                                 learningTransferIo.execute(()->{
                                     boolean completed=false;
                                     try{
-                                        LearningTransferStore.importV2Confirmed(this,parsed);
+                                        LearningTransferStore.importV3Confirmed(this,parsed);
                                         completed=true;
                                     }catch(Exception rejected){
                                         // No raw learned words or selected URI logged.
