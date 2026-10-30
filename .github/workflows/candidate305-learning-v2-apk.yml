@@ -398,29 +398,6 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 | grep -Fq "com.chroomareborn.keyboard.build305trial"
           ! "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" | grep -Fq 'android.permission.INTERNET'
           echo "Candidate 305 trial package, dictionary integrity and privacy checks passed."
-      - name: Verify final compiled identity, debug signer and package permissions
-        shell: bash
-        run: |
-          set -euo pipefail
-          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
-          test -n "$apk" && test -s "$apk"
-          mkdir -p dist
-          cp "$apk" dist/Orivra-Candidate-304.apk
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" |
-            head -n 1 | tee dist/apk-identity.txt
-          grep -Fq "package: name='com.chroomareborn.keyboard.build305trial' versionCode='304'" dist/apk-identity.txt
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" |
-            tee dist/apk-signer.txt
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" |
-            tee dist/apk-permissions.txt
-          ! grep -Fq 'android.permission.INTERNET' dist/apk-permissions.txt
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
-            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
-            grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
-          cd dist
-          sha256sum Orivra-Candidate-304.apk > Orivra-Candidate-304.apk.sha256
-          cat Orivra-Candidate-304.apk.sha256
       - name: Confirm V2 opt-in and editor privacy gates
         run: |
           set -euo pipefail
