@@ -2520,6 +2520,7 @@ public final class RebornImeService extends InputMethodService {
             confirmSuggestionTap(source);
             if(editorAllowsPersonalLearning) {
                 PersonalLearning.recordAcceptance(this,expected,replacement);
+                PersonalWordFrequency328.recordTapped(this,replacement);
                 PersonalContextLearning319.record(this,priorWord,replacement);
             }
             updateSentenceShift();
@@ -2727,8 +2728,16 @@ public final class RebornImeService extends InputMethodService {
                     final CursorEditSnapshotGuard.Ticket ticket=
                             captureEditingTicket(cursorWord);
                     if(ticket!=null) {
-                        renderSuggestions(cursorWord,
-                                CommittedEnglishCursorPolicy.immediate(cursorWord));
+                        java.util.List<String> initial=
+                                CommittedEnglishCursorPolicy.immediate(cursorWord);
+                        if(editorAllowsPersonalLearning &&
+                                PersonalLearning.enabled(this))
+                            initial=AdaptivePrefixPolicy328.merge(cursorWord,
+                                    initial,PersonalWordFrequency328.matching(
+                                            this,cursorWord,3),
+                                    PredictionLite.publicWordForContext(
+                                            cursorWord.toLowerCase(java.util.Locale.ROOT)));
+                        renderSuggestions(cursorWord,initial);
                         visibleEditingTicket=ticket;
                         final long startedAt=CandidateLatencyMetrics.start(getPackageName());
                         predictionDispatcher.scheduleEditing(cursorWord,(id,input,options)->{
@@ -2739,8 +2748,16 @@ public final class RebornImeService extends InputMethodService {
                                         !editorAllowsSuggestions || !composing.isEmpty() ||
                                         !input.equals(wordAtCursor()) ||
                                         !isEditingTicketCurrent(ticket))return;
-                                renderSuggestions(input,
-                                        CommittedEnglishCursorPolicy.merge(input,options));
+                                java.util.List<String> merged=
+                                        CommittedEnglishCursorPolicy.merge(input,options);
+                                if(editorAllowsPersonalLearning &&
+                                        PersonalLearning.enabled(this))
+                                    merged=AdaptivePrefixPolicy328.merge(
+                                            input,merged,
+                                            PersonalWordFrequency328.matching(this,input,3),
+                                            PredictionLite.publicWordForContext(
+                                                    input.toLowerCase(java.util.Locale.ROOT)));
+                                renderSuggestions(input,merged);
                                 visibleEditingTicket=ticket;
                                 if(CandidateLatencyMetrics.recordReady(
                                         startedAt,computedAt,System.nanoTime()))
