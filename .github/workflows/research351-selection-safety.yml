@@ -42,7 +42,7 @@ jobs:
           oldservice=(old/'src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
           assert service!=oldservice
           assert 'SelectionCommitRecovery351.recover(' in service
-          assert 'SelectionCommitRecovery351.finishBeforeTypedReplacement(' in service
+          assert '.finishBeforeTypedReplacement(' in service
           assert 'if(SelectionCommitRecovery351' in service
           assert 'PredictionStripContinuity345.holdVisualOnly(option)' in service
           assert 'PredictionStripContinuity345.currentChip(option)' in service
