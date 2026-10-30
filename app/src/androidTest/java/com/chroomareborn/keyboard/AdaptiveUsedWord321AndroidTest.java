@@ -43,11 +43,16 @@ public final class AdaptiveUsedWord321AndroidTest {
             PersonalContextLearning319.recordUsed(c,"please","tell");
             assertEquals(2,p.getInt("used:please:tell",0));
             assertEquals("tell",PersonalLearning.preferredCorrection(c,"tekk"));
-            assertTrue(PersonalContextLearning319.suggest(c,"please",3)
-                    .contains("tell"));
+            assertTrue("2 unassisted uses must not prematurely become next-word",
+                    PersonalContextLearning319.suggest(c,"please",3).isEmpty());
+            PersonalContextLearning319.recordUsed(c,"please","tell");
+            assertEquals(3,p.getInt("used:please:tell",0));
+            assertTrue("3 completed uses qualify personalized next-word",
+                    PersonalContextLearning319.suggest(c,"please",3)
+                            .contains("tell"));
             PersonalLearning.setEnabled(c,false);
             PersonalContextLearning319.recordUsed(c,"please","tell");
-            assertEquals(2,p.getInt("used:please:tell",0));
+            assertEquals(3,p.getInt("used:please:tell",0));
             assertNull(PersonalLearning.preferredCorrection(c,"tekk"));
             assertTrue(PersonalContextLearning319.suggest(c,"please",3).isEmpty());
             PersonalLearning.setEnabled(c,true);
