@@ -83,6 +83,17 @@ public final class RebornImeService extends InputMethodService {
     private boolean manuallyCollapsedPredictions=false;
     private List<String> latestOptions=java.util.Collections.emptyList();
     private NextWordTapTicket340 idleWordTicket340;
+    // One narrow Android selection echo after a physical typed character.
+    // Captured without another InputConnection read.
+    private long recentKeyUptime342=-1L,recentKeySession342=-1L;
+    private int expectedKeySelection342=-1;
+    private InputConnection keyEditor342;
+    private void resetKeyEcho342() {
+        recentKeyUptime342=-1L;
+        recentKeySession342=-1L;
+        expectedKeySelection342=-1;
+        keyEditor342=null;
+    }
     private boolean nextWordTicketCurrent340(InputConnection ic) {
         if(ic==null || ic!=getCurrentInputConnection() ||
                 idleWordTicket340==null || editingInMiddle || hasSelection() ||
@@ -1366,6 +1377,7 @@ public final class RebornImeService extends InputMethodService {
         personalPrefixCache340.clear();
         splitSnapshot340=null;
         idleWordTicket340=null;
+        resetKeyEcho342();
         tappedSequence340.clear();
         clearTapSequence340();
         invalidateBackspaceGestureSession();
@@ -1456,6 +1468,21 @@ public final class RebornImeService extends InputMethodService {
         // Suppress per-character prediction work while the finger is moving.
         if(cursorSwipeNavigating || cursorReleaseSuggestionsPending)return;
         if(composing.isEmpty()) {
+            // Some editors echo the exact +1 selection produced by the key
+            // after type() already refreshed the strip. Do not synchronously
+            // reconstruct the same predictions twice for that callback.
+            boolean expectedEcho342=PredictionStripStability342
+                    .suppressExpectedCursorEcho(
+                        recentKeyUptime342<0?-1:
+                            android.os.SystemClock.uptimeMillis()-recentKeyUptime342,
+                        oldSelStart,oldSelEnd,newSelStart,newSelEnd,
+                        expectedKeySelection342,true,
+                        recentKeySession342==inputSessionGeneration &&
+                        keyEditor342==getCurrentInputConnection());
+            if(expectedEcho342) {
+                resetKeyEcho342();
+                return;
+            }
             // Cursor moves outside composition must refresh word-under-cursor predictions.
             // The previous early return made the preview path unreachable.
             if(newSelStart!=oldSelStart || newSelEnd!=oldSelEnd) {
@@ -2158,6 +2185,7 @@ public final class RebornImeService extends InputMethodService {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
         final long typeSession340=inputSessionGeneration;
+        final int beforeKeySelection342=lastSelectionStart;
         prepareCursorEdit(ic);
         if (PunctuationSpacing.insertSpaceBeforeLetter(ic.getTextBeforeCursor(1, 0),
                 value, sensitive, editingInMiddle, hasSelection(), cursorHasTextAfter())) {
@@ -2228,6 +2256,14 @@ public final class RebornImeService extends InputMethodService {
                 tappedSequence340.resetContext();
         }
         showSuggestions();
+        if(value.length()==1 && Character.isLetter(value.charAt(0)) &&
+                beforeKeySelection342>=0 &&
+                !hasSelection() && typeSession340==inputSessionGeneration) {
+            recentKeyUptime342=android.os.SystemClock.uptimeMillis();
+            recentKeySession342=typeSession340;
+            expectedKeySelection342=beforeKeySelection342+1;
+            keyEditor342=ic;
+        } else resetKeyEcho342();
         scheduleStableWord329();
         // Only Shift changes require re-rendering key labels. In particular,
         // never detach the touched key while a symbol long-press is active.
@@ -3111,22 +3147,18 @@ public final class RebornImeService extends InputMethodService {
         final java.util.List<String> personalized328=prefixLearning328 ?
                 personalizedPrefix340(snapshot):
                 java.util.Collections.emptyList();
-        if(!personalized328.isEmpty())
-            renderSuggestions(snapshot,AdaptivePrefixPolicy328.merge(
-                    snapshot,java.util.Collections.emptyList(),
-                    personalized328,PredictionLite.publicWordForContext(
-                            snapshot.toLowerCase(java.util.Locale.ROOT))));
-        // Narrow fast lane: show the typed word and exact, tap-only
-        // apostrophe choices at once (including were/we're and hows/how's).
-        // Full SentenceFlow still runs off-thread and replaces these options
-        // only if its result belongs to the same composing snapshot.
-        if(EnglishApostrophePolicy.hasDistinctSuggestion(snapshot)) {
-            java.util.ArrayList<String> immediate=new java.util.ArrayList<>();
-            immediate.add(snapshot);
-            immediate.addAll(EnglishApostrophePolicy.suggestions(snapshot));
-            renderSuggestions(snapshot,AdaptivePrefixPolicy328.merge(
-                    snapshot,immediate,personalized328,true));
-        }
+        // Exactly ONE deterministic immediate row per typed character:
+        // the literal current word (and safe tap-only alternatives).
+        // Never leave the previous word's idle bar visible while the worker
+        // computes. The expensive SentenceFlow ranking remains off-thread.
+        java.util.ArrayList<String> immediate342=new java.util.ArrayList<>();
+        immediate342.add(snapshot);
+        immediate342.addAll(EnglishApostrophePolicy.suggestions(snapshot));
+        renderSuggestions(snapshot,AdaptivePrefixPolicy328.merge(
+                snapshot,immediate342,personalized328,
+                PredictionLite.publicWordForContext(
+                        snapshot.toLowerCase(java.util.Locale.ROOT))));
+
         // The background worker does all expensive sentence reconstruction.
         // Do not dim visible predictions while an asynchronous update runs.
         // The old alpha toggle visibly flashed during fast typing/backspace.
@@ -3189,7 +3221,8 @@ public final class RebornImeService extends InputMethodService {
         visibleEditingTicket=null;
         idleWordTicket340=null;
         if(candidates==null)return;
-        if(input.isEmpty() && !sensitive && !numericEditor &&
+        if(input.isEmpty() && options!=null && !options.isEmpty() &&
+                !sensitive && !numericEditor &&
                 !editingInMiddle && !hasSelection() &&
                 !cursorHasTextAfter() && editorAllowsSuggestions) {
             try {
@@ -3222,33 +3255,11 @@ public final class RebornImeService extends InputMethodService {
             splitPhrases=java.util.Collections.emptyList();
             splitNextWords=java.util.Collections.emptyList();
         }
-        if(splitActive && (!splitNextWords.isEmpty() || !splitPhrases.isEmpty())) {
-            java.util.ArrayList<String> singles=new java.util.ArrayList<>();
-            for(String option:options) if(option.indexOf(' ')<0)singles.add(option);
-            // For a correctly spelled word, offer useful next words rather
-            // than filling the strip with near-miss spelling corrections.
-            if(!splitNextWords.isEmpty()) {
-                singles.clear();
-                // Split mode used to replace the entire suggestion strip
-                // with generic right-side words, hiding learned "con ->
-                // continue" completions. Keep personalized prefix choices
-                // visible without discarding split next-word controls.
-                if(editorAllowsPersonalLearning &&
-                        PersonalLearning.enabled(this) && !numericEditor &&
-                        !editingInMiddle && !hasSelection() &&
-                        !cursorHasTextAfter()) {
-                    String raw=input.toLowerCase(java.util.Locale.ROOT);
-                    if(PredictionLite.publicWordForContext(raw))
-                        singles.add(input);
-                    singles.addAll(personalizedPrefix340(input));
-                }
-                for(String next:splitNextWords)
-                    if(!singles.contains(next))singles.add(next);
-            }
-            // If a typo is being reconstructed into multiple words, keep
-            // sentence candidates rather than hiding all useful corrections.
-            if(!singles.isEmpty())options=singles;
-        }
+        // Keep typed-word corrections in the main strip UNTIL Space.
+        // Build 340 injected generic next-word chips mid-word whenever
+        // the prefix became a recognized word. That switches layout while
+        // typing, steals the literal candidate, and can flicker repeatedly.
+        // Optional phrase alternatives remain in the manually opened row.
         // Display-only condensation retains the highest-ranked prediction.
         // Do not change the underlying predictor scores or accepted text.
         options=SuggestionDisplayPolicy.compact(input,options);
@@ -3273,8 +3284,10 @@ public final class RebornImeService extends InputMethodService {
                 else predictionsExpanded=false;
             }
             manuallyCollapsedPredictions=false;
-        } else if(!freezeRiseDuringDelete && !sensitive && !manuallyCollapsedPredictions
-                && input.length()>=2 && (!splitPhrases.isEmpty() || options.size()>3)) {
+        } else if(PredictionStripStability342.autoExpandDuringTyping() &&
+                !freezeRiseDuringDelete && !sensitive &&
+                !manuallyCollapsedPredictions && input.length()>=2 &&
+                (!splitPhrases.isEmpty() || options.size()>3)) {
             predictionsExpanded=true;
         } else if(!freezeRiseDuringDelete && (options.isEmpty() || (splitPhrases.isEmpty() && options.size()<=3))
                 && !manuallyCollapsedPredictions) {
@@ -3290,12 +3303,31 @@ public final class RebornImeService extends InputMethodService {
             options=java.util.Collections.singletonList(input);
         }
         if(options.isEmpty()) {
+            if(!PredictionStripStability342.showPrivateStatus(
+                    sensitive,editorAllowsSuggestions)) {
+                // No "Keep typing" or "NW OFF" message in an ordinary editor.
+                // Leave the fixed-height prediction strip quiet. Repeated
+                // callbacks must NOT recreate views/force keyboard relayout.
+                if(!"quiet342".equals(candidates.getTag())) {
+                    candidates.removeAllViews();
+                    candidates.setTag("quiet342");
+                }
+                return;
+            }
+            String status=sensitive?"Private field • predictions off":
+                    "Suggestions off for this field";
+            if("message342".equals(candidates.getTag()) &&
+                    candidates.getChildCount()==1 &&
+                    candidates.getChildAt(0) instanceof TextView) {
+                TextView existing=(TextView)candidates.getChildAt(0);
+                if(!TextUtils.equals(existing.getText(),status))
+                    existing.setText(status);
+                return;
+            }
             candidates.removeAllViews();
-            candidates.setTag("message");
+            candidates.setTag("message342");
             TextView message=new TextView(this);
-            message.setText(sensitive?"Private field • predictions off":
-                    !editorAllowsSuggestions?"Suggestions off for this field":
-                    NextWordControlLabels.emptyBarText(offlineNextWordEnabled()));
+            message.setText(status);
             message.setTextColor(secondaryTextColor);
             message.setTextSize(12);
             message.setPadding(dp(12),0,0,0);
