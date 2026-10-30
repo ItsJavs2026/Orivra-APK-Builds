@@ -30,8 +30,8 @@ final class ShortJoinedContext362 {
             Map<String,Integer> offlineWords,
             Map<String,List<String>> establishedNext) {
         if(typed==null || offlineWords==null || establishedNext==null ||
-                typed.length()<4 || typed.length()>16 ||
-                !typed.matches("[A-Za-z]{4,16}"))
+                typed.length()<3 || typed.length()>16 ||
+                !typed.matches("[A-Za-z]{3,16}"))
             return List.of();
         String compact=typed.toLowerCase(Locale.ROOT);
         if(offlineWords.containsKey(compact))return List.of();
