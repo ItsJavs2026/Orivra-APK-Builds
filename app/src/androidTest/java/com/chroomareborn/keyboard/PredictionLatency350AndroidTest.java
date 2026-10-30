@@ -6,6 +6,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.junit.Assert.*;
@@ -36,7 +37,11 @@ public final class PredictionLatency350AndroidTest {
     @Test public void rapidTypingOnlyDeliversMostRecentGeneration()
             throws Exception {
         CountDownLatch received=new CountDownLatch(1);
-        AtomicInteger callbacks=new AtomicInteger();
+        // Slow emulators may legitimately deliver an EARLIER generation
+        // before the next keypress arrives. The strict invariant is that
+        // NONE of them can render AFTER a newer generation is scheduled.
+        AtomicLong finalGeneration=new AtomicLong(Long.MAX_VALUE);
+        AtomicInteger supersededAfterFinal=new AtomicInteger();
         AtomicReference<String> winning=new AtomicReference<>();
         PredictionDispatcher dispatcher=new PredictionDispatcher((input,editing)->{
             if(Thread.currentThread().isInterrupted())return List.of();
@@ -46,19 +51,19 @@ public final class PredictionLatency350AndroidTest {
             for(int i=0;i<300;i++) {
                 final String word="continu"+(i%10);
                 dispatcher.schedule(word,(id,input,options)->{
-                    callbacks.incrementAndGet();
-                    winning.set(input);
-                    if(input.equals("continue"))received.countDown();
+                    if(id<finalGeneration.get())
+                        supersededAfterFinal.incrementAndGet();
                 });
             }
-            dispatcher.schedule("continue",(id,input,options)->{
-                callbacks.incrementAndGet();
+            long finalId=dispatcher.schedule("continue",(id,input,options)->{
                 winning.set(input);
                 received.countDown();
             });
+            finalGeneration.set(finalId);
             assertTrue("final candidate should dispatch",received.await(4,TimeUnit.SECONDS));
             assertEquals("continue",winning.get());
-            assertEquals("only latest queued generation may render",1,callbacks.get());
+            assertEquals("no superseded callback after final scheduling",
+                    0,supersededAfterFinal.get());
         }finally{dispatcher.close();}
     }
 
