@@ -2560,10 +2560,17 @@ public final class RebornImeService extends InputMethodService {
             composing="";
             // Editor can switch while a split chip completes; never learn
             // from a stale input session or a rejected host commit.
-            if(acceptedPrior!=null && sourceSession==inputSessionGeneration &&
+            if(sourceSession==inputSessionGeneration &&
                     ic==getCurrentInputConnection() &&
-                    editorAllowsPersonalLearning && !sensitive)
-                PersonalContextLearning319.record(this,acceptedPrior,next);
+                    editorAllowsPersonalLearning && !sensitive &&
+                    !editingInMiddle && !hasSelection() &&
+                    !cursorHasTextAfter() && PersonalLearning.enabled(this)) {
+                if(acceptedPrior!=null)
+                    PersonalContextLearning319.record(this,acceptedPrior,next);
+                // Split next-word chips are explicitly chosen words too.
+                // Count only after a successful commit to the same editor.
+                PersonalWordFrequency328.recordTapped(this,next);
+            }
             confirmSuggestionTap(source);
             updateSentenceShift();
             showSuggestions();

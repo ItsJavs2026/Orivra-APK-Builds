@@ -3,8 +3,10 @@ package com.chroomareborn.keyboard;
 import android.content.Context;
 import android.content.SharedPreferences;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Bounded, private, opt-in, completed-word frequency learning.
@@ -47,11 +49,42 @@ final class PersonalWordFrequency328 {
     }
     static void recordAcceptedPhrase(Context c,String selectedPhrase) {
         if(c==null || !PersonalLearning.enabled(c))return;
-        // The host accepted an explicit suggestion; reinforce up to 12
-        // distinct known words. Unknown personal text, emails and whole
-        // sentence content are never retained in this store.
-        for(String token:AcceptedPhraseFrequencyPolicy335.words(selectedPhrase))
-            recordTapped(c,token);
+        List<String> selected=AcceptedPhraseFrequencyPolicy335.words(selectedPhrase);
+        if(selected.isEmpty())return;
+        // The old code called recordTapped separately for every chosen word,
+        // repeatedly reading SharedPreferences and scanning the dictionary,
+        // then scheduling up to twelve disk updates on a single chip tap.
+        // Accumulate at most 12 approved individual counters in ONE write.
+        SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
+        Map<String,?> existing=p.getAll();
+        Set<String> saved=null;
+        SharedPreferences.Editor editor=p.edit();
+        int count=existing.size();
+        boolean changed=false;
+        for(String token:selected) {
+            if(!PredictionLite.publicWordForContext(token)) {
+                if(saved==null) {
+                    saved=new HashSet<>();
+                    for(String custom:PersonalDictionary.savedWords(c)) {
+                        String word=EnglishApostrophePolicy.canonical(custom);
+                        if(word!=null)saved.add(word);
+                    }
+                }
+                if(!saved.contains(token))continue;
+            }
+            String key=PREFIX+token;
+            Object prior=existing.get(key);
+            if(prior!=null && !(prior instanceof Integer))continue;
+            if(prior==null) {
+                if(count>=MAX_WORDS)continue;
+                count++;
+            }
+            int old=prior==null?0:(Integer)prior;
+            if(old<0 || old>1000 || old==1000)continue;
+            editor.putInt(key,Math.min(1000,old+2));
+            changed=true;
+        }
+        if(changed && PersonalLearning.enabled(c))editor.apply();
     }
     static List<String> matching(Context c,String prefix,int limit) {
         if(c==null || !PersonalLearning.enabled(c) || limit<=0)return List.of();

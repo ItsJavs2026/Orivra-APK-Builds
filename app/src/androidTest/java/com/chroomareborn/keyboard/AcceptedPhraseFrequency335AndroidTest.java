@@ -56,10 +56,15 @@ public final class AcceptedPhraseFrequency335AndroidTest {
                     FrequencyBackupFormat330.decode(export);
             assertEquals(4,(int)reloaded.frequencies.get("continue"));
             assertEquals(2,(int)reloaded.frequencies.get("can"));
+            PersonalWordFrequency328.recordAcceptedPhrase(ctx,
+                    "please continue");
+            assertEquals("each tap increments each word by two",
+                    6,words.getInt("word:continue",0));
+            assertEquals(4,words.getInt("word:please",0));
             PersonalLearning.setEnabled(ctx,false);
             PersonalWordFrequency328.recordAcceptedPhrase(ctx,
                     "Please continue");
-            assertEquals(4,words.getInt("word:continue",0));
+            assertEquals(6,words.getInt("word:continue",0));
         } finally {
             restore(words,oldWords);
             restore(prefs,oldSettings);
