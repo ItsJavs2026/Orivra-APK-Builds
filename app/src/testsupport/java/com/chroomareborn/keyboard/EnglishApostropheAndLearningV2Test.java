@@ -48,7 +48,7 @@ public final class EnglishApostropheAndLearningV2Test {
                 "preserve exact user-entered apostrophized word");
         ok(EnglishApostrophePolicy.suggestions("can’t").get(0).equals("can’t"),
                 "preserve exact curly user input");
-        for(String word:new String[]{"were","its","well","shell","ill","id","cantilever"}) {
+        for(String word:new String[]{"its","well","shell","ill","id","cantilever"}) {
             ok(EnglishApostrophePolicy.suggestions(word).isEmpty(),
                     "ambiguous proper spelling must not convert automatically");
         }
@@ -61,7 +61,22 @@ public final class EnglishApostropheAndLearningV2Test {
         ok(EnglishApostrophePolicy.merge("cant",List.of("cant","can","can't"))
                 .get(0).equals("cant"),"do not auto-replace valid literal cant");
         ok(EnglishApostrophePolicy.merge("were",List.of("were"))
-                .equals(List.of("were")),"do not silently change were");
+                .equals(List.of("were","we're")),
+                "preserve valid were and OFFER we're separately, never autocorrect");
+        ok(EnglishApostrophePolicy.suggestions("hows").contains("how's"),
+                "hows offers literal how's only on tap");
+        ok(EnglishApostrophePolicy.suggestions("Were").contains("We're"),
+                "sentence-case Were offers We're");
+        ok(EnglishApostrophePolicy.suggestions("HOWS").contains("HOW'S"),
+                "upper-case HOWS offers HOW'S");
+        ok(EnglishApostrophePolicy.hasDistinctSuggestion("were"),
+                "were has a distinct optional candidate");
+        ok(EnglishApostrophePolicy.hasDistinctSuggestion("hows"),
+                "hows has a distinct optional candidate");
+        ok(!EnglishApostrophePolicy.hasDistinctSuggestion("we're"),
+                "completed apostrophized word needs no missing-mark preview");
+        ok(!EnglishApostrophePolicy.hasDistinctSuggestion("a@b.com"),
+                "email is never processed as contraction");
         ok(EnglishApostrophePolicy.merge("can’t",List.of()).get(0).equals("can’t"),
                 "curly word survives empty base predictor");
         ok(EnglishApostrophePolicy.merge("aint",List.of("ant","aint"))
