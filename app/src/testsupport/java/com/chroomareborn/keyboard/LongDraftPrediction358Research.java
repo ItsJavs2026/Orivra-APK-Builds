@@ -93,10 +93,10 @@ public final class LongDraftPrediction358Research {
                 LongDraftPrediction358.afterCommittedBoundary(
                         "normaltopic ",List.of(),true),
                 "Non-special unknown word still gets safe tap-only options");
-        eq(List.of("the","a"),
+        eq(List.of("be","do"),
                 LongDraftPrediction358.afterCommittedBoundary(
                         "I am going to ",List.of(),true),
-                "Grammar backoff for common preposition");
+                "Grammar backoff for infinitive");
         eq(List.of(),
                 LongDraftPrediction358.afterCommittedBoundary(
                         " ",List.of(),true),
