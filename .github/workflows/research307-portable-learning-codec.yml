@@ -1,0 +1,60 @@
+name: Orivra 307 - explicit learning export import format research
+on:
+  push:
+    branches:
+      - research/build307-explicit-learning-portability-20261029
+    paths:
+      - .github/workflows/research307-portable-learning-codec.yml
+      - app/src/main/java/com/chroomareborn/keyboard/LearningTransferCodec.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/LearningTransferCodecTest.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-307-portable-learning
+  cancel-in-progress: true
+jobs:
+  safe-offline-format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ab6a8d7e675533271981dca6fe0d146419ffe338
+          path: phone-trial-candidate-305
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Protect existing IME, V1 preference format, Keep and all installed trial packages
+        run: |
+          set -euo pipefail
+          for f in RebornImeService.java EnglishApostrophePolicy.java PersonalDictionaryPolicy.java PersonalDictionary.java EditorSuggestionPrivacyPolicy.java PredictionLite.java OfflineDictionaryActivationPolicy.java; do
+            cmp "phone-trial-candidate-305/app/src/main/java/com/chroomareborn/keyboard/$f" "app/src/main/java/com/chroomareborn/keyboard/$f"
+          done
+          cmp phone-trial-candidate-305/app/build.gradle.kts app/build.gradle.kts
+          cmp phone-trial-candidate-305/app/src/main/AndroidManifest.xml app/src/main/AndroidManifest.xml
+          cmp phone-trial-candidate-305/app/src/main/java/com/chroomareborn/keyboard/MainActivity.java app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          grep -Fq 'orivra_personal_learning_v1' app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+      - name: Compile and run strictly local learning V2.1 and export format tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PersonalDictionaryPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningTransferCodec.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningV21ConflictTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningTransferCodecTest.java
+          java -ea -Xmx128m -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.EnglishApostropheAndLearningV2Test
+          java -ea -Xmx128m -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.LearningV21ConflictTest
+          java -ea -Xmx128m -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.LearningTransferCodecTest
+      - name: Research only
+        if: success()
+        run: echo "No app UI, no permissions, no stored data and no APK release. Codec is opt-in design-only."
