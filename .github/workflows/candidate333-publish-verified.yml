@@ -1,0 +1,115 @@
+name: Orivra Candidate 333 - publish verified APK
+on:
+  push:
+    branches:
+      - candidate/build333-frequent-words-v3-20261030
+    paths:
+      - .github/workflows/candidate333-publish-verified.yml
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: orivra-candidate333-publish
+  cancel-in-progress: false
+jobs:
+  publish-only-verified-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact previously qualified source and green Android run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          confirmed=$(gh api "repos/$repo/actions/runs/41062583313" --jq '.conclusion')
+          source_sha=$(gh api "repos/$repo/actions/runs/41062583313" --jq '.head_sha')
+          test "$confirmed" = "success"
+          test "$source_sha" = "7859f4fd8e2e7eee69d5c0aed72aa99d96c1891d"
+          test -f .github/workflows/candidate333-combined-apk.yml
+          echo "PASS: verified Build 327 Android 35 test run was successful"
+      - name: Retrieve byte-identical, qualified Candidate 333 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 41062583313 --repo "$GITHUB_REPOSITORY" \
+            --name Orivra-Candidate-333-Android35-Passed --dir dist
+          test -s dist/Orivra-Candidate-333.apk
+          test -s dist/Orivra-Candidate-333.apk.sha256
+          (cd dist && sha256sum -c Orivra-Candidate-333.apk.sha256)
+          test -s dist/package.txt
+          test -s dist/permissions.txt
+          test -s dist/signature.txt
+      - name: Independently reverify original APK identity, signature, privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=dist/Orivra-Candidate-333.apk
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          apksigner="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          test -x "$aapt"
+          test -x "$apksigner"
+          "$aapt" dump badging "$apk" | head -n 1 | tee dist/reverified-package.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build333trial' versionCode='327'" dist/reverified-package.txt
+          "$apksigner" verify --verbose --print-certs "$apk" > dist/reverified-signature.txt
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' dist/reverified-signature.txt
+          "$aapt" dump permissions "$apk" > dist/reverified-permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/reverified-permissions.txt
+          "$aapt" list "$apk" | grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$aapt" list "$apk" | grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+          echo "PASS: unchanged signature, correct trial ID, no internet permission"
+      - name: Publish independently installable GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=candidate-333-20261030
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release tag already exists. Leaving existing release untouched."
+            exit 0
+          fi
+          cat > "$RUNNER_TEMP/notes.md" <<'NOTES'
+          Orivra Candidate 333 — Android 35 emulator-qualified, debug-signed test APK.
+
+          Verified 59/59 Android instrumentation tests in GitHub run 41062583313.
+          Separate application ID com.chroomareborn.keyboard.build333trial (versionCode 327).
+          Installing does NOT overwrite Candidate 319 or Build 310. Not yet Samsung Android 17 or real bank-app verified.
+
+          New in this combined build:
+          - Learned short/common words appear as tap-only prefix completions after repeated use. Example: con or cont => continue; m => my after enough use.
+          - Learns safely from completed words typed without Space where supported, and from suggestions explicitly accepted. Does not automatically rewrite typed words.
+          - Preserves the smoother Candidate 319 key response, Google Search/Keep Enter, and protected banking numeric Amount keypad.
+          - Prefix lookup reads manually saved words at most once per suggestion update.
+          - V1 manual words + accepted typo corrections: orivra-local-learning-backup.txt.
+          - V2 adds contextual word-pair learning: orivra-context-learning-v2-backup.txt.
+          - V3 adds frequent-word learning: orivra-word-frequency-v3-backup.txt.
+          - Existing backups V1 and V2 still import. Older versions cannot import V3. Import never enables Learning automatically.
+          - No INTERNET permission and no automatic backups/cloud sync.
+
+          Trial instructions:
+          1. Export and retain a V1 backup on your currently installed Orivra, whether Candidate 319 or 327. Do not uninstall it.
+          2. Install Candidate 333 as a separately identified trial keyboard, select it, and import the V1 or V2 backup.
+          3. Enable opt-in Learning if desired. Type normal everyday sentences. After repeat use, check con/cont => continue and m => my, tap a prediction to accept.
+          4. Export V3 as your new complete learning backup before later builds, while retaining V1 for rollback.
+          5. Test digits/decimal in a banking Amount field without submitting a payment.
+
+          Android 35 emulator qualified; actual Samsung Android 17 and bank app testing remains outstanding.
+          Personal V3 backup is plaintext and reveals saved vocabulary/frequency patterns; store privately.
+
+          APK SHA256 is in the attached .sha256 asset.
+          Source commit 7859f4fd8e2e7eee69d5c0aed72aa99d96c1891d.
+          NOTES
+          gh release create "$tag" \
+            dist/Orivra-Candidate-333.apk dist/Orivra-Candidate-333.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target 7859f4fd8e2e7eee69d5c0aed72aa99d96c1891d \
+            --title "Orivra Candidate 333 — Short-word Learning + V3 Backups" \
+            --notes-file "$RUNNER_TEMP/notes.md" --prerelease
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY"
