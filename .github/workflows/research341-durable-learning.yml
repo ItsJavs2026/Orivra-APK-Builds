@@ -24,6 +24,9 @@ jobs:
         run: |
           set -euo pipefail
           pinned=141b6275df50bd8853e9a47503387862b3a4e37e
+          # checkout is shallow by default; fetch the passing 340 commit
+          # before comparing files, otherwise git show fails unrelated to code.
+          git fetch --no-tags --depth=1 origin "$pinned"
           for p in             app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java             app/src/main/java/com/chroomareborn/keyboard/PersonalNextWordModel.java             app/src/main/java/com/chroomareborn/keyboard/LearningTransferStore.java             app/src/main/java/com/chroomareborn/keyboard/LearningTransferDocumentIO.java             app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java             app/src/main/java/com/chroomareborn/keyboard/FrequencyBackupFormat330.java             app/build.gradle.kts             app/src/main/AndroidManifest.xml; do
             git show "$pinned:$p" | cmp - "$p"
           done
