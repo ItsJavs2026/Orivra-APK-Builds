@@ -26,6 +26,9 @@ final class LearningTransferDocumentIO {
         // V2 must not accidentally overwrite a previously exported V1 file.
         return createNamedIntent("orivra-context-learning-v2-backup.txt");
     }
+    static Intent createFrequencyIntent(){
+        return createNamedIntent("orivra-word-frequency-v3-backup.txt");
+    }
     private static Intent createNamedIntent(String filename){
         Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
