@@ -81,13 +81,19 @@ public final class TypedLearning341SelfTest {
                 Map.of("to continue",3));
         check(a.eligibleWords().get("continue")==5,
                 "duplicate backup cannot inflate frequency");
+        reject(()->a.mergeValidated(Map.of("unrelated",3),
+                Map.of("unrelated phrase",3)),
+                "rejected pair must not introduce unsupported successor");
+        check(!a.eligibleWords().containsKey("unrelated"),
+                "invalid pair import is fully rolled back");
         a.clearAll();
         check(a.observedVocabularyCount()==0 && a.observedPairCount()==0,
                 "clear removes all archive state");
     }
     private static void verifyBackup(){
         String base=oldV3();
-        Map<String,Integer> w=Map.of("continue",5,"orivra",3,"i",4);
+        Map<String,Integer> w=Map.of("continue",5,"orivra",3,"i",4,
+                "need",3,"to",4);
         Map<String,Integer> p=Map.of("i need",3,"need to",4,"to continue",5);
         String out=TypedLearningV4Codec341.encode(base,w,p);
         check(out.startsWith(TypedLearningV4Codec341.HEADER+"\n"),
@@ -118,6 +124,9 @@ public final class TypedLearning341SelfTest {
                 "truncated backup");
         reject(()->TypedLearningV4Codec341.encode(base,
                 Map.of("person@host",3),Map.of()),"invalid identity payload");
+        reject(()->TypedLearningV4Codec341.encode(base,
+                Map.of("i",3),Map.of("i need",3)),
+                "pair without repeated evidence for both words");
         reject(()->TypedLearningV4Codec341.encode(base,
                 Map.of("continue",2),Map.of()),"insufficient evidence");
         reject(()->TypedLearningV4Codec341.encode(base,

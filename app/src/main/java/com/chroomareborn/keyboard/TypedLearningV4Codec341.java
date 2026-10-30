@@ -44,6 +44,17 @@ final class TypedLearningV4Codec341 {
         }catch(Exception noProvider){throw new IllegalStateException(noProvider);}
     }
 
+    private static void requireAnchoredPairs(Map<String,Integer> words,
+            Map<String,Integer> pairs) {
+        for(String pair:pairs.keySet()) {
+            int split=pair.indexOf(' ');
+            if(split<1 || !words.containsKey(pair.substring(0,split)) ||
+                    !words.containsKey(pair.substring(split+1)))
+                throw new IllegalArgumentException(
+                        "Word pair missing confirmed component vocabulary");
+        }
+    }
+
     static String encode(String legacyBackup,Map<String,Integer> words,
             Map<String,Integer> pairs) {
         if(legacyBackup==null || words==null || pairs==null ||
@@ -69,6 +80,7 @@ final class TypedLearningV4Codec341 {
             if(orderedPairs.putIfAbsent(e.getKey(),e.getValue())!=null)
                 throw new IllegalArgumentException("Duplicate pair");
         }
+        requireAnchoredPairs(orderedWords,orderedPairs);
         StringBuilder body=new StringBuilder(HEADER).append('\n')
                 .append(canonicalV3,FrequencyBackupFormat330.HEADER.length()+1,footer);
         for(Map.Entry<String,Integer> e:orderedWords.entrySet())
@@ -156,6 +168,7 @@ final class TypedLearningV4Codec341 {
                 v3Body.append(line).append('\n');
             }
         }
+        requireAnchoredPairs(words,pairs);
         String canonicalV3=v3Body+FOOTER+digest(v3Body.toString())+"\n";
         FrequencyBackupFormat330.Data earlier=
                 FrequencyBackupFormat330.decode(canonicalV3);

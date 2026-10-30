@@ -97,7 +97,18 @@ final class TypedSequenceArchive341 {
         return qualified(words);
     }
     synchronized Map<String,Integer> eligiblePairs() {
-        return qualified(pairs);
+        Map<String,Integer> confirmed=eligibleWords();
+        TreeMap<String,Integer> anchored=new TreeMap<>();
+        for(Map.Entry<String,Integer> e:pairs.entrySet()) {
+            if(e.getValue()<MIN_EVIDENCE)continue;
+            int separator=e.getKey().indexOf(' ');
+            if(separator<1)continue;
+            String left=e.getKey().substring(0,separator);
+            String right=e.getKey().substring(separator+1);
+            if(confirmed.containsKey(left) && confirmed.containsKey(right))
+                anchored.put(e.getKey(),e.getValue());
+        }
+        return Collections.unmodifiableMap(anchored);
     }
     private static Map<String,Integer> qualified(Map<String,Integer> map) {
         TreeMap<String,Integer> result=new TreeMap<>();
@@ -148,6 +159,15 @@ final class TypedSequenceArchive341 {
             updatedPairs.merge(e.getKey(),e.getValue(),Math::max);
         if(updatedWords.size()>MAX_WORDS || updatedPairs.size()>MAX_PAIRS)
             throw new IllegalArgumentException("Archive merge capacity exceeded");
+        for(Map.Entry<String,Integer> e:updatedPairs.entrySet()) {
+            if(e.getValue()<MIN_EVIDENCE)continue;
+            String pair=e.getKey();
+            int sep=pair.indexOf(' ');
+            String left=pair.substring(0,sep),right=pair.substring(sep+1);
+            if(updatedWords.getOrDefault(left,0)<MIN_EVIDENCE ||
+                    updatedWords.getOrDefault(right,0)<MIN_EVIDENCE)
+                throw new IllegalArgumentException("Orphaned typed pair evidence");
+        }
         words.clear();words.putAll(updatedWords);
         pairs.clear();pairs.putAll(updatedPairs);
     }
