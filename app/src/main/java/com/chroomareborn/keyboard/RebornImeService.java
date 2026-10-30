@@ -553,6 +553,18 @@ public final class RebornImeService extends InputMethodService {
     // Guard deferred touch-release deletion against editor and view lifecycle
     // changes. A stale callback must never delete in the next text field.
     private long inputSessionGeneration = 0L;
+    // One-shot explicit cursor-word suggestion insertion boundary.
+    // Holds at most 48+48 transient editor characters until the next key.
+    // Cleared on editor lifecycle, Backspace, Space and any other chip tap.
+    private PredictionTapCaret364.Ticket pendingCaretInsert364;
+    private InputConnection pendingCaretEditor364;
+    private long pendingCaretSession364=-1L;
+    private void clearPendingCaretInsert364() {
+        pendingCaretInsert364=null;
+        pendingCaretEditor364=null;
+        pendingCaretSession364=-1L;
+    }
+
     // Cancel the initial hold timer when a swipe wins or the editor closes.
     private Runnable deleteHoldPending;
     private final Runnable deleteRepeat = new Runnable() {
@@ -1459,6 +1471,7 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onStartInput(EditorInfo info, boolean restarting) {
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
+        clearPendingCaretInsert364();
         endTypedWords347();
         cancelStableWord329();
         stableWordCounted329="";
@@ -1520,6 +1533,7 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onFinishInput() {
+        clearPendingCaretInsert364();
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
         endTypedWords347();
@@ -1539,6 +1553,7 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInput();
     }
     @Override public void onFinishInputView(boolean finishingInput) {
+        clearPendingCaretInsert364();
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
         endTypedWords347();
@@ -1554,6 +1569,7 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInputView(finishingInput);
     }
     @Override public void onDestroy() {
+        clearPendingCaretInsert364();
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
         endTypedWords347();
@@ -2357,13 +2373,41 @@ public final class RebornImeService extends InputMethodService {
         invalidateEditingTicket();
         cancelCursorReleaseSuggestions();
         InputConnection ic = getCurrentInputConnection();
-        if (ic == null) return;
+        if (ic == null) {clearPendingCaretInsert364();return;}
         final long typeSession340=inputSessionGeneration;
         final int beforeKeySelection342=lastSelectionStart;
+        final PredictionTapCaret364.Ticket insertion364=pendingCaretInsert364;
+        final boolean sameEditor364=ic==pendingCaretEditor364;
+        final boolean sameSession364=typeSession340==pendingCaretSession364;
+        // Exactly one attempted first-key check; do not retain a ticket
+        // if the next key is unrelated, editor changed or input was rejected.
+        clearPendingCaretInsert364();
         // Reuse this existing punctuation sample for cursor recovery; do
         // NOT add an editor IPC or dictionary read to the key's hot path.
         final CharSequence beforeKey360=ic.getTextBeforeCursor(1,0);
         prepareCursorEdit(ic);
+        boolean insertLeftBoundary364=false;
+        if(insertion364!=null && sameEditor364 && sameSession364 &&
+                editingInMiddle && !sensitive && !numericEditor &&
+                !symbols && editorAllowsSuggestions && !hasSelection()) {
+            // Two small editor reads ONLY after the user taps a completed
+            // word's prediction. Ordinary typing remains untouched.
+            try {
+                CharSequence liveBefore364=ic.getTextBeforeCursor(
+                        PredictionTapCaret364.sampleLimit(),0);
+                CharSequence liveAfter364=ic.getTextAfterCursor(
+                        PredictionTapCaret364.sampleLimit(),0);
+                CharSequence selected364=ic.getSelectedText(0);
+                insertLeftBoundary364=PredictionTapCaret364.prefixFirstLetter(
+                        insertion364,liveBefore364,liveAfter364,value,
+                        sameEditor364,sameSession364,editingInMiddle,
+                        hasSelection() || (selected364!=null &&
+                                selected364.length()>0),
+                        sensitive,numericEditor,symbols,editorAllowsSuggestions);
+            } catch(RuntimeException detachedEditor) {
+                insertLeftBoundary364=false;
+            }
+        }
         if(CommittedWordBoundary360.resumeWholeWordCorrection(
                 beforeKey360,composing,value,hasSelection(),
                 editingInMiddle,sensitive,editorAllowsSuggestions,
@@ -2414,7 +2458,7 @@ public final class RebornImeService extends InputMethodService {
         } else if (editingInMiddle || sensitive || !editorAllowsSuggestions ||
                 symbols || !value.matches("[A-Za-z]")) {
             if (!composing.isEmpty()) currentFinish();
-            ic.commitText(value, 1);
+            ic.commitText(insertLeftBoundary364?" "+value:value, 1);
         } else {
             appendComposing340(ic,value);
         }
@@ -2451,7 +2495,8 @@ public final class RebornImeService extends InputMethodService {
                 !hasSelection() && typeSession340==inputSessionGeneration) {
             recentKeyUptime342=android.os.SystemClock.uptimeMillis();
             recentKeySession342=typeSession340;
-            expectedKeySelection342=beforeKeySelection342+1;
+            expectedKeySelection342=beforeKeySelection342+
+                    (insertLeftBoundary364?2:1);
             keyEditor342=ic;
         } else resetKeyEcho342();
         scheduleStableWord329();
@@ -2528,6 +2573,7 @@ public final class RebornImeService extends InputMethodService {
     // the final composing letter and briefly show an empty suggestion hint.
     private boolean singleBackspaceMutation338;
     private void backspace() {
+        clearPendingCaretInsert364();
         clearTapSequence340();
         cancelStableWord329();
         stableWordCounted329="";
@@ -2606,6 +2652,7 @@ public final class RebornImeService extends InputMethodService {
         if(!deleteHeld && oldShift!=shift)refreshView();
     }
     private void space() {
+        clearPendingCaretInsert364();
         cancelStableWord329();
         invalidateEditingTicket();
         cancelCursorReleaseSuggestions();
@@ -2958,6 +3005,23 @@ public final class RebornImeService extends InputMethodService {
             return false;
         }
         if(done) {
+            clearPendingCaretInsert364();
+            // Only a real word-chip tap may arm insertion between existing
+            // words. If the caret moves or host editor changes, the next
+            // key's bounded snapshot fails closed and performs normal input.
+            try {
+                pendingCaretInsert364=PredictionTapCaret364.arm(
+                        ic.getTextBeforeCursor(PredictionTapCaret364.sampleLimit(),0),
+                        ic.getTextAfterCursor(PredictionTapCaret364.sampleLimit(),0),
+                        plan.replacement,editorAllowsSuggestions,
+                        hasSelection(),sensitive,numericEditor,symbols);
+                if(pendingCaretInsert364!=null) {
+                    pendingCaretEditor364=ic;
+                    pendingCaretSession364=inputSessionGeneration;
+                }
+            } catch(RuntimeException detachedEditor) {
+                clearPendingCaretInsert364();
+            }
             editingInMiddle=cursorHasTextAfter();
             confirmSuggestionTap(source);
             if(editorAllowsPersonalLearning) {
@@ -3022,6 +3086,7 @@ public final class RebornImeService extends InputMethodService {
         return committed;
     }
     private void acceptSuggestion(View source, String expected, String suggestion) {
+        clearPendingCaretInsert364();
         cancelStableWord329();
         stableWordCounted329="";
         stableWordSession329=-1L;
