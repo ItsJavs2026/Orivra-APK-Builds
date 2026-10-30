@@ -2412,6 +2412,25 @@ public final class RebornImeService extends InputMethodService {
         }
         if(snapshot.isEmpty()) {
             predictionDispatcher.cancel();
+            // Some apps commit each key immediately and leave Orivra with no
+            // composing span. In that case a known contraction alternative
+            // must still be reachable at the live caret. The verified cursor
+            // ticket and live edit plan prevent stale or cross-editor edits.
+            if(!editingInMiddle && !hasSelection() && !cursorHasTextAfter()) {
+                final String cursorWord=wordAtCursor();
+                if(EnglishApostrophePolicy.hasDistinctSuggestion(cursorWord)) {
+                    final CursorEditSnapshotGuard.Ticket ticket=
+                            captureEditingTicket(cursorWord);
+                    if(ticket!=null) {
+                        renderSuggestions(cursorWord,
+                                CursorWordCorrectionPolicy.safeOptions(
+                                        cursorWord,
+                                        EnglishApostrophePolicy.suggestions(cursorWord)));
+                        visibleEditingTicket=ticket;
+                        return;
+                    }
+                }
+            }
             if(editingInMiddle || cursorHasTextAfter() || hasSelection()) {
                 final String word=wordAtCursor();
                 if(word.isEmpty()) {
@@ -2419,9 +2438,15 @@ public final class RebornImeService extends InputMethodService {
                     return;
                 }
                 // Cursor-word options use a live range-checked replacement on tap.
-                renderSuggestions(word,java.util.Collections.emptyList());
+                // Show a safe exact-word/contraction alternative immediately,
+                // even if the debounced fuzzy predictor has not returned yet.
                 final CursorEditSnapshotGuard.Ticket editTicket=captureEditingTicket(word);
+                java.util.List<String> immediately=
+                        CursorWordCorrectionPolicy.safeOptions(word,
+                                EnglishApostrophePolicy.suggestions(word));
+                renderSuggestions(word,immediately);
                 if(editTicket==null)return; // No trustworthy editor snapshot.
+                visibleEditingTicket=editTicket;
                 final long startedAt=CandidateLatencyMetrics.start(getPackageName());
                 predictionDispatcher.scheduleEditing(word,(id,input,options)->{
                     final long computedAt=startedAt==0L?0L:System.nanoTime();
@@ -2472,6 +2497,16 @@ public final class RebornImeService extends InputMethodService {
                         phrase,seed,legacy,3));
             } else renderSuggestions("",legacy);
             return;
+        }
+        // Narrow fast lane: show the typed word and exact, tap-only
+        // apostrophe choices at once (including were/we're and hows/how's).
+        // Full SentenceFlow still runs off-thread and replaces these options
+        // only if its result belongs to the same composing snapshot.
+        if(EnglishApostrophePolicy.hasDistinctSuggestion(snapshot)) {
+            java.util.ArrayList<String> immediate=new java.util.ArrayList<>();
+            immediate.add(snapshot);
+            immediate.addAll(EnglishApostrophePolicy.suggestions(snapshot));
+            renderSuggestions(snapshot,immediate);
         }
         // The background worker does all expensive sentence reconstruction.
         // Do not dim visible predictions while an asynchronous update runs.
