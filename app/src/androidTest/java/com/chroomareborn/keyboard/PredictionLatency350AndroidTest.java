@@ -40,7 +40,7 @@ public final class PredictionLatency350AndroidTest {
         // Slow emulators may legitimately deliver an EARLIER generation
         // before the next keypress arrives. The strict invariant is that
         // NONE of them can render AFTER a newer generation is scheduled.
-        AtomicLong finalGeneration=new AtomicLong(Long.MAX_VALUE);
+        AtomicLong finalGeneration=new AtomicLong(Long.MIN_VALUE);
         AtomicInteger supersededAfterFinal=new AtomicInteger();
         AtomicReference<String> winning=new AtomicReference<>();
         PredictionDispatcher dispatcher=new PredictionDispatcher((input,editing)->{
