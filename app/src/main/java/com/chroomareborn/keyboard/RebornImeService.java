@@ -74,6 +74,9 @@ public final class RebornImeService extends InputMethodService {
     }
     private List<String> splitPhrases=java.util.Collections.emptyList();
     private List<String> splitNextWords=java.util.Collections.emptyList();
+    private String splitSnapshot340=null;
+    private List<String> splitPhrasesCache340=java.util.Collections.emptyList();
+    private List<String> splitNextCache340=java.util.Collections.emptyList();
     private boolean panelWasVisible=false;
     private boolean riseChipPressed=false;
     private String riseRenderedSignature="";
@@ -165,6 +168,7 @@ public final class RebornImeService extends InputMethodService {
                         editor==getCurrentInputConnection(),
                         session==inputSessionGeneration)) {
                     PersonalWordFrequency328.recordCommitted(this,expected);
+                    personalPrefixCache340.clear();
                     stableWordCounted329=expected;
                     stableWordSession329=session;
                 }
@@ -352,6 +356,12 @@ public final class RebornImeService extends InputMethodService {
     // Predictions never run on the keyboard UI thread. Result callbacks are guarded
     // against stale editor text and posted to the main thread before touching views.
     private final PredictionDispatcher predictionDispatcher = new PredictionDispatcher();
+    private final PrefixCandidateCache340 personalPrefixCache340=
+            new PrefixCandidateCache340();
+    private List<String> personalizedPrefix340(String prefix) {
+        return personalPrefixCache340.get(prefix,
+                word->PersonalWordFrequency328.matching(this,word,3));
+    }
     private final Handler suggestionHandler = new Handler(Looper.getMainLooper());
     // A single tap deletes once; holding for 380 ms starts repeated deletion.
     // All callbacks run on the IME main thread and are cancelled on release/exit.
@@ -1171,6 +1181,7 @@ public final class RebornImeService extends InputMethodService {
             // Keep opt-in immediate, reversible, and non-modal.
             boolean next = !PersonalLearning.enabled(this);
             PersonalLearning.setEnabled(this, next);
+            personalPrefixCache340.clear();
             android.widget.Toast.makeText(this,
                     next ? "Orivra Learning V2 ON (local explicit corrections)"
                          : "Orivra learning OFF",
@@ -1325,6 +1336,8 @@ public final class RebornImeService extends InputMethodService {
         stableWordSession329=-1L;
         invalidateEditingTicket();
         predictionDispatcher.cancel();
+        personalPrefixCache340.clear();
+        splitSnapshot340=null;
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         super.onStartInput(info, restarting);
@@ -2340,8 +2353,10 @@ public final class RebornImeService extends InputMethodService {
                 PersonalLearning.enabled(this)) {
             if(used!=null)
                 PersonalContextLearning319.recordUsed(this,used.prior,used.word);
-            if(completedWord328!=null && !alreadyCounted329)
+            if(completedWord328!=null && !alreadyCounted329) {
                 PersonalWordFrequency328.recordCommitted(this,completedWord328);
+                personalPrefixCache340.clear();
+            }
         }
         stableWordCounted329="";
         stableWordSession329=-1L;
@@ -2616,6 +2631,7 @@ public final class RebornImeService extends InputMethodService {
             if(editorAllowsPersonalLearning) {
                 PersonalLearning.recordAcceptance(this,expected,replacement);
                 PersonalWordFrequency328.recordTapped(this,replacement);
+                personalPrefixCache340.clear();
                 PersonalContextLearning319.record(this,priorWord,replacement);
             }
             updateSentenceShift();
@@ -2664,6 +2680,7 @@ public final class RebornImeService extends InputMethodService {
                 // Split next-word chips are explicitly chosen words too.
                 // Count only after a successful commit to the same editor.
                 PersonalWordFrequency328.recordTapped(this,next);
+                personalPrefixCache340.clear();
             }
             confirmSuggestionTap(source);
             updateSentenceShift();
@@ -2710,6 +2727,7 @@ public final class RebornImeService extends InputMethodService {
             if(editorAllowsPersonalLearning) {
                 PersonalContextLearning319.record(this,prior,suggestion);
                 PersonalWordFrequency328.recordTapped(this,suggestion);
+                personalPrefixCache340.clear();
             }
             confirmSuggestionTap(source);
             if(shift && !capsLock) shift=false;
@@ -2768,6 +2786,7 @@ public final class RebornImeService extends InputMethodService {
                 // A chosen sentence contains useful completed words too.
                 // V3 stores only bounded per-word counters, never the phrase.
                 PersonalWordFrequency328.recordAcceptedPhrase(this,suggestion);
+                personalPrefixCache340.clear();
                 // Explicit selection can teach adjacent public-word pairs.
                 // Only closed-list left context plus accepted words persist.
                 PersonalContextLearning319.record(this,priorWord,suggestion);
@@ -2843,8 +2862,7 @@ public final class RebornImeService extends InputMethodService {
                         if(editorAllowsPersonalLearning &&
                                 PersonalLearning.enabled(this))
                             initial=AdaptivePrefixPolicy328.merge(cursorWord,
-                                    initial,PersonalWordFrequency328.matching(
-                                            this,cursorWord,3),
+                                    initial,personalizedPrefix340(cursorWord),
                                     PredictionLite.publicWordForContext(
                                             cursorWord.toLowerCase(java.util.Locale.ROOT)));
                         renderSuggestions(cursorWord,initial);
@@ -2864,7 +2882,7 @@ public final class RebornImeService extends InputMethodService {
                                         PersonalLearning.enabled(this))
                                     merged=AdaptivePrefixPolicy328.merge(
                                             input,merged,
-                                            PersonalWordFrequency328.matching(this,input,3),
+                                            personalizedPrefix340(input),
                                             PredictionLite.publicWordForContext(
                                                     input.toLowerCase(java.util.Locale.ROOT)));
                                 renderSuggestions(input,merged);
@@ -2963,7 +2981,7 @@ public final class RebornImeService extends InputMethodService {
                 !hasSelection() && !cursorHasTextAfter() && !symbols &&
                 !numericEditor;
         final java.util.List<String> personalized328=prefixLearning328 ?
-                PersonalWordFrequency328.matching(this,snapshot,3):
+                personalizedPrefix340(snapshot):
                 java.util.Collections.emptyList();
         if(!personalized328.isEmpty())
             renderSuggestions(snapshot,AdaptivePrefixPolicy328.merge(
@@ -3016,7 +3034,7 @@ public final class RebornImeService extends InputMethodService {
                 // place even after the slower prediction batch arrives.
                 if(prefixLearning328)
                     ranked=AdaptivePrefixPolicy328.merge(input,ranked,
-                            PersonalWordFrequency328.matching(this,input,3),
+                            personalizedPrefix340(input),
                             PredictionLite.publicWordForContext(
                                     input.toLowerCase(java.util.Locale.ROOT)));
                 renderSuggestions(input,ranked);
@@ -3048,10 +3066,19 @@ public final class RebornImeService extends InputMethodService {
         boolean splitActive=splitPredictionsEnabled() && !sensitive &&
                 editorAllowsSuggestions && !input.isEmpty()
                 && !editingInMiddle && !cursorHasTextAfter();
-        splitPhrases=splitActive?PredictionLite.splitPhraseSuggestions(input):
-                java.util.Collections.emptyList();
-        splitNextWords=splitActive?PredictionLite.splitNextWords(input):
-                java.util.Collections.emptyList();
+        if(splitActive) {
+            if(!input.equals(splitSnapshot340)) {
+                splitSnapshot340=input;
+                splitPhrasesCache340=PredictionLite.splitPhraseSuggestions(input);
+                splitNextCache340=PredictionLite.splitNextWords(input);
+            }
+            splitPhrases=splitPhrasesCache340;
+            splitNextWords=splitNextCache340;
+        } else {
+            splitSnapshot340=null;
+            splitPhrases=java.util.Collections.emptyList();
+            splitNextWords=java.util.Collections.emptyList();
+        }
         if(splitActive && (!splitNextWords.isEmpty() || !splitPhrases.isEmpty())) {
             java.util.ArrayList<String> singles=new java.util.ArrayList<>();
             for(String option:options) if(option.indexOf(' ')<0)singles.add(option);
@@ -3070,8 +3097,7 @@ public final class RebornImeService extends InputMethodService {
                     String raw=input.toLowerCase(java.util.Locale.ROOT);
                     if(PredictionLite.publicWordForContext(raw))
                         singles.add(input);
-                    singles.addAll(PersonalWordFrequency328.matching(
-                            this,input,3));
+                    singles.addAll(personalizedPrefix340(input));
                 }
                 for(String next:splitNextWords)
                     if(!singles.contains(next))singles.add(next);
