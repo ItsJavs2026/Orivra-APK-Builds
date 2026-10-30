@@ -1,0 +1,50 @@
+name: Orivra Research 341 - explicit-consent durable learning prototype
+on:
+  push:
+    branches:
+      - research/build341-durable-tap-learning-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research341
+  cancel-in-progress: true
+jobs:
+  pure-java-privacy-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify Candidate 340 source and existing portable codecs are untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          pinned=141b6275df50bd8853e9a47503387862b3a4e37e
+          for p in             app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java             app/src/main/java/com/chroomareborn/keyboard/PersonalNextWordModel.java             app/src/main/java/com/chroomareborn/keyboard/LearningTransferStore.java             app/src/main/java/com/chroomareborn/keyboard/LearningTransferDocumentIO.java             app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java             app/src/main/java/com/chroomareborn/keyboard/FrequencyBackupFormat330.java             app/build.gradle.kts             app/src/main/AndroidManifest.xml; do
+            git show "$pinned:$p" | cmp - "$p"
+          done
+          test -s app/src/main/java/com/chroomareborn/keyboard/TypedSequenceArchive341.java
+          test -s app/src/main/java/com/chroomareborn/keyboard/TypedLearningV4Codec341.java
+          test -s research/java/com/chroomareborn/keyboard/TypedLearning341SelfTest.java
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          echo 'PASS: no live IME / backup / package / manifest behavior changed'
+      - name: Compile standalone Java 17 research policies and migration codec
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -sourcepath app/src/main/java:research/java \
+            -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/TypedSequenceArchive341.java \
+            app/src/main/java/com/chroomareborn/keyboard/TypedLearningV4Codec341.java \
+            research/java/com/chroomareborn/keyboard/TypedLearning341SelfTest.java
+      - name: Execute consent and single-file backup regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.TypedLearning341SelfTest
