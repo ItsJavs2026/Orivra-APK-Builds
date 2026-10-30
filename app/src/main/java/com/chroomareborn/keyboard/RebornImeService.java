@@ -3407,9 +3407,9 @@ public final class RebornImeService extends InputMethodService {
             }
         }
         for (int i=0;i<shownCount;i++) {
-            String suggestion=stableWord344?
+            String rawSuggestion344=stableWord344?
                     PredictionStripFrame344.slotValue(options,i):options.get(i);
-            if(suggestion==null)suggestion="";
+            final String suggestion=rawSuggestion344==null?"":rawSuggestion344;
             int childIndex=SuggestionStripLayoutPolicy.chipChildIndex(i,emptyInput);
             TextView option=reuseCells?(TextView)candidates.getChildAt(childIndex):new TextView(this);
             if(stableWord344 && suggestion.isEmpty()){
