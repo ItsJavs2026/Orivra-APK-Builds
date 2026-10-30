@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build339trial"
+        applicationId = "com.chroomareborn.keyboard.build340trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 339
-        versionName = "1.0.33-build339-backspace-final-character"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 339"
+        versionCode = 340
+        versionName = "1.0.34-build340-composing-tap-learning"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 340"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 339"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 340"
         }
     }
     compileOptions {
