@@ -2794,12 +2794,19 @@ public final class RebornImeService extends InputMethodService {
         // Empty-bar choices are NEXT-WORD insertions, not corrections to a
         // composing span. Never call setComposingText with an empty expected span.
         if (expected.isEmpty()) {
-            String prior=editorAllowsPersonalLearning &&
-                    !editingInMiddle && !hasSelection() && !cursorHasTextAfter()
+            final long tapSession340=inputSessionGeneration;
+            final boolean learnThisTap340=editorAllowsPersonalLearning &&
+                    PersonalLearning.enabled(this) && !sensitive &&
+                    !editingInMiddle && !hasSelection() &&
+                    !cursorHasTextAfter() && !numericEditor && !symbols;
+            String prior=learnThisTap340
                     ?AcceptedContextPolicy319.precedingForNextWord(
                             ic.getTextBeforeCursor(96,0)):null;
             if (!ic.commitText(suggestion + " ", 1)) return;
-            if(editorAllowsPersonalLearning) {
+            if(learnThisTap340 && tapSession340==inputSessionGeneration &&
+                    ic==getCurrentInputConnection() &&
+                    editorAllowsPersonalLearning && !sensitive &&
+                    PersonalLearning.enabled(this)) {
                 if(suggestion.indexOf(' ')>=0) {
                     // Only an explicit, successfully inserted phrase tap can
                     // reinforce its constituent supported words and pairs.
