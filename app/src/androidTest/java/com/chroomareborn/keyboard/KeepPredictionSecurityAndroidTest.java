@@ -85,6 +85,25 @@ public final class KeepPredictionSecurityAndroidTest {
         assertTrue(d.allowSuggestions);
         assertFalse(d.allowPersonalLearning);
     }
+    @Test public void nameAddressAndPhoneticFieldsNeverLearnYetStayEditable() {
+        for(int variation:new int[]{
+                InputType.TYPE_TEXT_VARIATION_PERSON_NAME,
+                InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS,
+                InputType.TYPE_TEXT_VARIATION_PHONETIC}) {
+            EditorSuggestionPrivacyPolicy.Decision d=
+                    RebornImeService.editorPrivacyDecision(info(
+                            "com.example.contacts",
+                            InputType.TYPE_CLASS_TEXT|variation,0));
+            assertFalse("personal-data text must not block editing",d.sensitive);
+            assertTrue("temporary suggestions still available",d.allowSuggestions);
+            assertFalse("personal-data field must never persist corrections",
+                    d.allowPersonalLearning);
+        }
+        EditorSuggestionPrivacyPolicy.Decision normal=
+                RebornImeService.editorPrivacyDecision(info(
+                        "com.example.notes",InputType.TYPE_CLASS_TEXT,0));
+        assertTrue("ordinary notes preserve opt-in learning",normal.allowPersonalLearning);
+    }
     @Test public void ordinaryNonSearchNoSuggestionsDisablesOnlySuggestionUi() {
         var other=RebornImeService.editorPrivacyDecision(info(
                 "com.example.note",
