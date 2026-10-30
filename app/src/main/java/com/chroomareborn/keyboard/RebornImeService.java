@@ -2153,7 +2153,15 @@ public final class RebornImeService extends InputMethodService {
         // existing editor string. Capture before finishComposingText(), and
         // keep only a short approved word pair after a successful Space.
         CommittedWordUsagePolicy321.Observation used=null;
+        // Separate per-word frequency from adjacent-context learning. A
+        // repeated standalone "continue" must be remembered even without
+        // a whitelisted previous word.
+        String completedWord328=null;
         long session=inputSessionGeneration;
+        if(editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
+                !sensitive && !editingInMiddle && !hasSelection() &&
+                !cursorHasTextAfter() && !symbols && !numericEditor)
+            completedWord328=EnglishApostrophePolicy.canonical(composing);
         if(editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
                 !sensitive && !composing.isEmpty()) {
             try {
@@ -2165,10 +2173,14 @@ public final class RebornImeService extends InputMethodService {
         }
         currentFinish();
         if(!ic.commitText(" ", 1))return;
-        if(used!=null && ic==getCurrentInputConnection() &&
-                session==inputSessionGeneration && !sensitive &&
-                editorAllowsPersonalLearning)
-            PersonalContextLearning319.recordUsed(this,used.prior,used.word);
+        if(ic==getCurrentInputConnection() && session==inputSessionGeneration &&
+                !sensitive && editorAllowsPersonalLearning &&
+                PersonalLearning.enabled(this)) {
+            if(used!=null)
+                PersonalContextLearning319.recordUsed(this,used.prior,used.word);
+            if(completedWord328!=null)
+                PersonalWordFrequency328.recordCommitted(this,completedWord328);
+        }
         // A normal space typed after repositioning must not switch back to
         // end-of-document composition when content remains after the cursor.
         editingInMiddle=cursorHasTextAfter() || hasSelection();
@@ -2514,8 +2526,10 @@ public final class RebornImeService extends InputMethodService {
                     ?AcceptedContextPolicy319.precedingForNextWord(
                             ic.getTextBeforeCursor(96,0)):null;
             if (!ic.commitText(suggestion + " ", 1)) return;
-            if(editorAllowsPersonalLearning)
+            if(editorAllowsPersonalLearning) {
                 PersonalContextLearning319.record(this,prior,suggestion);
+                PersonalWordFrequency328.recordTapped(this,suggestion);
+            }
             confirmSuggestionTap(source);
             if(shift && !capsLock) shift=false;
             // A next-word tap commits a trailing boundary at the cursor.
@@ -2570,6 +2584,7 @@ public final class RebornImeService extends InputMethodService {
             confirmSuggestionTap(source);
             if(editorAllowsPersonalLearning) {
                 PersonalLearning.recordAcceptance(this,expected,suggestion);
+                PersonalWordFrequency328.recordTapped(this,suggestion);
                 // Explicit selection can teach adjacent public-word pairs.
                 // Only closed-list left context plus accepted words persist.
                 PersonalContextLearning319.record(this,priorWord,suggestion);
@@ -2741,6 +2756,21 @@ public final class RebornImeService extends InputMethodService {
                     learned,legacy,3));
             return;
         }
+        // Instant, tap-only prefix predictions from completed-word habits,
+        // before the asynchronous full-sentence decoder finishes. Do not
+        // replace real short words such as "can", "my" or "in".
+        final boolean prefixLearning328=editorAllowsPersonalLearning &&
+                PersonalLearning.enabled(this) && !editingInMiddle &&
+                !hasSelection() && !cursorHasTextAfter() && !symbols &&
+                !numericEditor;
+        final java.util.List<String> personalized328=prefixLearning328 ?
+                PersonalWordFrequency328.matching(this,snapshot,3):
+                java.util.Collections.emptyList();
+        if(!personalized328.isEmpty())
+            renderSuggestions(snapshot,AdaptivePrefixPolicy328.merge(
+                    snapshot,java.util.Collections.emptyList(),
+                    personalized328,PredictionLite.publicWordForContext(
+                            snapshot.toLowerCase(java.util.Locale.ROOT))));
         // Narrow fast lane: show the typed word and exact, tap-only
         // apostrophe choices at once (including were/we're and hows/how's).
         // Full SentenceFlow still runs off-thread and replaces these options
@@ -2749,7 +2779,8 @@ public final class RebornImeService extends InputMethodService {
             java.util.ArrayList<String> immediate=new java.util.ArrayList<>();
             immediate.add(snapshot);
             immediate.addAll(EnglishApostrophePolicy.suggestions(snapshot));
-            renderSuggestions(snapshot,immediate);
+            renderSuggestions(snapshot,AdaptivePrefixPolicy328.merge(
+                    snapshot,immediate,personalized328,true));
         }
         // The background worker does all expensive sentence reconstruction.
         // Do not dim visible predictions while an asynchronous update runs.
@@ -2774,13 +2805,22 @@ public final class RebornImeService extends InputMethodService {
                 // twice-accepted explicit single-word correction may outrank.
                 String preferred=editorAllowsPersonalLearning ?
                         PersonalLearning.preferredCorrection(this,input):null;
+                java.util.List<String> ranked=withPersonal;
                 if(preferred!=null) {
-                    java.util.ArrayList<String> ranked=new java.util.ArrayList<>(withPersonal);
-                    ranked.remove(preferred);
-                    ranked.add(0,preferred);
-                    if(ranked.size()>8)ranked.remove(ranked.size()-1);
-                    renderSuggestions(input,ranked);
-                } else renderSuggestions(input,withPersonal);
+                    java.util.ArrayList<String> chosen=new java.util.ArrayList<>(withPersonal);
+                    chosen.remove(preferred);
+                    chosen.add(0,preferred);
+                    if(chosen.size()>8)chosen.remove(chosen.size()-1);
+                    ranked=chosen;
+                }
+                // Stable, evidence-ranked personal completions retain their
+                // place even after the slower prediction batch arrives.
+                if(prefixLearning328)
+                    ranked=AdaptivePrefixPolicy328.merge(input,ranked,
+                            PersonalWordFrequency328.matching(this,input,3),
+                            PredictionLite.publicWordForContext(
+                                    input.toLowerCase(java.util.Locale.ROOT)));
+                renderSuggestions(input,ranked);
                 if(CandidateLatencyMetrics.recordReady(
                         startedAt,computedAt,System.nanoTime()))
                     recordNextCandidateFrame(id,startedAt);
