@@ -1,0 +1,228 @@
+name: Orivra Candidate 361 - cursor resume predictions + long draft (separate APK)
+on:
+  push:
+    branches:
+      - candidate/build361-cursor-resume-predictions-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate361
+  cancel-in-progress: true
+
+jobs:
+  source-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify isolated identity on pinned Research 360
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="64d7b913b04ca60cbf3b61574290c49e533780f3"
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          allowed={
+              "app/build.gradle.kts",
+              "app/src/main/java/com/chroomareborn/keyboard/MainActivity.java",
+              "app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java",
+              ".github/workflows/candidate361-cursor-resume-predictions.yml",
+          }
+          assert changed==allowed, f"Unreviewed files: {changed ^ allowed}"
+          old=lambda name: subprocess.check_output(["git","show",base+":"+name],text=True)
+          for rel in [
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/main/java/com/chroomareborn/keyboard/LongDraftPrediction358.java",
+              "app/src/main/java/com/chroomareborn/keyboard/CommittedWordBoundary360.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java",
+              "app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java",
+              "app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java",
+          ]:
+              assert old(rel)==Path(rel).read_text(),f"Unexpected production change: {rel}"
+          build=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build361trial"' in build
+          assert 'versionCode = 361' in build
+          assert '"Orivra Candidate 361"' in build
+          main=Path("app/src/main/java/com/chroomareborn/keyboard/MainActivity.java").read_text()
+          assert "Orivra — Candidate 361 Test" in main
+          assert "TypedLearningV4Transfer347.exportV4(this)" in main
+          assert "TypedLearningV4Transfer347.importConfirmed(" in main
+          metrics=Path("app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java").read_text()
+          assert "com.chroomareborn.keyboard.build361trial" in metrics
+          pack=Path("app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java").read_text()
+          assert "com.chroomareborn.keyboard.build361trial" in pack
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert 'android:allowBackup="false"' in manifest
+          assert 'android.permission.INTERNET' not in manifest
+          assert 'android:usesCleartextTraffic="false"' in manifest
+          service=Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          assert "safeComposing358" in service and "safeIdle358" in service
+          assert "CommittedWordBoundary360.resumeWholeWordCorrection(" in service
+          assert "final CharSequence beforeKey360=ic.getTextBeforeCursor(1,0);" in service
+          assert "SuggestionContinuity353.resumeNextWordsAtDocumentEnd(" in service
+          assert "TypedWordsConsent341.enabled(this)" in service
+          print("PASS: isolated Trial 361 preserves Candidate 354 typing, privacy and V4 settings")
+          PY
+      - name: Synthetic long-draft and cursor-return privacy regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/LongDraftPrediction358.java \
+            app/src/main/java/com/chroomareborn/keyboard/CommittedWordBoundary360.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LongDraftPrediction358Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CommittedWordBoundary360Research.java
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.LongDraftPrediction358Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.CommittedWordBoundary360Research
+
+  android35-qualify-and-release:
+    needs: source-and-synthetic
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Materialize pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Build Candidate 361 debug-signed APK and Android tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration when available
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Verify emulator tests, APK identity and no Internet permission
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          files=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert files,"Missing emulator reports"
+          tests=failed=errors=skipped=0
+          for f in files:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith("testsuite") else [
+                  x for x in root.iter() if x.tag.endswith("testsuite")]
+              for suite in suites:
+                  tests+=int(suite.attrib.get("tests","0"))
+                  failed+=int(suite.attrib.get("failures","0"))
+                  errors+=int(suite.attrib.get("errors","0"))
+                  skipped+=int(suite.attrib.get("skipped","0"))
+          print(f'Android 35 emulator: {tests} tests, {failed} failures, {errors} errors, {skipped} skipped')
+          assert tests>=192 and failed==0 and errors==0 and skipped==0
+          PY
+          mkdir -p dist
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n1 |
+            grep -Fq "package: name='com.chroomareborn.keyboard.build361trial' versionCode='361'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > dist/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" > dist/permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/permissions.txt
+          cp "$apk" dist/Orivra-Candidate-361.apk
+          (cd dist && sha256sum Orivra-Candidate-361.apk > Orivra-Candidate-361.apk.sha256)
+          cat > dist/Release_Notes.txt <<'TXT'
+          Orivra Candidate 361 — Cursor-resume and long-draft prediction PHONE TRIAL
+
+          Separately installable debug-signed package:
+          com.chroomareborn.keyboard.build361trial
+
+          - Built on Candidate 359 long-draft fallback, retaining Candidate 354\x27s
+            previously phone-tested smooth touch baseline.
+          - When a user moves the caret out of a composed word and returns to
+            the end of an existing committed word, the next letter is committed
+            once and the full word is eligible for correction predictions.
+          - Conservative whole-word recovery is gated against selection,
+            numeric, protected editors and mid-document text.
+          - A known completed composing word without useful alternatives may
+            show up to two optional tap-only phrase continuations.
+          - After Space at the document end, weak generic suggestions fill
+            otherwise empty chips only after existing learned/curated model ranks.
+          - Protected fields, selections and mid-document edits remain gated.
+          - No new InputConnection IPC or touch handling on the letter-tap path.
+          - Backspace, Keep/Search, no-flicker row, safe single-commit choices,
+            default-OFF opt-in typed-word learning and V4 backup are retained.
+          - No Internet permission, data analytics or automatic app backup.
+          - This is not yet phone-tested: Android 35 emulator qualification
+            cannot prove Samsung S26 Ultra Android 17 smoothness.
+          - Low-confidence fallback is not a pretrained Gboard language model.
+          - Test first in a disposable note; keep Candidate 354 installed.
+          - A separate APK does not migrate data automatically. Use a manual
+            V4 export/import if you want to carry over learning.
+          TXT
+      - name: Upload verified APK, SHA-256 and signatures
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate361-Android35-Qualified
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Create prerelease only after full Android qualification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view candidate-361-20261030 >/dev/null 2>&1; then
+            echo "Release already exists; refusing to overwrite"
+            exit 1
+          fi
+          gh release create candidate-361-20261030 \
+            dist/Orivra-Candidate-361.apk \
+            dist/Orivra-Candidate-361.apk.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 361 - Cursor Return and Long Draft Predictions" \
+            --notes-file dist/Release_Notes.txt \
+            --prerelease
