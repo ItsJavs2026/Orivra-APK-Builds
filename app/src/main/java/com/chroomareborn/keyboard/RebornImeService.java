@@ -2800,8 +2800,17 @@ public final class RebornImeService extends InputMethodService {
                             ic.getTextBeforeCursor(96,0)):null;
             if (!ic.commitText(suggestion + " ", 1)) return;
             if(editorAllowsPersonalLearning) {
-                PersonalContextLearning319.record(this,prior,suggestion);
-                PersonalWordFrequency328.recordTapped(this,suggestion);
+                if(suggestion.indexOf(' ')>=0) {
+                    // Only an explicit, successfully inserted phrase tap can
+                    // reinforce its constituent supported words and pairs.
+                    PersonalContextLearning319.recordChosenPhrase(this,suggestion);
+                    PersonalWordFrequency328.recordAcceptedPhrase(this,suggestion);
+                    if(PersonalLearning.enabled(this) && !sensitive)
+                        tappedSequence340.observeCommittedText(suggestion,true);
+                } else {
+                    PersonalContextLearning319.record(this,prior,suggestion);
+                    PersonalWordFrequency328.recordTapped(this,suggestion);
+                }
                 personalPrefixCache340.clear();
             }
             confirmSuggestionTap(source);
@@ -3041,6 +3050,11 @@ public final class RebornImeService extends InputMethodService {
                     :java.util.Collections.emptyList();
             List<String> contextual340=NextWordCandidatePolicy.merge(
                     transient340,learned,3);
+            List<String> multiword340=editorAllowsPersonalLearning &&
+                    PersonalLearning.enabled(this) && !numericEditor &&
+                    !editingInMiddle && !hasSelection() && !cursorHasTextAfter()
+                    ?tappedSequence340.suggestPhrase(context,3)
+                    :java.util.Collections.emptyList();
             if(NextWordCandidatePolicy.eligible(offlineNextWordEnabled(),sensitive,
                     editingInMiddle,hasSelection(),cursorHasTextAfter(),precedingWord())) {
                 NextWordSeedModel model=offlineNextWordSeed();
@@ -3049,10 +3063,12 @@ public final class RebornImeService extends InputMethodService {
                 List<String> phrase=NextWordPhraseModel.suggest(context,3);
                 List<String> established=NextWordCandidatePolicy.mergeWithPhrase(
                         phrase,seed,legacy,5);
-                renderSuggestions("",NextWordCandidatePolicy.merge(
-                        contextual340,established,3));
-            } else renderSuggestions("",NextWordCandidatePolicy.merge(
-                    contextual340,legacy,3));
+                renderSuggestions("",SessionPhraseDisplay340.promote(
+                        multiword340,NextWordCandidatePolicy.merge(
+                                contextual340,established,3),3));
+            } else renderSuggestions("",SessionPhraseDisplay340.promote(
+                    multiword340,NextWordCandidatePolicy.merge(
+                            contextual340,legacy,3),3));
             return;
         }
         // Instant, tap-only prefix predictions from completed-word habits,
@@ -3284,7 +3300,8 @@ public final class RebornImeService extends InputMethodService {
             String shownSuggestion=suggestionCase(suggestion);
             if(!TextUtils.equals(option.getText(),shownSuggestion))
                 option.setText(shownSuggestion);
-            boolean fullSentenceChip=longPhrase && suggestion.indexOf(' ')>=0;
+            boolean fullSentenceChip=(longPhrase && suggestion.indexOf(' ')>=0) ||
+                    (emptyInput && suggestion.indexOf(' ')>=0);
             option.setTextSize(SuggestionVisualStyle.textSizeSp(fullSentenceChip,
                     suggestion.codePointCount(0,suggestion.length())));
             option.setLetterSpacing(SuggestionVisualStyle.letterSpacing(fullSentenceChip));
