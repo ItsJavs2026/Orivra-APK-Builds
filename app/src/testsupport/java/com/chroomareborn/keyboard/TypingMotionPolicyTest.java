@@ -13,8 +13,11 @@ public final class TypingMotionPolicyTest {
         ok(TypingMotionPolicy.scale(false,true)==1f,"release returns exactly");
         ok(TypingMotionPolicy.scale(true,false)==1f,"reduced motion no scale");
         ok(TypingMotionPolicy.duration(true,false)==0,"reduced motion no duration");
-        ok(TypingMotionPolicy.DOWN_MS<=75,"press animation quick");
-        ok(TypingMotionPolicy.RELEASE_MS<=120,"release cannot lag typing");
+        ok(TypingMotionPolicy.DOWN_MS<=40,"press must feel immediate");
+        ok(TypingMotionPolicy.DOWN_SCALE>=.97f,
+                "subtle compression must not feel sticky");
+        ok(TypingMotionPolicy.RELEASE_MS<=65,
+                "release animation must not trail the thumb");
         Random random=new Random(2942026L);
         for(int i=0;i<100000;i++) {
             boolean pressed=random.nextBoolean();

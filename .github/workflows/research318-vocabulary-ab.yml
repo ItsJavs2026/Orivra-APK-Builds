@@ -1,0 +1,111 @@
+name: Orivra Research 318 - Pinned common-English vocabulary A/B audit
+on:
+  push:
+    branches:
+      - research/build318-english-fluidity-integrated-20261030
+    paths:
+      - .github/workflows/research318-vocabulary-ab.yml
+      - app/src/main/java/com/chroomareborn/keyboard/EverydayEnglishCore316.java
+      - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/EverydayEnglishCoverageAudit316.java
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 8ec085e7de786972aee1b2088b45925648c46e50
+          path: frozen-build315
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: first20hours/google-10000-english
+          ref: d0736d492489198e4f9d650c7ab4143bc14c1e9e
+          path: research-frequency-reference
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compile untouched Build315 and experimental Build316 decoders
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/base" "$RUNNER_TEMP/experiment"
+          javac -encoding UTF-8 \
+            -sourcepath frozen-build315/app/src/main/java:app/src/testsupport/java \
+            -d "$RUNNER_TEMP/base" \
+            frozen-build315/app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowHoldoutBenchmark.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EverydayEnglishCoverageAudit316.java
+          javac -encoding UTF-8 \
+            -sourcepath app/src/main/java:app/src/testsupport/java \
+            -d "$RUNNER_TEMP/experiment" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowHoldoutBenchmark.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EverydayEnglishCoverageAudit316.java
+      - name: Audit exact runtime vocabulary and 487 identical synthetic sentences
+        run: |
+          set -euo pipefail
+          test -s research-frequency-reference/google-10000-english.txt
+          for variant in base experiment; do
+            for suite in EverydayEnglishCoverageAudit316 SentenceFlowAccuracyBenchmark SentenceFlowHoldoutBenchmark; do
+              if [ "$suite" = "EverydayEnglishCoverageAudit316" ]; then
+                timeout 120s java -Xmx1g -ea -cp "$RUNNER_TEMP/$variant" \
+                  "com.chroomareborn.keyboard.$suite" \
+                  research-frequency-reference/google-10000-english.txt \
+                  > "$RUNNER_TEMP/$variant-$suite.txt"
+              else
+                timeout 600s java -Xmx1g -ea -cp "$RUNNER_TEMP/$variant" \
+                  "com.chroomareborn.keyboard.$suite" \
+                  > "$RUNNER_TEMP/$variant-$suite.txt"
+              fi
+            done
+          done
+      - name: Reject protected and broad English quality regressions
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import os,re,sys
+          root=sys.argv[1]
+          def coverage(variant):
+              text=open(os.path.join(root,variant+'-EverydayEnglishCoverageAudit316.txt')).read()
+              return {k:int(v) for k,v in re.findall(r'^([A-Z_0-9]+)\t(\d+)$',text,re.M)}
+          base,exp=coverage('base'),coverage('experiment')
+          print('EXACT RUNTIME WORD COVERAGE:',base,'=>',exp)
+          assert base['FREQUENCY_TOP1000_ELIGIBLE']==exp['FREQUENCY_TOP1000_ELIGIBLE']
+          assert exp['FREQUENCY_TOP1000_RECOGNIZED']>base['FREQUENCY_TOP1000_RECOGNIZED'], 'Missing words not improved'
+          for suite in ('SentenceFlowAccuracyBenchmark','SentenceFlowHoldoutBenchmark'):
+              def load(variant):
+                  rows={}
+                  for line in open(os.path.join(root,variant+'-'+suite+'.txt')):
+                      match=re.match(r'^(GROUP|HOLDOUT)\s+([a-z_0-9]+)\s+n=\s*(\d+)\s+top1=\s*(\d+).*?top3=\s*(\d+)',line)
+                      if match:
+                          name=match.group(2)
+                          rows[name]=tuple(map(int,match.group(3,4,5)))
+                  return rows
+              old,new=load('base'),load('experiment')
+              assert old and old.keys()==new.keys(),suite+' category mismatched'
+              for key in old:
+                  b,a=old[key],new[key]
+                  print(f'{suite} {key}: n={a[0]}, top1 {b[1]}->{a[1]}, top3 {b[2]}->{a[2]}')
+                  assert b[0]==a[0]
+                  assert a[2]>=b[2],f'Top-3 regression {suite}:{key}'
+                  if key in ('ALL','known_word','stable_words','joined_exact','joined_0_typos'):
+                      assert a[1]>=b[1],f'Protected top-1 regression {suite}:{key}'
+          print('PASS: vocabulary coverage gain, 487-case quality non-regression')
+          PY
+      - name: Preserve reproducible comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-318-Vocabulary-Top1000-And-487-A-B
+          path: ${{ runner.temp }}/*-*.txt
+          retention-days: 30
+          if-no-files-found: warn
