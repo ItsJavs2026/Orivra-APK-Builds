@@ -14,7 +14,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Research-only pipeline; NOT yet connected to the live keyboard.
+ * Candidate 347 opt-in worker, researched and emulator-qualified in 346.
  *
  * The IME will eventually pass only an already-verified word after a
  * successful Space commit, never partial keys or full editor text.
@@ -111,6 +111,16 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
                 priorWord=null;
                 if(visibleSession==editorSession)visible=EMPTY;
             }
+        });
+    }
+
+    /** A punctuation, navigation or other hard boundary must not form
+     * false word pairs across unrelated text. Ordered on the same worker.
+     */
+    void breakContext(long session) {
+        if(closed)return;
+        worker.execute(()->{
+            if(workerSession==session)priorWord=null;
         });
     }
 
