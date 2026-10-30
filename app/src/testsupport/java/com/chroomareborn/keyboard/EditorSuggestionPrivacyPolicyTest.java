@@ -15,11 +15,13 @@ public final class EditorSuggestionPrivacyPolicyTest {
         final String keep=EditorSuggestionPrivacyPolicy.GOOGLE_KEEP_PACKAGE;
         EditorSuggestionPrivacyPolicy.Decision normal=decide(keep,true,false,false,false);
         check(!normal.sensitive,"Keep normal notes must suggest");
+        check(normal.allowSuggestions,"Keep normal notes display suggestions");
         check(normal.allowPersonalLearning,"Ordinary Keep notes honor user learning preference");
         check(!normal.keepCompatibility,"No exception required for normal Keep text");
 
         EditorSuggestionPrivacyPolicy.Decision hint=decide(keep,true,false,true,false);
         check(!hint.sensitive,"Keep NO_SUGGESTIONS is not a credential type");
+        check(hint.allowSuggestions,"Keep note UI suggestions remain enabled");
         check(!hint.allowPersonalLearning,"Keep NO_SUGGESTIONS must never learn");
         check(hint.keepCompatibility,"Keep flag exception recorded");
 
@@ -47,6 +49,8 @@ public final class EditorSuggestionPrivacyPolicyTest {
                     "NO_SUGGESTIONS alone is not a credential marker: "+otherPkg);
             check(!other.allowPersonalLearning,
                     "NO_SUGGESTIONS must not write learned words: "+otherPkg);
+            check(!other.allowSuggestions,
+                    "A non-search editor may still opt out of suggestion UI");
             check(!other.keepCompatibility,
                     "Keep compatibility is scoped to exact Keep package");
             // With normal text, Backspace swipe and spacebar cursor movement
@@ -68,6 +72,16 @@ public final class EditorSuggestionPrivacyPolicyTest {
                     pkg,true,true,noSuggest,noLearn);
             check(d.sensitive,"credential types remain private in every app");
             check(!d.allowPersonalLearning,"credential types never learn");
+        }
+        for(String searchPkg:new String[]{
+                "com.google.android.googlequicksearchbox","com.android.chrome",
+                "com.example.search"}) {
+            EditorSuggestionPrivacyPolicy.Decision search=
+                    EditorSuggestionPrivacyPolicy.decide(searchPkg,true,
+                            false,true,false,true);
+            check(!search.sensitive,"Search never classified as credential");
+            check(search.allowSuggestions,"Explicit Search/Go UI exception");
+            check(!search.allowPersonalLearning,"Search hint prevents learning");
         }
         for(String nonTextPkg:new String[]{keep,"com.bank.secure",null}) {
             EditorSuggestionPrivacyPolicy.Decision bad=decide(nonTextPkg,false,false,true,false);
