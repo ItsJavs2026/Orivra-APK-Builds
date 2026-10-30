@@ -1,0 +1,240 @@
+name: Orivra Candidate 310 - Search editor, Enter and editing gestures Android trial
+on:
+  push:
+    branches:
+      - candidate/build310-search-editor-input-fix-20261029
+    paths:
+      - .github/workflows/candidate310-search-editor-apk.yml
+      - app/**
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate310-release
+  cancel-in-progress: true
+jobs:
+  source-and-java:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: c16e8169b84c46902970bec07ec71fc7d65c0c9
+          path: qualified-310
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Pin qualified Build 310 and reject unreviewed changes
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('qualified-310/app')
+          now=Path('app')
+          exceptions={
+              'src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+              'src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
+              'src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java',
+          }
+          for tree in ('src/main/java','src/testsupport','src/androidTest'):
+              for file in (base/tree).rglob('*.java'):
+                  rel=file.relative_to(base).as_posix()
+                  if rel in exceptions:continue
+                  assert file.read_bytes()==(now/rel).read_bytes(),f'Unqualified keyboard/security drift: {rel}'
+          assert (base/'src/main/AndroidManifest.xml').read_bytes()==(now/'src/main/AndroidManifest.xml').read_bytes()
+          old=(base/'build.gradle.kts').read_text()
+          old=old.replace('build309trial','build310trial').replace(
+              'versionCode = 309','versionCode = 310').replace(
+              '1.0.26-build309-tap-only-contractions',
+              '1.0.27-build310-search-editor-gestures').replace(
+              'Orivra Candidate 309','Orivra Candidate 310')
+          assert (now/'build.gradle.kts').read_text()==old,'Unexpected build ID or permission drift'
+          p='src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java'
+          assert (now/p).read_text()==(base/p).read_text().replace(
+              'build309trial','build310trial'),'Candidate metric gate changed'
+          p='src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java'
+          assert (now/p).read_text()==(base/p).read_text().replace(
+              'build309trial','build310trial'),'Android package test changed'
+          p='src/main/java/com/chroomareborn/keyboard/MainActivity.java'
+          previous=(base/p).read_text()
+          expected=previous.replace('Candidate 309','Candidate 310').replace(
+              "Candidate 310: Tap-only we're and how's choices now appear promptly",
+              "Candidate 310: GOOGLE SEARCH FIX: normal Search/Go fields no longer inherit private-field restrictions from NO_SUGGESTIONS. A Search/Go Enter tap now performs the host action, not a newline. Backspace and spacebar cursor gestures remain available regardless of suggestion UI hints, and actual password/email/URI fields remain private. Tap-only we're and how's choices now appear promptly")
+          assert (now/p).read_text()==expected,'Unexpected activity/learning-transfer change'
+          for token in (
+              'editorAllowsSuggestions=privacy.allowSuggestions;',
+              'EnterKeyPolicy.tapEditorAction(info.imeOptions)',
+              'editor.performEditorAction(action)',
+              'if(sensitive || !editorAllowsSuggestions) {',
+              'BackspaceSwipeEditorTransaction.apply(',
+              'cursorSwipeBatch.takeFrame()'):
+              assert token in (now/'src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text(),f'Missing regression invariant {token}'
+          print('PASS: Candidate 310 exactly matches qualified Search/gesture source with isolated app identity')
+          PY
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SearchEditorActionsAndroidTest.java
+          grep -Fq 'orivra_personal_learning_v1' app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java
+          grep -Fq 'LearningTransferStore.importConfirmed(this,parsed)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+      - name: Re-run personal learning, typing safety, Search and Enter policy regressions
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PersonalDictionaryPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorEditSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningTransferCodec.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningV21ConflictTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningTransferCodecTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorEditSnapshotGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ContractionTapOnly309Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java
+          for suite in EnglishApostropheAndLearningV2Test LearningV21ConflictTest LearningTransferCodecTest CursorEditSnapshotGuardTest ContractionTapOnly309Test EditorSuggestionPrivacyPolicyTest EnterKeyPolicyTest; do
+            java -ea -Xmx128m -cp "$RUNNER_TEMP/classes" "com.chroomareborn.keyboard.$suite"
+          done
+  android-35-emulator:
+    needs: source-and-java
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Build verified offline source and include ESDB license
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          gzip -t < app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Verify independent package before emulator testing
+        run: |
+          set -euo pipefail
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/LearningTransferStoreAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PersonalLearningV2AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/IdleSuggestionCenterAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/AmbiguousContractionEditorAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SearchEditorActionsAndroidTest.java
+          grep -Fq 'com.chroomareborn.keyboard.build310trial' app/build.gradle.kts
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          gradle --no-daemon --stacktrace :app:assembleDebug
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 |
+            grep -Fq "package: name='com.chroomareborn.keyboard.build310trial' versionCode='310'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+      - name: Enable KVM
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            bash -euo pipefail -c '
+              if gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug > candidate310-android35.log 2>&1; then
+                cat candidate310-android35.log
+              else
+                code=$?
+                cat candidate310-android35.log
+                echo "Android instrumentation failed. APK release BLOCKED."
+                exit "$code"
+              fi
+              grep -F "Finished 44 tests" candidate310-android35.log
+              grep -F "BUILD SUCCESSFUL" candidate310-android35.log
+              if grep -Eq "([1-9][0-9]* failure\\(s\\)|[[:space:]]FAILED[[:space:]]|Tests on .* failed)" candidate310-android35.log; then
+                echo "Failure marker found despite task success. APK release BLOCKED."
+                exit 1
+              fi
+            '
+      - name: Verify tested APK identity, signer, permissions, licensed asset and SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          cp "$apk" dist/Orivra-Candidate-310.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" |
+            head -n 1 | tee dist/package.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build310trial' versionCode='310'" dist/package.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" |
+            tee dist/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" |
+            tee dist/permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/permissions.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+          cd dist
+          sha256sum Orivra-Candidate-310.apk > Orivra-Candidate-310.apk.sha256
+          cat Orivra-Candidate-310.apk.sha256
+      - name: Preserve verified Candidate 310 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate-310-Android35-Passed
+          path: dist/
+          retention-days: 21
+          if-no-files-found: error
+      - name: Publish isolated debug prerelease only after all Android tests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/notes.md" <<'ORIVRA_310'
+          Orivra Candidate 310 — Google Search, Enter and editing-gesture compatibility.
+
+          TEST-ONLY debug-signed prerelease. Android 35 Google APIs emulator 44/44 instrumented tests passed and Gradle BUILD SUCCESSFUL. Actual Google app on Samsung Galaxy S26 Ultra Android 17 is not yet verified. Separate app ID com.chroomareborn.keyboard.build310trial versionCode 310; does not overwrite Candidate 309, 308 or stable baselines.
+
+          The confirmed source bug: Android TYPE_TEXT_FLAG_NO_SUGGESTIONS was previously treated like credential privacy, hiding predictions and disabling Backspace word swipe plus spacebar cursor drag in everyday Google Search. This build explicitly separates sensitive credential fields, opt-out suggestion UI, and personalized learning. Normal Search/Go text fields can show offline ephemeral predictions and keep gestures usable. Other NO_SUGGESTIONS fields may still opt out of suggestions but remain editable. Password/email/URI and non-text editors remain protected. NO_SUGGESTIONS and NO_PERSONALIZED_LEARNING never contribute to personal learning.
+
+          Enter now recognizes host-declared SEARCH/GO on a normal tap even when Android automatically adds NO_ENTER_ACTION to a multiline-capable search field. It never submits a SEND action on an ordinary tap; deliberately held Send remains as before. Regular multiline notes keep Enter-as-newline. Backspace falls back to standard KEYCODE_DEL only if both targeted deletion APIs explicitly reject; no double-delete after success. Google Keep compatibility, Candidate 309 Were/We're/how's suggestions, Learning V2.1, portable local backup and centered idle suggestions remain.
+
+          PHONE TEST: In Google Search type keyboard live touch wallpaper. The suggestion row should not say Private field. Backspace hold, left-swipe word delete and horizontal spacebar cursor movement should work. Tap Search icon once and verify Google searches instead of inserting a newline. Retest Google Keep typing and safe newline, ChatGPT draft Send hold, and actual password fields (no predictions/learning). Never use personal sensitive data for testing.
+
+          Offline, no INTERNET permission. Contains attributed licensed ESDB dictionary (opt-in default OFF). Personal learning remains opt-in and backups are explicit plaintext. This is not production-stable; keep existing Candidate 309 as fallback and report any differing Google field behavior.
+          ORIVRA_310
+          gh release create candidate-310-20261029 \
+            dist/Orivra-Candidate-310.apk dist/Orivra-Candidate-310.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 310 — Search, Enter & Gesture Fix" \
+            --notes-file "$RUNNER_TEMP/notes.md" --prerelease
+          gh release view candidate-310-20261029 --repo "$GITHUB_REPOSITORY"
