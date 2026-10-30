@@ -35,3 +35,12 @@ GitHub CI run: https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/409
 
 ## Further work
 Treat both accuracy and backup transfer as ongoing research. After physical acceptance, add optional preview of exact word-list changes before committing, stronger error reporting and two-preference rollback; keep improving multi-typo SentenceFlow/English-Spanish offline routing in separate research branches. Do not call any research result a phone-confirmed stable version without the user's explicit report.
+
+## FINAL — GitHub prerelease published after full qualification
+
+- [Final Candidate 308 GitHub Actions run 40991044687](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40991044687) **SUCCESS** across both jobs. The source parity audit confirmed byte-identical qualified Build 307 IME/security/learning behavior, except isolated label/package changes.
+- Pure Java regression suites: **89** original English contraction assertions, **266** deterministic Learning V2.1 conflict-and-case checks, **46** portable learning codec checks. All **401** passed.
+- Android 35 Pixel 6 emulator: **35/35** instrumentation tests passed (log: `Starting 35 tests`, `Finished 35 tests`, `BUILD SUCCESSFUL`). Includes existing Google Keep, safe editor, layout, offline dictionary and new optional import/export regression tests. Actual Samsung Android 17 testing still pending.
+- Final APK was checked for application ID `com.chroomareborn.keyboard.build308trial`, versionCode `308`, versionName `1.0.25-build308-learning-export-import`, debug APK signature, bundled pinned ESDB wordpack and copyright notice, and **no INTERNET permission**.
+- [Published separate prerelease](https://github.com/ItsJavs2026/Orivra-APK-Builds/releases/tag/candidate-308-20261029), verified by GitHub release API; direct asset: https://github.com/ItsJavs2026/Orivra-APK-Builds/releases/download/candidate-308-20261029/Orivra-Candidate-308.apk . APK size **473,279 bytes**, SHA-256 **`c29ad281002aa6887e13f8ac204ea6ea729b5e56ea5bad02ef6f4b8f36c949eb`**. Companion `Orivra-Candidate-308.apk.sha256` published.
+- **Do not label Samsung phone-approved** until user reports testing. Keep phone-positive Candidate 304, Keep fallback Candidate 300, and previous Candidate 305 untouched. Because older distinct packages lack the new export control, their private learning still cannot be migrated automatically.
