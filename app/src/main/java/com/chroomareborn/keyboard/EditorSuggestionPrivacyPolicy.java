@@ -4,10 +4,15 @@ package com.chroomareborn.keyboard;
  * Pure-Java editor prediction/privacy policy. The Android adapter supplies
  * the platform InputType / EditorInfo flags; no app text is inspected here.
  *
- * TYPE_TEXT_FLAG_NO_SUGGESTIONS is an editor UI hint, not itself a credential
- * marker. Google Keep is an explicitly scoped compatibility exception for
- * normal free-form note fields only. Password, email/URL, non-text and
- * IME-requested no-personalization rules always take precedence.
+ * Android's TYPE_TEXT_FLAG_NO_SUGGESTIONS describes dictionary UI, NOT
+ * credentials or whether InputConnection editing is allowed. Never couple
+ * backspace, spacebar cursor movement, or Enter actions to this flag.
+ *
+ * Actual credential/identifier variations and non-text fields remain private.
+ * In ordinary free-form text, including Google search and Google Keep,
+ * ephemeral, fully local tap-only suggestions are allowed. When an editor
+ * requests NO_SUGGESTIONS, personal learning is always disabled. The
+ * IME_FLAG_NO_PERSONALIZED_LEARNING restriction is also always honored.
  */
 final class EditorSuggestionPrivacyPolicy {
     private EditorSuggestionPrivacyPolicy() {}
@@ -32,12 +37,11 @@ final class EditorSuggestionPrivacyPolicy {
         if(!isTextClass || isPasswordOrIdentifier)
             return new Decision(true,false,false);
         final boolean keep=GOOGLE_KEEP_PACKAGE.equals(editorPackage);
-        if(noSuggestions && !keep)
-            return new Decision(true,false,false);
-
-        // If Keep requests no dictionary suggestions, we can still offer
-        // ephemeral, offline one-tap candidates without retaining a learning
-        // record. Never bypass the IME no-personalized-learning flag.
+        // This flag is a suggestion preference, not a password signal.
+        // Treating it as "sensitive" broke ordinary Google search fields,
+        // disabled text editing gestures, and hid the suggestion strip.
+        // No app-name allowlist is needed; only trustworthy InputType
+        // credential/identifier signals above can mark the editor private.
         final boolean allowLearning=!noSuggestions && !noPersonalizedLearning;
         return new Decision(false,allowLearning,keep && noSuggestions);
     }
