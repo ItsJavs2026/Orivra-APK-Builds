@@ -94,16 +94,15 @@ final class TypedWordBoundaryStore346 {
             // but the editor now mutates ONLY the verified changed entries.
             // Our private-store monitor still serializes concurrent writers;
             // all counts/pair anchors are prevalidated before mutation.
-            final boolean wordChanged=!words.get(next).equals(old.words.get(next));
-            final boolean pairChanged=pair!=null && pairs.containsKey(pair) &&
-                    !pairs.get(pair).equals(old.pairs.get(pair));
+            final Map<String,Integer> changed=TypedWordDelta349.changedEntries(
+                    old,words,pairs,next,pair);
             final TypedWordEvidenceStore341.Snapshot result=
                     new TypedWordEvidenceStore341.Snapshot(words,pairs);
-            if(!wordChanged && !pairChanged)return new Result(true,result);
+            if(changed.isEmpty())return new Result(true,result);
             SharedPreferences.Editor edit=c.getSharedPreferences(
                     TypedWordEvidenceStore341.PREFS,Context.MODE_PRIVATE).edit();
-            if(wordChanged)edit.putInt("w:"+next,words.get(next));
-            if(pairChanged)edit.putInt("p:"+pair,pairs.get(pair));
+            for(Map.Entry<String,Integer> entry:changed.entrySet())
+                edit.putInt(entry.getKey(),entry.getValue());
             if(!edit.commit())return new Result(false,null);
             return new Result(true,result);
         }
