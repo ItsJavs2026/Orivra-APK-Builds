@@ -1193,6 +1193,8 @@ public final class RebornImeService extends InputMethodService {
             boolean next = !PersonalLearning.enabled(this);
             PersonalLearning.setEnabled(this, next);
             personalPrefixCache340.clear();
+            tappedSequence340.clear();
+            clearTapSequence340();
             android.widget.Toast.makeText(this,
                     next ? "Orivra Learning V2 ON (local explicit corrections)"
                          : "Orivra learning OFF",
@@ -2139,6 +2141,7 @@ public final class RebornImeService extends InputMethodService {
         cancelCursorReleaseSuggestions();
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
+        final long typeSession340=inputSessionGeneration;
         prepareCursorEdit(ic);
         if (PunctuationSpacing.insertSpaceBeforeLetter(ic.getTextBeforeCursor(1, 0),
                 value, sensitive, editingInMiddle, hasSelection(), cursorHasTextAfter())) {
@@ -2193,7 +2196,7 @@ public final class RebornImeService extends InputMethodService {
             if(normalized!=null &&
                     StableWordUsagePolicy329.sameVisibleWord(normalized,
                             visible,before,ic==getCurrentInputConnection(),
-                            inputSessionGeneration==inputSessionGeneration) &&
+                            typeSession340==inputSessionGeneration) &&
                     before!=null && before.toString().endsWith(value)) {
                 lastTappedWord340=normalized;
                 lastTappedSession340=inputSessionGeneration;
