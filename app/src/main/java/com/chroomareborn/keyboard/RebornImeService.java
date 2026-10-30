@@ -2037,9 +2037,24 @@ public final class RebornImeService extends InputMethodService {
             composing = composing.substring(0, composing.length() - 1);
             if (composing.isEmpty()) ic.finishComposingText();
             else ic.setComposingText(composing, 1);
-        } else if (!ic.deleteSurroundingTextInCodePoints(1, 0)) {
-            // Fallback for editors that do not support code-point deletion.
-            ic.deleteSurroundingText(1, 0);
+        } else {
+            try {
+                if(!ic.deleteSurroundingTextInCodePoints(1,0)
+                        && !ic.deleteSurroundingText(1,0)) {
+                    // Some custom search editors implement only the standard
+                    // delete key event. Send it ONLY if both direct deletion
+                    // APIs rejected the operation, so a single tap cannot
+                    // delete multiple characters on a successful API call.
+                    if(ic.sendKeyEvent(new KeyEvent(
+                            KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL)))
+                        ic.sendKeyEvent(new KeyEvent(
+                                KeyEvent.ACTION_UP,KeyEvent.KEYCODE_DEL));
+                }
+            } catch(RuntimeException editorDetached) {
+                // The editor switched while Backspace was held. Do not
+                // retry or dispatch a keystroke to the newly focused editor.
+                return;
+            }
         }
         boolean oldShift=shift;
         updateSentenceShift();
@@ -2096,7 +2111,7 @@ public final class RebornImeService extends InputMethodService {
             // Make the completed query visible to the host before SEARCH/GO.
             currentFinish();
             boolean acted=editor.performEditorAction(action);
-            if(!acted) {
+            if(!acted && !EnterKeyPolicy.supportsNewline(info.inputType)) {
                 // Only the user explicitly tapped a Search/Go action. Some
                 // custom web search editors handle physical ENTER instead
                 // of performEditorAction. Do not retry on a success and do
