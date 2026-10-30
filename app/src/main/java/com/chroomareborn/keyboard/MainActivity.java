@@ -367,6 +367,41 @@ public final class MainActivity extends Activity {
                 }).show());
         root.addView(resetLearning);
 
+        // Build 307 research: explicit user-selected backup, never automatic.
+        TextView transferNotice=new TextView(this);
+        transferNotice.setText("\nPortable learning backup (experimental)\n"
+                +"Export only manually saved words and intentional accepted corrections. "
+                +"The file is plaintext: it may include names or personalized words. "
+                +"Choose a location you trust. No full notes or typing history.");
+        transferNotice.setTextColor(0xFF455263);
+        transferNotice.setTextSize(14);
+        root.addView(transferNotice);
+
+        Button exportLearning=new Button(this);
+        exportLearning.setAllCaps(false);
+        exportLearning.setText("Export my saved words + learned corrections");
+        exportLearning.setOnClickListener(v->
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("Export local learning?")
+                    .setMessage("You choose where the plain-text backup is saved. "
+                            +"It may reveal words and names you saved and deliberate "
+                            +"correction pairs. No full notes or raw typing "
+                            +"history are included. Save only to a trusted place.")
+                    .setNegativeButton("Cancel",null)
+                    .setPositiveButton("Choose location",(dialog,which)->
+                            startActivityForResult(
+                                    LearningTransferDocumentIO.createIntent(),
+                                    REQUEST_EXPORT_LEARNING))
+                    .show());
+        root.addView(exportLearning);
+
+        Button importLearning=new Button(this);
+        importLearning.setAllCaps(false);
+        importLearning.setText("Import previous Orivra learning backup");
+        importLearning.setOnClickListener(v->startActivityForResult(
+                LearningTransferDocumentIO.openIntent(),REQUEST_IMPORT_LEARNING));
+        root.addView(importLearning);
+
         // This entire panel is invisible to stable-preview and other packages.
         // Opt-in lives only in process memory; no SharedPreferences or export.
         if(CandidateLatencyMetrics.isCandidate(getPackageName())) {
