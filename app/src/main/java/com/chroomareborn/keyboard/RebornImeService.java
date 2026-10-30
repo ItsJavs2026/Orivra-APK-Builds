@@ -128,6 +128,48 @@ public final class RebornImeService extends InputMethodService {
         view.performHapticFeedback(effect);
     }
     private int currentRowHeightDp=72;
+    // Candidate 329 research: one completed-word observation per stable
+    // composition; never store intermediate keystrokes or full sentences.
+    private Runnable pendingStableWord329;
+    private String stableWordCounted329="";
+    private long stableWordSession329=-1L;
+    private void cancelStableWord329() {
+        if(pendingStableWord329!=null)
+            suggestionHandler.removeCallbacks(pendingStableWord329);
+        pendingStableWord329=null;
+    }
+    private void scheduleStableWord329() {
+        cancelStableWord329();
+        String expected=StableWordUsagePolicy329.candidate(
+                composing,PersonalLearning.enabled(this),
+                editorAllowsPersonalLearning,sensitive,editingInMiddle,
+                hasSelection(),cursorHasTextAfter(),symbols,numericEditor);
+        if(expected==null || (expected.equals(stableWordCounted329) &&
+                stableWordSession329==inputSessionGeneration))return;
+        final InputConnection editor=getCurrentInputConnection();
+        final long session=inputSessionGeneration;
+        if(editor==null)return;
+        final Runnable candidate=()->{
+            pendingStableWord329=null;
+            if(!PersonalLearning.enabled(this) || !editorAllowsPersonalLearning ||
+                    sensitive || editingInMiddle || hasSelection() ||
+                    cursorHasTextAfter() || symbols || numericEditor)return;
+            try {
+                if(StableWordUsagePolicy329.sameVisibleWord(expected,
+                        composing,editor.getTextBeforeCursor(64,0),
+                        editor==getCurrentInputConnection(),
+                        session==inputSessionGeneration)) {
+                    PersonalWordFrequency328.recordCommitted(this,expected);
+                    stableWordCounted329=expected;
+                    stableWordSession329=session;
+                }
+            } catch(RuntimeException detached){/* ignore stale input editor */}
+        };
+        pendingStableWord329=candidate;
+        // Idle observation is weaker than an explicit tap. Combined with
+        // minimum repeat thresholds, a pause mid-word won't auto-replace it.
+        suggestionHandler.postDelayed(candidate,700L);
+    }
     private String composing = "";
     private boolean sensitive, shift, symbols, capsLock;
     // NO_SUGGESTIONS is not a password marker in Google Keep note editors.
@@ -1220,6 +1262,9 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onStartInput(EditorInfo info, boolean restarting) {
+        cancelStableWord329();
+        stableWordCounted329="";
+        stableWordSession329=-1L;
         invalidateEditingTicket();
         predictionDispatcher.cancel();
         invalidateBackspaceGestureSession();
@@ -1265,6 +1310,9 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onFinishInput() {
+        cancelStableWord329();
+        stableWordCounted329="";
+        stableWordSession329=-1L;
         invalidateEditingTicket();
         predictionDispatcher.cancel();
         invalidateBackspaceGestureSession();
@@ -1280,6 +1328,7 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInputView(finishingInput);
     }
     @Override public void onDestroy() {
+        cancelStableWord329();
         invalidateEditingTicket();
         predictionDispatcher.close();
         closeOptionalDictionary();
@@ -1989,6 +2038,11 @@ public final class RebornImeService extends InputMethodService {
         return b;
     }
     private void type(String value) {
+        cancelStableWord329();
+        // A new character changes the observed word; preserve neither
+        // full draft text nor a stale completed prefix.
+        stableWordCounted329="";
+        stableWordSession329=-1L;
         invalidateEditingTicket();
         cancelCursorReleaseSuggestions();
         InputConnection ic = getCurrentInputConnection();
@@ -2042,6 +2096,7 @@ public final class RebornImeService extends InputMethodService {
         }
         if (!value.matches("[A-Za-z]")) updateSentenceShift();
         showSuggestions();
+        scheduleStableWord329();
         // Only Shift changes require re-rendering key labels. In particular,
         // never detach the touched key while a symbol long-press is active.
         // ?123 and symbol-page switches refresh explicitly on user activation.
@@ -2109,6 +2164,9 @@ public final class RebornImeService extends InputMethodService {
         showSuggestions();
     }
     private void backspace() {
+        cancelStableWord329();
+        stableWordCounted329="";
+        stableWordSession329=-1L;
         invalidateEditingTicket();
         cancelCursorReleaseSuggestions();
         InputConnection ic = getCurrentInputConnection();
@@ -2145,6 +2203,7 @@ public final class RebornImeService extends InputMethodService {
         if(!deleteHeld && oldShift!=shift)refreshView();
     }
     private void space() {
+        cancelStableWord329();
         invalidateEditingTicket();
         cancelCursorReleaseSuggestions();
         InputConnection ic = getCurrentInputConnection();
@@ -2171,6 +2230,9 @@ public final class RebornImeService extends InputMethodService {
                         hasSelection(),cursorHasTextAfter(),symbols);
             } catch(RuntimeException detached) { used=null; }
         }
+        boolean alreadyCounted329=completedWord328!=null &&
+                completedWord328.equals(stableWordCounted329) &&
+                session==stableWordSession329;
         currentFinish();
         if(!ic.commitText(" ", 1))return;
         if(ic==getCurrentInputConnection() && session==inputSessionGeneration &&
@@ -2178,9 +2240,11 @@ public final class RebornImeService extends InputMethodService {
                 PersonalLearning.enabled(this)) {
             if(used!=null)
                 PersonalContextLearning319.recordUsed(this,used.prior,used.word);
-            if(completedWord328!=null)
+            if(completedWord328!=null && !alreadyCounted329)
                 PersonalWordFrequency328.recordCommitted(this,completedWord328);
         }
+        stableWordCounted329="";
+        stableWordSession329=-1L;
         // A normal space typed after repositioning must not switch back to
         // end-of-document composition when content remains after the cursor.
         editingInMiddle=cursorHasTextAfter() || hasSelection();
@@ -2495,6 +2559,9 @@ public final class RebornImeService extends InputMethodService {
         return committed;
     }
     private void acceptSuggestion(View source, String expected, String suggestion) {
+        cancelStableWord329();
+        stableWordCounted329="";
+        stableWordSession329=-1L;
         cancelCursorReleaseSuggestions();
         if(splitNextWords.contains(suggestion) && !suggestion.equalsIgnoreCase(expected)
                 && acceptSplitNextWord(source,expected,suggestion))return;
