@@ -2860,7 +2860,22 @@ public final class RebornImeService extends InputMethodService {
             // than filling the strip with near-miss spelling corrections.
             if(!splitNextWords.isEmpty()) {
                 singles.clear();
-                singles.addAll(splitNextWords);
+                // Split mode used to replace the entire suggestion strip
+                // with generic right-side words, hiding learned "con ->
+                // continue" completions. Keep personalized prefix choices
+                // visible without discarding split next-word controls.
+                if(editorAllowsPersonalLearning &&
+                        PersonalLearning.enabled(this) && !numericEditor &&
+                        !editingInMiddle && !hasSelection() &&
+                        !cursorHasTextAfter()) {
+                    String raw=input.toLowerCase(java.util.Locale.ROOT);
+                    if(PredictionLite.publicWordForContext(raw))
+                        singles.add(input);
+                    singles.addAll(PersonalWordFrequency328.matching(
+                            this,input,3));
+                }
+                for(String next:splitNextWords)
+                    if(!singles.contains(next))singles.add(next);
             }
             // If a typo is being reconstructed into multiple words, keep
             // sentence candidates rather than hiding all useful corrections.
