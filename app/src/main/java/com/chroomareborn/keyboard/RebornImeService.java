@@ -1690,7 +1690,7 @@ public final class RebornImeService extends InputMethodService {
             attachSpacebarCursorControl(spaceKey);
         }
         if(!numericEditor)addKey(bottom,".",0.95f,()->type("."));
-        Button enterKey=addKey(bottom,"↵",1.3f,this::insertNewlineSafely);
+        Button enterKey=addKey(bottom,"↵",1.3f,this::handleEnterTap);
         attachSafeEnterKey(enterKey);
         keys.addView(bottom);
         showSuggestions();
@@ -2076,6 +2076,60 @@ public final class RebornImeService extends InputMethodService {
         showSuggestions();
         refreshView();
     }
+    /**
+     * A normal SEARCH/GO button performs the host-declared editor action.
+     * Ordinary SEND is deliberately excluded: it retains the hold gesture.
+     * Never fabricate a search based on the app package or the typed text.
+     */
+    private void handleEnterTap() {
+        EditorInfo info=getCurrentInputEditorInfo();
+        int action=info==null?0:EnterKeyPolicy.tapEditorAction(info.imeOptions);
+        if(action==0) {
+            insertNewlineSafely();
+            return;
+        }
+        InputConnection editor=getCurrentInputConnection();
+        if(editor==null)return;
+        invalidateEditingTicket();
+        cancelCursorReleaseSuggestions();
+        try {
+            // Make the completed query visible to the host before SEARCH/GO.
+            currentFinish();
+            boolean acted=editor.performEditorAction(action);
+            if(!acted) {
+                // Only the user explicitly tapped a Search/Go action. Some
+                // custom web search editors handle physical ENTER instead
+                // of performEditorAction. Do not retry on a success and do
+                // not send KEYCODE_ENTER in SEND or arbitrary text fields.
+                boolean down=editor.sendKeyEvent(new KeyEvent(
+                        KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER));
+                if(down)editor.sendKeyEvent(new KeyEvent(
+                        KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER));
+            }
+        } catch(RuntimeException editorDetached) {
+            // Focus can switch during search submission. Never retry.
+        }
+        if(editor==getCurrentInputConnection()) {
+            editingInMiddle=cursorHasTextAfter()||hasSelection();
+            updateSentenceShift();
+            showSuggestions();
+            refreshView();
+        }
+    }
+
+    private String enterKeyLabel() {
+        EditorInfo info=getCurrentInputEditorInfo();
+        return EnterKeyPolicy.keyLabel(info==null?0:info.imeOptions);
+    }
+
+    private String enterKeyDescription() {
+        EditorInfo info=getCurrentInputEditorInfo();
+        int action=info==null?0:EnterKeyPolicy.tapEditorAction(info.imeOptions);
+        return action==EnterKeyPolicy.IME_ACTION_SEARCH?"Search":
+                action==EnterKeyPolicy.IME_ACTION_GO?"Go":
+                "Enter newline. Hold then release to send if supported";
+    }
+
     private void sendIfExplicitlySupported() {
         InputConnection ic = getCurrentInputConnection();
         EditorInfo info = getCurrentInputEditorInfo();
@@ -2093,10 +2147,12 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     private void attachSafeEnterKey(Button key) {
-        key.setContentDescription("Enter newline. Hold then release to send if supported");
+        key.setText(enterKeyLabel());
+        key.setContentDescription(enterKeyDescription());
         // addKey's normal ACTION_DOWN trigger is replaced for this key.
-        // Accessibility/programmatic clicks also insert a newline, never SEND.
-        key.setOnClickListener(v -> insertNewlineSafely());
+        // Accessibility/programmatic taps mirror the user's short tap:
+        // SEARCH/GO when declared, newline only for ordinary multiline text.
+        key.setOnClickListener(v -> handleEnterTap());
         final float[] startX={0f},startY={0f};
         final boolean[] armed={false},cancelled={false};
         final InputConnection[] touchedEditor={null};
@@ -2140,7 +2196,7 @@ public final class RebornImeService extends InputMethodService {
                         cancelled[0]=true;
                         armed[0]=false;
                         stopEnterHold();
-                        key.setText("↵");
+                        key.setText(enterKeyLabel());
                     }
                     return true;
                 }
@@ -2149,7 +2205,7 @@ public final class RebornImeService extends InputMethodService {
                     cancelled[0]=true;
                     armed[0]=false;
                     stopEnterHold();
-                    key.setText("↵");
+                    key.setText(enterKeyLabel());
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL: {
@@ -2175,9 +2231,8 @@ public final class RebornImeService extends InputMethodService {
                             release,armed[0],cancelled[0],sameSession);
                     stopEnterHold();
                     enterTouchActive=false;
-                    key.setText("↵");
-                    key.setContentDescription(
-                            "Enter newline. Hold then release to send if supported");
+                    key.setText(enterKeyLabel());
+                    key.setContentDescription(enterKeyDescription());
                     view.setPressed(false);
                     animateKeyPress(view,false);
                     // Build 287 showed that rebuilding a LinearLayout during touch
@@ -2189,7 +2244,7 @@ public final class RebornImeService extends InputMethodService {
                         if(send) {
                             sendIfExplicitlySupported();
                         } else if(newline) {
-                            insertNewlineSafely();
+                            handleEnterTap();
                         }
                     });
                     return true;
