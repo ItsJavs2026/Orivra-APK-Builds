@@ -2623,26 +2623,27 @@ public final class RebornImeService extends InputMethodService {
             }
             String context=precedingContext();
             List<String> legacy=PredictionLite.contextualNextWords(context);
-            // Personal context is independent of optional pretrained seed
-            // suggestions; only twice-reinforced, opt-in accepted taps rank.
-            if(editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
-                    !editingInMiddle && !hasSelection() && !cursorHasTextAfter()) {
-                List<String> learned=PersonalContextLearning319.suggest(
-                        this,precedingWord(),3);
-                if(!learned.isEmpty())
-                    legacy=NextWordCandidatePolicy.merge(learned,legacy,3);
-            }
+            // Learned context must remain visible even when the optional
+            // offline seed/phrase models fill all three candidate slots.
+            // Only two or more explicitly accepted, safe local associations
+            // are promoted; never auto-insert a next word.
+            List<String> learned=editorAllowsPersonalLearning &&
+                    PersonalLearning.enabled(this) &&
+                    !editingInMiddle && !hasSelection() && !cursorHasTextAfter()
+                    ?PersonalContextLearning319.suggest(this,precedingWord(),3)
+                    :java.util.Collections.emptyList();
             if(NextWordCandidatePolicy.eligible(offlineNextWordEnabled(),sensitive,
                     editingInMiddle,hasSelection(),cursorHasTextAfter(),precedingWord())) {
                 NextWordSeedModel model=offlineNextWordSeed();
                 List<String> seed=model==null ? java.util.Collections.emptyList() :
                         model.suggest(context,5);
-                // Use precise multiword context where known; fall back to the
-                // established offline single-word model and legacy ranking.
                 List<String> phrase=NextWordPhraseModel.suggest(context,3);
-                renderSuggestions("",NextWordCandidatePolicy.mergeWithPhrase(
-                        phrase,seed,legacy,3));
-            } else renderSuggestions("",legacy);
+                List<String> established=NextWordCandidatePolicy.mergeWithPhrase(
+                        phrase,seed,legacy,5);
+                renderSuggestions("",NextWordCandidatePolicy.merge(
+                        learned,established,3));
+            } else renderSuggestions("",NextWordCandidatePolicy.merge(
+                    learned,legacy,3));
             return;
         }
         // Narrow fast lane: show the typed word and exact, tap-only
