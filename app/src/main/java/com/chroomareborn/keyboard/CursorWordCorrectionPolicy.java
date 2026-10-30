@@ -16,11 +16,14 @@ final class CursorWordCorrectionPolicy {
         final int lettersBefore;
         final int lettersAfter;
         final String replacement;
+        final String trailingSeparator;
 
-        Plan(int lettersBefore,int lettersAfter,String replacement) {
+        Plan(int lettersBefore,int lettersAfter,String replacement,
+                String trailingSeparator) {
             this.lettersBefore=lettersBefore;
             this.lettersAfter=lettersAfter;
             this.replacement=replacement;
+            this.trailingSeparator=trailingSeparator;
         }
     }
 
@@ -31,7 +34,7 @@ final class CursorWordCorrectionPolicy {
         if(sensitive || selected || before==null || after==null ||
                 expected==null || replacement==null || expected.length()<2 ||
                 expected.length()>64 || replacement.length()<2 ||
-                replacement.length()>64 || expected.equals(replacement) ||
+                replacement.length()>64 ||
                 !singleWord(replacement))return null;
 
         int left=before.length(),right=0;
@@ -47,9 +50,13 @@ final class CursorWordCorrectionPolicy {
         String live=before.subSequence(left,before.length()).toString()+
                 after.subSequence(0,right).toString();
         if(!expected.equals(live))return null;
-        // Do not auto-insert a space: this is a replacement, not next-word
-        // acceptance, even if the caret is at the document end.
-        return new Plan(beforeCount,right,replacement);
+        // A prediction CHIP is an explicit acceptance, including a tap on
+        // the original centered word. Leave exactly one word separator,
+        // except when whitespace/closing punctuation already follows.
+        // This avoids orphaned words in a long draft and avoids "word  next".
+        CharSequence suffix=after.subSequence(right,after.length());
+        return new Plan(beforeCount,right,replacement,
+                SuggestionContinuity353.spaceAfter(suffix));
     }
 
     /**
