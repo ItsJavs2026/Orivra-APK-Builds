@@ -33,6 +33,10 @@ import java.util.List;
 
 public final class RebornImeService extends InputMethodService {
     private LinearLayout base, keys, candidates, paletteBar, paletteControls, themePanel;
+    private static final android.graphics.Typeface STRIP_REGULAR_344=
+            android.graphics.Typeface.create("sans-serif",android.graphics.Typeface.NORMAL);
+    private static final android.graphics.Typeface STRIP_EMPHASIZED_344=
+            android.graphics.Typeface.create("sans-serif-medium",android.graphics.Typeface.NORMAL);
     private HorizontalScrollView suggestionScroll;
     private TextView swipeDeletePreview;
     private TextView paletteLabel;
@@ -3378,38 +3382,88 @@ public final class RebornImeService extends InputMethodService {
         final boolean primarySentence=!options.isEmpty()
                 && SuggestionDisplayPolicy.longSentence(input,options.get(0));
         final int emphasizedIndex=primarySentence?0:1;
-        final int shownCount=SuggestionStripLayoutPolicy.shownCount(
-                options.size(),stableSentenceStrip);
+        final boolean stableWord344=PredictionStripFrame344.stableWord(
+                input,sensitive,editorAllowsSuggestions,longPhrase,stableSentenceStrip);
+        final int shownCount=stableWord344?3:
+                SuggestionStripLayoutPolicy.shownCount(
+                        options.size(),stableSentenceStrip);
         final boolean emptyInput=input.isEmpty();
         final String cellSignature="chips:"+shownCount+":"+emptyInput;
         final int expectedChildren=SuggestionStripLayoutPolicy.childCount(
                 shownCount,emptyInput);
-        boolean reuseCells=cellSignature.equals(candidates.getTag()) &&
-                candidates.getChildCount()==expectedChildren;
-        if(!reuseCells) {
-            candidates.removeAllViews();
-            candidates.setTag(cellSignature);
+        final boolean reuseCells;
+        if(stableWord344) {
+            // Three permanent cells: one/two/three changing predictions do
+            // NOT remove/recreate the row on every fast keypress or worker
+            // result. Hidden empty cells reserve width without flashing.
+            PredictionStripFrame344.ensureThreeSlots(candidates,this);
+            reuseCells=true;
+        }else{
+            reuseCells=cellSignature.equals(candidates.getTag()) &&
+                    candidates.getChildCount()==expectedChildren;
+            if(!reuseCells) {
+                candidates.removeAllViews();
+                candidates.setTag(cellSignature);
+            }
         }
         for (int i=0;i<shownCount;i++) {
-            String suggestion=options.get(i);
+            String suggestion=stableWord344?
+                    PredictionStripFrame344.slotValue(options,i):options.get(i);
+            if(suggestion==null)suggestion="";
             int childIndex=SuggestionStripLayoutPolicy.chipChildIndex(i,emptyInput);
             TextView option=reuseCells?(TextView)candidates.getChildAt(childIndex):new TextView(this);
+            if(stableWord344 && suggestion.isEmpty()){
+                // INVISIBLE is intentional: unlike GONE, it does not resize
+                // adjacent predictions as the async model adds/removes chips.
+                if(option.getVisibility()!=View.INVISIBLE)
+                    option.setVisibility(View.INVISIBLE);
+                if(option.length()!=0)option.setText("");
+                option.setContentDescription(null);
+                option.setOnClickListener(null);
+                option.setOnLongClickListener(null);
+                int fixedWidth=Math.max(dp(70),(screenWidth-dp(30))/3);
+                LinearLayout.LayoutParams previous=
+                        (LinearLayout.LayoutParams)option.getLayoutParams();
+                if(previous.width!=fixedWidth || previous.height!=dp(44)){
+                    LinearLayout.LayoutParams placeholder=new LinearLayout.LayoutParams(
+                            fixedWidth,dp(44));
+                    placeholder.setMargins(dp(2),dp(2),dp(2),dp(2));
+                    option.setLayoutParams(placeholder);
+                }
+                continue;
+            }
+            if(option.getVisibility()!=View.VISIBLE)
+                option.setVisibility(View.VISIBLE);
             String shownSuggestion=suggestionCase(suggestion);
             if(!TextUtils.equals(option.getText(),shownSuggestion))
                 option.setText(shownSuggestion);
             boolean fullSentenceChip=(longPhrase && suggestion.indexOf(' ')>=0) ||
                     (emptyInput && suggestion.indexOf(' ')>=0);
-            option.setTextSize(SuggestionVisualStyle.textSizeSp(fullSentenceChip,
-                    suggestion.codePointCount(0,suggestion.length())));
-            option.setLetterSpacing(SuggestionVisualStyle.letterSpacing(fullSentenceChip));
-            option.setIncludeFontPadding(false);
-            option.setSingleLine(!fullSentenceChip);
-            option.setMaxLines(fullSentenceChip?2:1);
-            option.setEllipsize(TextUtils.TruncateAt.END);
-            option.setMaxWidth(maxCandidateWidth);
-            option.setGravity(Gravity.CENTER);
-            option.setPadding(dp(13),0,dp(13),0);
-            option.setContentDescription("Insert suggestion "+suggestionCase(suggestion));
+            float desiredSp344=SuggestionVisualStyle.textSizeSp(fullSentenceChip,
+                    suggestion.codePointCount(0,suggestion.length()));
+            float desiredPixels344=desiredSp344*
+                    getResources().getDisplayMetrics().scaledDensity;
+            if(Math.abs(option.getTextSize()-desiredPixels344)>.5f)
+                option.setTextSize(desiredSp344);
+            float letterSpacing344=SuggestionVisualStyle.letterSpacing(fullSentenceChip);
+            if(option.getLetterSpacing()!=letterSpacing344)
+                option.setLetterSpacing(letterSpacing344);
+            if(option.getIncludeFontPadding())option.setIncludeFontPadding(false);
+            int maxLines344=fullSentenceChip?2:1;
+            if(option.getMaxLines()!=maxLines344){
+                option.setSingleLine(!fullSentenceChip);
+                option.setMaxLines(maxLines344);
+            }
+            if(option.getEllipsize()!=TextUtils.TruncateAt.END)
+                option.setEllipsize(TextUtils.TruncateAt.END);
+            if(option.getMaxWidth()!=maxCandidateWidth)option.setMaxWidth(maxCandidateWidth);
+            if(option.getGravity()!=Gravity.CENTER)option.setGravity(Gravity.CENTER);
+            if(option.getPaddingLeft()!=dp(13) || option.getPaddingRight()!=dp(13)
+                    || option.getPaddingTop()!=0 || option.getPaddingBottom()!=0)
+                option.setPadding(dp(13),0,dp(13),0);
+            String description344="Insert suggestion "+shownSuggestion;
+            if(!TextUtils.equals(option.getContentDescription(),description344))
+                option.setContentDescription(description344);
             // Long press previews the complete candidate without accepting
             // or changing the editor. Toast uses only the current local text.
             if(fullSentenceChip)option.setOnLongClickListener(v->{
@@ -3425,16 +3479,19 @@ public final class RebornImeService extends InputMethodService {
                     input,suggestion,i,shownCount==1?0:emphasizedIndex);
             int tileColor=SuggestionVisualStyle.chipColor(
                     suggestionBackground,keyBackground,themeDark,emphasize);
-            option.setTextColor(SuggestionVisualStyle.readableText(
-                    suggestionTextColor,tileColor));
+            int readable344=SuggestionVisualStyle.readableText(
+                    suggestionTextColor,tileColor);
+            if(option.getCurrentTextColor()!=readable344)
+                option.setTextColor(readable344);
             if(!(option.getTag() instanceof Integer) ||
                     ((Integer)option.getTag())!=tileColor) {
                 option.setBackground(feedbackBackground(tileColor));
                 option.setTag(tileColor);
             }
-            option.setTypeface(android.graphics.Typeface.create(
-                    emphasize?"sans-serif-medium":"sans-serif",
-                    android.graphics.Typeface.NORMAL));
+            android.graphics.Typeface targetFont344=
+                    emphasize?STRIP_EMPHASIZED_344:STRIP_REGULAR_344;
+            if(option.getTypeface()!=targetFont344)
+                option.setTypeface(targetFont344);
             // Give long phrases almost the whole scrollable strip. A 1/3-
             // width chip hid most of the correction on the Galaxy S26 Ultra.
             LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(
