@@ -7,7 +7,9 @@ import java.util.Map;
 import java.util.HashMap;
 
 /**
- * Local, opt-in learning from explicitly accepted corrections only.
+ * Local, opt-in Learning V2 from explicit correction taps only.
+ * V1 preferences/pairs are retained. Supports internal apostrophes and
+ * one changed word in an otherwise identical aligned sentence.
  * No raw sentences, surrounding text, or keystroke history are stored.
  * Sensitive editors must never call recordAcceptance.
  */
@@ -34,12 +36,12 @@ final class PersonalLearning {
 
     static void recordAcceptance(Context context, String typed, String accepted) {
         if (!enabled(context) || typed == null || accepted == null) return;
-        String input = typed.trim().toLowerCase(Locale.ROOT);
-        String output = accepted.trim().toLowerCase(Locale.ROOT);
-        // Restrict initial learning to short single-word corrections.
-        // Sentence and phrase learning needs separate privacy safeguards.
-        if (!input.matches("[a-z]{2,24}") || !output.matches("[a-z]{2,24}")
-                || input.equals(output)) return;
+        // V2 keeps the V1 preference file and key format so existing
+        // learned corrections migrate without an export or reset.
+        // Never persist full sentences, neighboring context or raw keys.
+        LearningV2Policy.Pair pair=LearningV2Policy.extract(typed,accepted);
+        if(pair==null)return;
+        String input=pair.typed,output=pair.accepted;
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String key = PREFIX + input + ":" + output;
         if (!prefs.contains(key) && countEntries(prefs) >= MAX_ENTRIES) return;
@@ -48,8 +50,8 @@ final class PersonalLearning {
 
     static String preferredCorrection(Context context, String typed) {
         if (!enabled(context) || typed == null) return null;
-        String input = typed.toLowerCase(Locale.ROOT);
-        if (!input.matches("[a-z]{2,24}")) return null;
+        String input=EnglishApostrophePolicy.canonical(typed);
+        if(input==null)return null;
         String prefix = PREFIX + input + ":";
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String best = null;
@@ -58,7 +60,7 @@ final class PersonalLearning {
             if (!entry.getKey().startsWith(prefix) || !(entry.getValue() instanceof Integer))
                 continue;
             int count = (Integer) entry.getValue();
-            if (count > bestCount) {
+            if (LearningV2Policy.reinforced(count) && count > bestCount) {
                 best = entry.getKey().substring(prefix.length());
                 bestCount = count;
             }
@@ -80,7 +82,7 @@ final class PersonalLearning {
             acceptances+=count;
             if(count>=2)reinforced++;
         }
-        return "Orivra local learning v1\n"+
+        return "Orivra local learning v2 (V1 history preserved)\n"+
                 "Enabled: "+(enabled(context)?"yes":"no")+"\n"+
                 "Distinct accepted correction pairs: "+entries+"\n"+
                 "Total accepted corrections: "+acceptances+"\n"+
