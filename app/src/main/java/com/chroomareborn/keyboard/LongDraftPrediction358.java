@@ -45,6 +45,7 @@ final class LongDraftPrediction358 {
         if("please".equals(low))return List.of("help","check");
         if("and".equals(low))return List.of("the","I");
         if("but".equals(low))return List.of("I","the");
+        if("to".equals(low))return List.of("be","do");
         if("is".equals(low))return List.of("the","a");
         if("are".equals(low))return List.of("the","you");
         if(PREPOSITIONS.contains(low))return List.of("the","a");
