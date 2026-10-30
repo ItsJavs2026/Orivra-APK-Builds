@@ -1,14 +1,17 @@
 package com.chroomareborn.keyboard;
 
 /**
- * Safety-first Enter behavior. The keyboard never submits an editor action on
- * a normal Enter tap. A supported SEND action requires a deliberate long press
- * and release without a cancelled gesture or input-session change.
+ * Safety-first Enter behavior. An explicit SEARCH or GO field submits on an
+ * ordinary Enter tap. SEND (chat/message) still requires a deliberate held
+ * release; ordinary multiline notes insert a newline only. App-specific
+ * guesses based on package names are forbidden.
  *
  * Constants match android.view.inputmethod.EditorInfo, but this class remains
  * dependency-free for fast Java regression testing.
  */
 public final class EnterKeyPolicy {
+    static final int IME_ACTION_GO = 2;
+    static final int IME_ACTION_SEARCH = 3;
     static final int IME_ACTION_SEND = 4;
     static final int IME_MASK_ACTION = 0xFF;
     static final int IME_FLAG_NO_ENTER_ACTION = 0x40000000;
@@ -18,6 +21,22 @@ public final class EnterKeyPolicy {
         // NO_ENTER_ACTION forbids replacing the normal Enter key with Send.
         // It does not forbid a separate, deliberately held SEND gesture.
         return (imeOptions & IME_MASK_ACTION) == IME_ACTION_SEND;
+    }
+
+    /**
+     * Only an explicitly declared SEARCH/GO action may execute on a short
+     * Enter tap. NO_ENTER_ACTION wins; SEND still requires a deliberate hold.
+     * Returns 0 when the host did not explicitly request a search/navigation.
+     */
+    static int tapEditorAction(int imeOptions) {
+        if((imeOptions & IME_FLAG_NO_ENTER_ACTION)!=0)return 0;
+        int action=imeOptions & IME_MASK_ACTION;
+        return action==IME_ACTION_SEARCH || action==IME_ACTION_GO?action:0;
+    }
+
+    static String keyLabel(int imeOptions) {
+        int action=tapEditorAction(imeOptions);
+        return action==IME_ACTION_SEARCH?"⌕":action==IME_ACTION_GO?"Go":"↵";
     }
 
     /**
