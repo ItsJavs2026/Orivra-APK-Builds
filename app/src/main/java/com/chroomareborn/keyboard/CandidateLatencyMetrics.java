@@ -11,7 +11,7 @@ import java.util.Locale;
  */
 final class CandidateLatencyMetrics {
     private CandidateLatencyMetrics() {}
-    static final String CANDIDATE_PACKAGE="com.chroomareborn.keyboard.build309trial";
+    static final String CANDIDATE_PACKAGE="com.chroomareborn.keyboard.build310trial";
     private static final int CAPACITY=120;
     private static final long MAX_DURATION_NANOS=30_000_000_000L;
     private static final long[] compute=new long[CAPACITY];
