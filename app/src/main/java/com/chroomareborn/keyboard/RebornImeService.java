@@ -3328,6 +3328,13 @@ public final class RebornImeService extends InputMethodService {
                     !editingInMiddle && !hasSelection() && !cursorHasTextAfter()
                     ?tappedSequence340.suggestPhrase(context,3)
                     :java.util.Collections.emptyList();
+            // Fallback is strictly LAST: personal, corpus, phrase and seed
+            // evidence retain their ranks. A full draft cannot make all
+            // predictions disappear just because its final word is uncommon.
+            // Reuse the bounded context already read for this refresh.
+            final boolean safeIdle358=editorAllowsSuggestions && !sensitive &&
+                    !numericEditor && !symbols && !editingInMiddle &&
+                    !hasSelection() && !cursorHasTextAfter();
             if(NextWordCandidatePolicy.eligible(offlineNextWordEnabled(),sensitive,
                     editingInMiddle,hasSelection(),cursorHasTextAfter(),precedingWord())) {
                 NextWordSeedModel model=offlineNextWordSeed();
@@ -3336,12 +3343,18 @@ public final class RebornImeService extends InputMethodService {
                 List<String> phrase=NextWordPhraseModel.suggest(context,3);
                 List<String> established=NextWordCandidatePolicy.mergeWithPhrase(
                         phrase,seed,legacy,5);
+                List<String> ranked=NextWordCandidatePolicy.merge(
+                        combinedContext347,established,3);
                 renderSuggestions("",SessionPhraseDisplay340.promote(
-                        multiword340,NextWordCandidatePolicy.merge(
-                                combinedContext347,established,3),3));
-            } else renderSuggestions("",SessionPhraseDisplay340.promote(
-                    multiword340,NextWordCandidatePolicy.merge(
-                            combinedContext347,legacy,3),3));
+                        multiword340,LongDraftPrediction358.afterCommittedBoundary(
+                                context,ranked,safeIdle358),3));
+            } else {
+                List<String> ranked=NextWordCandidatePolicy.merge(
+                        combinedContext347,legacy,3);
+                renderSuggestions("",SessionPhraseDisplay340.promote(
+                        multiword340,LongDraftPrediction358.afterCommittedBoundary(
+                                context,ranked,safeIdle358),3));
+            }
             return;
         }
         // Instant, tap-only prefix predictions from completed-word habits,
@@ -3361,10 +3374,19 @@ public final class RebornImeService extends InputMethodService {
         java.util.ArrayList<String> immediate342=new java.util.ArrayList<>();
         immediate342.add(snapshot);
         immediate342.addAll(EnglishApostrophePolicy.suggestions(snapshot));
-        renderImmediateSuggestions345(snapshot,AdaptivePrefixPolicy328.merge(
-                snapshot,immediate342,personalized328,
+        final boolean safeComposing358=editorAllowsSuggestions && !sensitive &&
+                !numericEditor && !symbols && !editingInMiddle &&
+                !hasSelection() && !cursorHasTextAfter();
+        final boolean knownComposingWord358=safeComposing358 &&
                 PredictionLite.publicWordForContext(
-                        snapshot.toLowerCase(java.util.Locale.ROOT))));
+                        snapshot.toLowerCase(java.util.Locale.ROOT));
+        List<String> initial358=AdaptivePrefixPolicy328.merge(
+                snapshot,immediate342,personalized328,
+                knownComposingWord358);
+        renderImmediateSuggestions345(snapshot,
+                LongDraftPrediction358.whileComposing(
+                        snapshot,initial358,safeComposing358,
+                        knownComposingWord358));
 
         // The background worker does all expensive sentence reconstruction.
         // Do not dim visible predictions while an asynchronous update runs.
@@ -3404,6 +3426,13 @@ public final class RebornImeService extends InputMethodService {
                             personalizedPrefix340(input),
                             PredictionLite.publicWordForContext(
                                     input.toLowerCase(java.util.Locale.ROOT)));
+                // The asynchronous result must not erase safe preview chips
+                // when only the typed word remains after a long draft.
+                ranked=LongDraftPrediction358.whileComposing(
+                        input,ranked,safeComposing358 &&
+                                !editingInMiddle && !hasSelection() &&
+                                !cursorHasTextAfter(),
+                        knownComposingWord358);
                 renderSuggestions(input,ranked);
                 if(CandidateLatencyMetrics.recordReady(
                         startedAt,computedAt,System.nanoTime()))
