@@ -178,6 +178,75 @@ final class LearningTransferStore {
         return result;
     }
 
+
+    /** Optional V3 frequency learning transfer. Original V1/V2 APIs stay unchanged. */
+    private static SharedPreferences frequencyPrefs(Context c) {
+        return c.getSharedPreferences(PersonalWordFrequency328.PREFS,
+                Context.MODE_PRIVATE);
+    }
+    static String exportV3(Context c) {
+        ContextBackupFormat322.Data v2=ContextBackupFormat322.decode(exportV2(c));
+        TreeMap<String,Integer> counts=new TreeMap<>();
+        for(Map.Entry<String,?> e:frequencyPrefs(c).getAll().entrySet()) {
+            if(!e.getKey().startsWith("word:") ||
+                    !(e.getValue() instanceof Integer))continue;
+            String word=e.getKey().substring(5);
+            int count=(Integer)e.getValue();
+            if(count>0 && count<=1000 && approvedTarget(word,v2.legacy.words))
+                counts.merge(word,count,Math::max);
+        }
+        return FrequencyBackupFormat330.encode(v2,counts);
+    }
+    private static Map<String,Integer> plannedFrequencyWrites(Context c,
+            FrequencyBackupFormat330.Data proposed) {
+        if(proposed==null||proposed.earlier==null||proposed.frequencies==null)
+            throw new IllegalArgumentException("Invalid frequency backup");
+        FrequencyBackupFormat330.Data verified=FrequencyBackupFormat330.decode(
+                FrequencyBackupFormat330.encode(proposed.earlier,proposed.frequencies));
+        // Entire V1/V2 component preflight happens before ANY preference write.
+        planV2(c,verified.earlier);
+        List<String> approved=new ArrayList<>(verified.earlier.legacy.words);
+        approved.addAll(PersonalDictionary.savedWords(c));
+        Map<String,?> existing=frequencyPrefs(c).getAll();
+        LinkedHashMap<String,Integer> changes=new LinkedHashMap<>();
+        int added=0;
+        for(Map.Entry<String,Integer> e:verified.frequencies.entrySet()) {
+            if(!approvedTarget(e.getKey(),approved))
+                throw new IllegalArgumentException("Unrecognized learned word");
+            String key="word:"+e.getKey();
+            Object oldValue=existing.get(key);
+            if(oldValue!=null && !(oldValue instanceof Integer))
+                throw new IllegalArgumentException("Corrupted frequency entry");
+            int previous=oldValue==null?0:(Integer)oldValue;
+            if(previous<0||previous>1000)
+                throw new IllegalArgumentException("Corrupted frequency count");
+            if(oldValue==null)added++;
+            if(e.getValue()>previous)changes.put(key,e.getValue());
+        }
+        if(existing.size()+added>FrequencyBackupFormat330.MAX_WORDS)
+            throw new IllegalArgumentException("No capacity for learned words");
+        return changes;
+    }
+    static Preview previewV3(Context c,FrequencyBackupFormat330.Data backup) {
+        plannedFrequencyWrites(c,backup);
+        return previewV2(c,backup.earlier);
+    }
+    static Preview importV3Confirmed(Context c,FrequencyBackupFormat330.Data backup) {
+        Map<String,Integer> frequencyWrites=plannedFrequencyWrites(c,backup);
+        Preview result=importV2Confirmed(c,backup.earlier);
+        // These three Android preference files are not an atomic transaction.
+        // All invalid inputs have been rejected in preflight before this point.
+        if(!frequencyWrites.isEmpty()) {
+            SharedPreferences.Editor editor=frequencyPrefs(c).edit();
+            for(Map.Entry<String,Integer> e:frequencyWrites.entrySet())
+                editor.putInt(e.getKey(),e.getValue());
+            if(!editor.commit())
+                throw new IllegalStateException("Could not save learned word usage");
+        }
+        // No import changes the user's existing opt-in Learning setting.
+        return result;
+    }
+
     private static Plan buildPlan(Context context,LearningTransferCodec.Bundle bundle){
         if(context==null||bundle==null)throw new IllegalArgumentException("Missing backup");
         // Round-trip to validate the entire in-memory bundle before any
