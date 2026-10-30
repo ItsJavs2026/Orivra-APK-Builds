@@ -24,6 +24,7 @@ final class LearningTransferStore {
 
     static final class Preview {
         final int newWords,newPairs,strongerPairs;
+        int newFrequencies,strongerFrequencies;
         Preview(int words,int pairs,int stronger){
             newWords=words;newPairs=pairs;strongerPairs=stronger;
         }
@@ -74,6 +75,10 @@ final class LearningTransferStore {
 
 
     // Research 325: completely optional format, keeping V1 exports unchanged.
+    private static SharedPreferences frequencyPrefs(Context c) {
+        return c.getSharedPreferences(FrequentWordLearning328.PREFS,
+                Context.MODE_PRIVATE);
+    }
     private static SharedPreferences contextPrefs(Context c) {
         return c.getSharedPreferences(PersonalContextLearning319.PREFS,
                 Context.MODE_PRIVATE);
@@ -110,24 +115,36 @@ final class LearningTransferStore {
         for(Map.Entry<String,int[]> entry:grouped.entrySet())
             contexts.put(entry.getKey(),new ContextBackupFormat322.Counts(
                     entry.getValue()[0],entry.getValue()[1]));
+        TreeMap<String,Integer> frequency=new TreeMap<>();
+        for(Map.Entry<String,?> item:frequencyPrefs(c).getAll().entrySet()) {
+            if(!item.getKey().startsWith("freq:") ||
+                    !(item.getValue() instanceof Integer))continue;
+            String word=item.getKey().substring(5);
+            int count=(Integer)item.getValue();
+            if(count>0&&count<=1000 &&
+                    word.equals(EnglishApostrophePolicy.canonical(word)) &&
+                    approvedTarget(word,legacy.words))frequency.put(word,count);
+        }
         return ContextBackupFormat322.encode(
-                legacy.words,legacy.learnedPairs,contexts);
+                legacy.words,legacy.learnedPairs,contexts,frequency);
     }
     private static final class V2Plan {
         final Plan legacy;
         final LinkedHashMap<String,Integer> newContext=new LinkedHashMap<>();
+        final LinkedHashMap<String,Integer> newFrequency=new LinkedHashMap<>();
         final int added,stronger;
         V2Plan(Plan base,LinkedHashMap<String,Integer> changes,int add,int boosted){
             legacy=base;newContext.putAll(changes);added=add;stronger=boosted;
         }
     }
     private static V2Plan planV2(Context c,ContextBackupFormat322.Data input){
-        if(input==null||input.legacy==null||input.contexts==null)
+        if(input==null||input.legacy==null||input.contexts==null ||
+                input.frequentWords==null)
             throw new IllegalArgumentException("Invalid portable file");
         // Validate even synthetic in-memory callers before any mutation.
         ContextBackupFormat322.Data safe=ContextBackupFormat322.decode(
                 ContextBackupFormat322.encode(input.legacy.words,
-                        input.legacy.learnedPairs,input.contexts));
+                        input.legacy.learnedPairs,input.contexts,input.frequentWords));
         Plan legacy=buildPlan(c,safe.legacy);
         List<String> known=new ArrayList<>(safe.legacy.words);
         known.addAll(PersonalDictionary.savedWords(c));
@@ -159,7 +176,31 @@ final class LearningTransferStore {
         }
         if(current.size()+added>ContextBackupFormat322.MAX_CONTEXT)
             throw new IllegalArgumentException("Context capacity exceeded");
-        return new V2Plan(legacy,changes,added,strengthened);
+        V2Plan plan=new V2Plan(legacy,changes,added,strengthened);
+        Map<String,?> localFrequency=frequencyPrefs(c).getAll();
+        int newWords=0,strongerWords=0;
+        for(Map.Entry<String,Integer> e:safe.frequentWords.entrySet()) {
+            String token=e.getKey();
+            if(!approvedTarget(token,known))
+                throw new IllegalArgumentException("Unapproved frequency target");
+            String key="freq:"+token;
+            Object existing=localFrequency.get(key);
+            if(existing!=null && !(existing instanceof Integer))
+                throw new IllegalArgumentException("Invalid existing frequency");
+            int old=existing==null?0:(Integer)existing;
+            if(old<0||old>1000)throw new IllegalArgumentException(
+                    "Invalid existing frequency count");
+            if(existing==null)newWords++;
+            if(e.getValue()>old) {
+                plan.newFrequency.put(key,e.getValue());
+                if(old>0)strongerWords++;
+            }
+        }
+        if(localFrequency.size()+newWords>FrequentWordCompletionPolicy328.MAX_WORDS)
+            throw new IllegalArgumentException("Word frequency capacity exceeded");
+        plan.legacy.preview.newFrequencies=newWords;
+        plan.legacy.preview.strongerFrequencies=strongerWords;
+        return plan;
     }
     static Preview previewV2(Context c,ContextBackupFormat322.Data input){
         return planV2(c,input).legacy.preview;
@@ -174,6 +215,12 @@ final class LearningTransferStore {
             for(Map.Entry<String,Integer> item:validated.newContext.entrySet())
                 e.putInt(item.getKey(),item.getValue());
             if(!e.commit())throw new IllegalStateException("Context save failed");
+        }
+        if(!validated.newFrequency.isEmpty()) {
+            SharedPreferences.Editor e=frequencyPrefs(c).edit();
+            for(Map.Entry<String,Integer> item:validated.newFrequency.entrySet())
+                e.putInt(item.getKey(),item.getValue());
+            if(!e.commit())throw new IllegalStateException("Frequency save failed");
         }
         return result;
     }
