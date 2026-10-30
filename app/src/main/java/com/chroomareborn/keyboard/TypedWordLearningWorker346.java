@@ -1,13 +1,8 @@
 package com.chroomareborn.keyboard;
 
 import android.content.Context;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -39,9 +34,25 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
     private String priorWord;
     private long workerSession=-1L;
     private long consentEpoch=-1L;
-    // UI-only reads; updated with immutable snapshots on the worker.
+    /** Atomic view of one editor session, its evidence and pre-ranked lookup.
+     * The worker constructs the index; the IME only reads this immutable ref.
+     * A session carried inside the snapshot forbids stale-worker publishing.
+     */
+    private static final class Display {
+        final long session;
+        final TypedWordEvidenceStore341.Snapshot evidence;
+        final LearnedSuggestionIndex356 index;
+        Display(long id,TypedWordEvidenceStore341.Snapshot values,
+                LearnedSuggestionIndex356 prepared) {
+            session=id;
+            evidence=values;
+            index=prepared;
+        }
+    }
+    private static final Display EMPTY_DISPLAY=new Display(-1L,EMPTY,
+            LearnedSuggestionIndex356.fromVerifiedEvidence(Map.of(),Map.of()));
     private volatile long visibleSession=-1L;
-    private volatile TypedWordEvidenceStore341.Snapshot visible=EMPTY;
+    private volatile Display display=EMPTY_DISPLAY;
     private volatile boolean closed;
 
     TypedWordLearningWorker346(Context c) {
@@ -54,7 +65,7 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
      */
     void beginEditor(long session,boolean editorAllowsLearning) {
         if(closed)return;
-        visible=EMPTY;
+        display=EMPTY_DISPLAY;
         visibleSession=session;
         worker.execute(()->{
             workerSession=session;
@@ -68,14 +79,23 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
                             TypedWordEvidenceStore341.read(app);
                     if(TypedWordsConsent341.mayRemember(app,true) &&
                             epoch==TypedWordsConsent341.generation(app)) {
-                        consentEpoch=epoch;
-                        if(visibleSession==session)visible=snap;
+                        // Precompute on this low-priority worker, never when
+                        // handling a key or rendering the suggestion strip.
+                        Display prepared=new Display(session,snap,
+                                LearnedSuggestionIndex356.fromVerifiedEvidence(
+                                        snap.words,snap.pairs));
+                        if(visibleSession==session &&
+                                TypedWordsConsent341.mayRemember(app,true) &&
+                                epoch==TypedWordsConsent341.generation(app)) {
+                            consentEpoch=epoch;
+                            display=prepared;
+                        }
                     }
                 }
             } catch(RuntimeException malformedOrUnavailable) {
                 // Fail CLOSED: never modify corrupt private storage.
                 consentEpoch=-1L;
-                if(visibleSession==session)visible=EMPTY;
+                if(visibleSession==session)display=EMPTY_DISPLAY;
             }
         });
     }
@@ -101,15 +121,25 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
                 if(!updated.stored) {
                     priorWord=null;
                     if(visibleSession==editorSession && !TypedWordsConsent341
-                            .mayRemember(app,true))visible=EMPTY;
+                            .mayRemember(app,true))display=EMPTY_DISPLAY;
                     return;
                 }
+                Display prepared=new Display(editorSession,updated.evidence,
+                        LearnedSuggestionIndex356.fromVerifiedEvidence(
+                                updated.evidence.words,updated.evidence.pairs));
                 priorWord=word;
-                if(visibleSession==editorSession)visible=updated.evidence;
+                // Consent/session may change while the worker prepares the
+                // index. Re-check before any new suggestions become visible.
+                if(visibleSession==editorSession &&
+                        TypedWordsConsent341.mayRemember(app,true) &&
+                        consentEpoch==TypedWordsConsent341.generation(app))
+                    display=prepared;
+                else if(visibleSession==editorSession)
+                    display=EMPTY_DISPLAY;
             } catch(RuntimeException invalidState) {
                 // Never delete/rewrite unknown data. No user text in logs.
                 priorWord=null;
-                if(visibleSession==editorSession)visible=EMPTY;
+                if(visibleSession==editorSession)display=EMPTY_DISPLAY;
             }
         });
     }
@@ -127,7 +157,7 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
     void endEditor(long session) {
         if(visibleSession==session) {
             visibleSession=-1L;
-            visible=EMPTY;
+            display=EMPTY_DISPLAY;
         }
         if(closed)return;
         worker.execute(()->{
@@ -139,59 +169,31 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
         });
     }
 
-    /** Read-only, tap-only suggestions from qualified associations.
-     * No SharedPreferences accesses or locks on this code path.
+    /** Indexed, explicit-tap-only suggestions. No scan, sorting, regex,
+     * SharedPreferences, or mutable builder work on the UI thread.
      */
     List<String> nextWords(String preceding,int limit,long editorSession) {
-        if(visibleSession!=editorSession || limit<=0)return List.of();
-        String key=TypedSequenceArchive341.canonical(preceding);
-        if(key==null)return List.of();
-        TypedWordEvidenceStore341.Snapshot s=visible;
-        String prefix=key+" ";
-        ArrayList<Map.Entry<String,Integer>> matches=new ArrayList<>();
-        for(Map.Entry<String,Integer> p:s.pairs.entrySet()) {
-            if(p.getValue()>=TypedSequenceArchive341.MIN_EVIDENCE &&
-                    p.getKey().startsWith(prefix))
-                matches.add(p);
-        }
-        matches.sort(Comparator.<Map.Entry<String,Integer>>comparingInt(
-                p->-p.getValue()).thenComparing(Map.Entry::getKey));
-        ArrayList<String> words=new ArrayList<>();
-        for(Map.Entry<String,Integer> p:matches){
-            if(words.size()>=Math.min(5,limit))break;
-            words.add(p.getKey().substring(prefix.length()));
-        }
-        return Collections.unmodifiableList(words);
+        if(closed || visibleSession!=editorSession || limit<=0)return List.of();
+        Display snapshot=display;
+        if(snapshot.session!=editorSession)return List.of();
+        return snapshot.index.nextWords(preceding,limit);
     }
 
-    /** Bounded suggestion from manually typed word evidence; min 3 repeats.
-     * Display-only; never inserts or silently autocorrects anything.
+    /** A candidate is still learned only after three verified uses.
+     * Every returned value was built from the user's opt-in evidence.
      */
     List<String> completedWords(String prefix,int limit,long editorSession) {
-        if(visibleSession!=editorSession || limit<=0 || prefix==null ||
-                prefix.length()<2 || prefix.length()>24 ||
-                !prefix.matches("[A-Za-z]{2,24}"))
-            return List.of();
-        String needle=prefix.toLowerCase(java.util.Locale.ROOT);
-        TypedWordEvidenceStore341.Snapshot s=visible;
-        ArrayList<Map.Entry<String,Integer>> matches=new ArrayList<>();
-        for(Map.Entry<String,Integer> e:s.words.entrySet()) {
-            if(e.getValue()>=TypedSequenceArchive341.MIN_EVIDENCE &&
-                    e.getKey().startsWith(needle) && !e.getKey().equals(needle))
-                matches.add(e);
-        }
-        matches.sort(Comparator.<Map.Entry<String,Integer>>comparingInt(
-                e->-e.getValue()).thenComparing(Map.Entry::getKey));
-        ArrayList<String> words=new ArrayList<>();
-        for(Map.Entry<String,Integer> e:matches) {
-            if(words.size()>=Math.min(3,limit))break;
-            words.add(e.getKey());
-        }
-        return Collections.unmodifiableList(words);
+        if(closed || visibleSession!=editorSession || limit<=0)return List.of();
+        Display snapshot=display;
+        if(snapshot.session!=editorSession)return List.of();
+        return snapshot.index.completedWords(prefix,limit);
     }
 
     int visibleWordCount(long editorSession) {
-        return editorSession==visibleSession?visible.words.size():0;
+        Display snapshot=display;
+        return !closed && visibleSession==editorSession &&
+                snapshot.session==editorSession?
+                snapshot.evidence.words.size():0;
     }
 
     /** Deterministic Android test seam. Never call from the IME main thread. */
@@ -202,7 +204,7 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
     @Override public void close(){
         if(closed)return;
         closed=true;
-        visible=EMPTY;
+        display=EMPTY_DISPLAY;
         visibleSession=-1L;
         // Do not abandon previously queued verified Space commits.
         worker.shutdown();
