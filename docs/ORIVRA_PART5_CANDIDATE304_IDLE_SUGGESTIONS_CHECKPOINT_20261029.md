@@ -23,3 +23,13 @@ Workflow `.github/workflows/candidate304-centered-idle-apk.yml` pins Candidate 3
 
 ## Physical test after CI success
 Install separately, select `Orivra Candidate 304`. Open a disposable Samsung Notes or Google Keep normal note with NO text being composed. Three default next-word suggestions should appear centered as a group; type `hey` to confirm active typing reverts to normal layout; Backspace to empty to recenter. Check expand caret remains right, Keep predictions, Safe Enter, any flicker or unexpected shifting. If problems, revert to Candidate 303. Only mark phone verified on explicit user feedback.
+
+## Final CI-qualified Candidate 304 prerelease
+
+- Final [GitHub Actions run 40978804751](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40978804751): **SUCCESS**. Java source parity/privacy checks passed, including 237 suggestion-strip policy assertions, 43 Google Keep/privacy assertions and 41 optional-language activation assertions.
+- Android 35 Pixel 6 emulator: **26/26 instrumentation tests passed**, including 3 new actual Android view-measurement tests for idle centered 1/2/3 next words, active typed and private field restoring start alignment, and fixed right caret. Android `BUILD SUCCESSFUL`.
+- APK package confirmed `com.chroomareborn.keyboard.build304trial`, versionCode `304`, versionName `1.0.23-build304-idle-predictions-centered`; manifest has no INTERNET permission. Debug signing, source-licensed dictionary asset, final APK hash and GitHub release verified.
+- Public prerelease: https://github.com/ItsJavs2026/Orivra-APK-Builds/releases/tag/candidate-304-20261029
+- Direct asset: https://github.com/ItsJavs2026/Orivra-APK-Builds/releases/download/candidate-304-20261029/Orivra-Candidate-304.apk
+- APK SHA-256 `858a110f1d456c7eea5ca772ed595fde0fa6330937bbd6cc832a004af1f3de84`, size 460,795 bytes; optional companion `Orivra-Candidate-304.apk.sha256` published.
+- **Samsung physical-device confirmation still pending for Candidate 304.** The user has only demonstrated the left-aligned issue on Candidate 303 so far, not tested this new APK. Candidate 303 remains the phone-positive fallback; Candidate 300 remains Google Keep-fix backup.
