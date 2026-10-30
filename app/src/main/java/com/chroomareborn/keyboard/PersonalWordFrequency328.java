@@ -45,6 +45,14 @@ final class PersonalWordFrequency328 {
         if(!p.contains(key) && p.getAll().size()>=MAX_WORDS)return;
         p.edit().putInt(key,Math.min(1000,p.getInt(key,0)+2)).apply();
     }
+    static void recordAcceptedPhrase(Context c,String selectedPhrase) {
+        if(c==null || !PersonalLearning.enabled(c))return;
+        // The host accepted an explicit suggestion; reinforce up to 12
+        // distinct known words. Unknown personal text, emails and whole
+        // sentence content are never retained in this store.
+        for(String token:AcceptedPhraseFrequencyPolicy335.words(selectedPhrase))
+            recordTapped(c,token);
+    }
     static List<String> matching(Context c,String prefix,int limit) {
         if(c==null || !PersonalLearning.enabled(c) || limit<=0)return List.of();
         String raw=EnglishApostrophePolicy.prefix(prefix);

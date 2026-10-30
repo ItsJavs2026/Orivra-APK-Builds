@@ -2664,7 +2664,9 @@ public final class RebornImeService extends InputMethodService {
             confirmSuggestionTap(source);
             if(editorAllowsPersonalLearning) {
                 PersonalLearning.recordAcceptance(this,expected,suggestion);
-                PersonalWordFrequency328.recordTapped(this,suggestion);
+                // A chosen sentence contains useful completed words too.
+                // V3 stores only bounded per-word counters, never the phrase.
+                PersonalWordFrequency328.recordAcceptedPhrase(this,suggestion);
                 // Explicit selection can teach adjacent public-word pairs.
                 // Only closed-list left context plus accepted words persist.
                 PersonalContextLearning319.record(this,priorWord,suggestion);
