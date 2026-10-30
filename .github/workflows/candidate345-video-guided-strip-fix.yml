@@ -74,6 +74,8 @@ jobs:
           assert (root/'src/main/java/com/chroomareborn/keyboard/PredictionStripContinuity345.java').exists()
           assert (root/'src/androidTest/java/com/chroomareborn/keyboard/PredictionStripContinuity345AndroidTest.java').exists()
           assert 'renderImmediateSuggestions345(snapshot,' in service
+          assert 'renderImmediateSuggestions345(cursorWord,initial)' in service
+          assert 'renderImmediateSuggestions345(word,immediately)' in service
           assert 'PredictionStripContinuity345.holdVisualOnly(option)' in service
           assert 'PredictionStripContinuity345.clearQuietRow(candidates,this)' in service
           assert 'PredictionStripContinuity345.currentChip(option)' in service
