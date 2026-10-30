@@ -153,7 +153,7 @@ final class TypedSequenceArchive341 {
     }
 
     static void verifyWord(String word,Integer count) {
-        if(count==null || count<MIN_EVIDENCE || count>MAX_COUNT ||
+        if(word==null || count==null || count<MIN_EVIDENCE || count>MAX_COUNT ||
                 !word.equals(canonical(word)))
             throw new IllegalArgumentException("Invalid learned vocabulary");
     }
