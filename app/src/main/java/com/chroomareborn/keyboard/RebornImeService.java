@@ -358,6 +358,17 @@ public final class RebornImeService extends InputMethodService {
     private final PredictionDispatcher predictionDispatcher = new PredictionDispatcher();
     private final PrefixCandidateCache340 personalPrefixCache340=
             new PrefixCandidateCache340();
+    // Research 340: opt-in, strictly transient word-by-word next-word
+    // learning, including new words. Does not alter the portable V3 format.
+    private final PersonalNextWordModel tappedSequence340=
+            new PersonalNextWordModel();
+    private String lastTappedWord340="";
+    private long lastTappedSession340=-1L;
+    private void clearTapSequence340() {
+        lastTappedWord340="";
+        lastTappedSession340=-1L;
+        tappedSequence340.resetContext();
+    }
     private List<String> personalizedPrefix340(String prefix) {
         return personalPrefixCache340.get(prefix,
                 word->PersonalWordFrequency328.matching(this,word,3));
@@ -1338,6 +1349,8 @@ public final class RebornImeService extends InputMethodService {
         predictionDispatcher.cancel();
         personalPrefixCache340.clear();
         splitSnapshot340=null;
+        tappedSequence340.clear();
+        clearTapSequence340();
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         super.onStartInput(info, restarting);
@@ -1384,6 +1397,8 @@ public final class RebornImeService extends InputMethodService {
         cancelStableWord329();
         stableWordCounted329="";
         stableWordSession329=-1L;
+        tappedSequence340.clear();
+        clearTapSequence340();
         invalidateEditingTicket();
         predictionDispatcher.cancel();
         invalidateBackspaceGestureSession();
@@ -2166,6 +2181,33 @@ public final class RebornImeService extends InputMethodService {
             appendComposing340(ic,value);
         }
         if (!value.matches("[A-Za-z]")) updateSentenceShift();
+        // Only an actual key entered through this IME can teach the transient
+        // word sequence. Do not infer learning from pasted/editor-only text.
+        if(value.matches("[A-Za-z]") &&
+                editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
+                !sensitive && !editingInMiddle && !hasSelection() &&
+                !cursorHasTextAfter() && !numericEditor && !symbols) {
+            String visible=composing.isEmpty()?wordAtCursor():composing;
+            String normalized=EnglishApostrophePolicy.canonical(visible);
+            CharSequence before=ic.getTextBeforeCursor(96,0);
+            if(normalized!=null &&
+                    StableWordUsagePolicy329.sameVisibleWord(normalized,
+                            visible,before,ic==getCurrentInputConnection(),
+                            inputSessionGeneration==inputSessionGeneration) &&
+                    before!=null && before.toString().endsWith(value)) {
+                lastTappedWord340=normalized;
+                lastTappedSession340=inputSessionGeneration;
+            } else {
+                lastTappedWord340="";
+                lastTappedSession340=-1L;
+            }
+        } else {
+            lastTappedWord340="";
+            lastTappedSession340=-1L;
+            if(".".equals(value) || "!".equals(value) ||
+                    "?".equals(value) || ";".equals(value))
+                tappedSequence340.resetContext();
+        }
         showSuggestions();
         scheduleStableWord329();
         // Only Shift changes require re-rendering key labels. In particular,
@@ -2239,6 +2281,7 @@ public final class RebornImeService extends InputMethodService {
     // the final composing letter and briefly show an empty suggestion hint.
     private boolean singleBackspaceMutation338;
     private void backspace() {
+        clearTapSequence340();
         cancelStableWord329();
         stableWordCounted329="";
         stableWordSession329=-1L;
@@ -2330,6 +2373,19 @@ public final class RebornImeService extends InputMethodService {
         // a whitelisted previous word.
         String completedWord328=null;
         long session=inputSessionGeneration;
+        String tappedWord340=null;
+        if(lastTappedSession340==session && !lastTappedWord340.isEmpty() &&
+                editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
+                !sensitive && !editingInMiddle && !hasSelection() &&
+                !cursorHasTextAfter() && !numericEditor && !symbols) {
+            String visible=composing.isEmpty()?wordAtCursor():composing;
+            try {
+                if(StableWordUsagePolicy329.sameVisibleWord(lastTappedWord340,
+                        visible,ic.getTextBeforeCursor(96,0),
+                        ic==getCurrentInputConnection(),true))
+                    tappedWord340=lastTappedWord340;
+            } catch(RuntimeException detached) { tappedWord340=null; }
+        }
         if(editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
                 !sensitive && !editingInMiddle && !hasSelection() &&
                 !cursorHasTextAfter() && !symbols && !numericEditor)
@@ -2347,7 +2403,20 @@ public final class RebornImeService extends InputMethodService {
                 completedWord328.equals(stableWordCounted329) &&
                 session==stableWordSession329;
         currentFinish();
-        if(!ic.commitText(" ", 1))return;
+        if(!ic.commitText(" ", 1)) {
+            clearTapSequence340();
+            return;
+        }
+        // New words can be learned as in-memory bigrams/trigrams after
+        // repeated successful word boundaries, including ordinary key taps.
+        // No raw message or unsaved new word is written to persistent storage.
+        if(ic==getCurrentInputConnection() && session==inputSessionGeneration &&
+                editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
+                !sensitive && tappedWord340!=null)
+            tappedSequence340.observeCommittedWord(tappedWord340,true);
+        else tappedSequence340.resetContext();
+        lastTappedWord340="";
+        lastTappedSession340=-1L;
         if(ic==getCurrentInputConnection() && session==inputSessionGeneration &&
                 !sensitive && editorAllowsPersonalLearning &&
                 PersonalLearning.enabled(this)) {
@@ -2959,6 +3028,13 @@ public final class RebornImeService extends InputMethodService {
                     !editingInMiddle && !hasSelection() && !cursorHasTextAfter()
                     ?PersonalContextLearning319.suggest(this,precedingWord(),3)
                     :java.util.Collections.emptyList();
+            List<String> transient340=editorAllowsPersonalLearning &&
+                    PersonalLearning.enabled(this) && !numericEditor &&
+                    !editingInMiddle && !hasSelection() && !cursorHasTextAfter()
+                    ?tappedSequence340.suggest(context,3)
+                    :java.util.Collections.emptyList();
+            List<String> contextual340=NextWordCandidatePolicy.merge(
+                    transient340,learned,3);
             if(NextWordCandidatePolicy.eligible(offlineNextWordEnabled(),sensitive,
                     editingInMiddle,hasSelection(),cursorHasTextAfter(),precedingWord())) {
                 NextWordSeedModel model=offlineNextWordSeed();
@@ -2968,9 +3044,9 @@ public final class RebornImeService extends InputMethodService {
                 List<String> established=NextWordCandidatePolicy.mergeWithPhrase(
                         phrase,seed,legacy,5);
                 renderSuggestions("",NextWordCandidatePolicy.merge(
-                        learned,established,3));
+                        contextual340,established,3));
             } else renderSuggestions("",NextWordCandidatePolicy.merge(
-                    learned,legacy,3));
+                    contextual340,legacy,3));
             return;
         }
         // Instant, tap-only prefix predictions from completed-word habits,
