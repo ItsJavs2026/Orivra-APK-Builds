@@ -115,6 +115,32 @@ final class PersonalNextWordModel {
         return suggest(context,limit);
     }
 
+    /**
+     * Reconstruct one tap-only multiword continuation from repeated typed
+     * sequences. No speculative infilling or raw sentence persistence.
+     */
+    synchronized List<String> suggestPhrase(String committedContext,int maxNextWords) {
+        if(maxNextWords<2)return Collections.emptyList();
+        List<String> observed=tokenize(committedContext);
+        if(observed.isEmpty())return Collections.emptyList();
+        String context=observed.get(observed.size()-1);
+        if(observed.size()>1)
+            context=observed.get(observed.size()-2)+" "+context;
+        ArrayList<String> chain=new ArrayList<>();
+        for(int i=0;i<Math.min(3,maxNextWords);i++) {
+            List<String> next=suggest(context,1);
+            if(next.isEmpty())break;
+            String word=next.get(0);
+            if(chain.contains(word))break; // reject repetitive loops
+            chain.add(word);
+            List<String> tokens=tokenize(context+" "+word);
+            int length=tokens.size();
+            context=tokens.get(length-2)+" "+tokens.get(length-1);
+        }
+        return chain.size()<2?Collections.emptyList():
+                List.of(String.join(" ",chain));
+    }
+
     synchronized void resetContext() {
         previousCommitted=null;
         latestCommitted=null;
