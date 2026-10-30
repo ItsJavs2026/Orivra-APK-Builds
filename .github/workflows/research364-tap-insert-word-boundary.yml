@@ -1,0 +1,163 @@
+name: Orivra Research 364 - prediction tap inserts next word safely (NO APK)
+on:
+  push:
+    branches:
+      - research/build364-prediction-tap-caret-spacing-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research364
+  cancel-in-progress: true
+
+jobs:
+  source-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify unchanged Candidate 363 and scoped transient insert changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="05bb873d2285f695c4aa28b174419597d4c67111"
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          expected={
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java",
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/PredictionTapCaret364Research.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/PredictionTapCaret364AndroidTest.java",
+              ".github/workflows/research364-tap-insert-word-boundary.yml"
+          }
+          assert changed==expected,f"Unexpected/missing research changes: {changed ^ expected}"
+          for rel in [
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java",
+              "app/src/main/java/com/chroomareborn/keyboard/SuggestionContinuity353.java",
+              "app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java",
+              "app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java",
+              "app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java",
+              "app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java"
+          ]:
+              old=subprocess.check_output(["git","show",base+":"+rel],text=True)
+              assert old==Path(rel).read_text(),f"Unexpected stable code drift: {rel}"
+          original=subprocess.check_output([
+              "git","show",base+":app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java"],text=True)
+          service=Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          assert service.count("hintPressOrder353")==original.count("hintPressOrder353")
+          assert service.count("PredictionDispatcher")==original.count("PredictionDispatcher")
+          assert "final PredictionTapCaret364.Ticket insertion364" in service
+          assert "insertLeftBoundary364" in service
+          assert 'ic.commitText(insertLeftBoundary364?" "+value:value, 1)' in service
+          assert "clearPendingCaretInsert364();" in service
+          assert "PredictionTapCaret364.arm(" in service
+          assert "getTextBeforeCursor(" in service
+          helper=Path("app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java").read_text()
+          assert "getSharedPreferences" not in helper
+          assert "android." not in helper
+          assert "commitText(" in helper # documented only, never code
+          assert "private static final int WINDOW=48" in helper
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert "android.permission.INTERNET" not in manifest
+          app=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build363trial"' in app
+          assert "versionCode = 363" in app
+          print("PASS: protected Candidate 363; no change to normal key touch handling, IME package, learning, network")
+          PY
+      - name: Run 120k+ deterministic next-word-insertion assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PredictionTapCaret364Research.java
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.PredictionTapCaret364Research
+
+  android35-emulator:
+    needs: source-and-synthetic
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Materialize verified pinned offline dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile test APKs without publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Assert full Android regression suite and five new tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,"Missing emulator reports"
+          total=fail=errors=skipped=0
+          for p in reports:
+              root=ET.parse(p).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  x for x in root.iter() if x.tag.endswith('testsuite')]
+              for x in suites:
+                  total+=int(x.attrib.get('tests','0'))
+                  fail+=int(x.attrib.get('failures','0'))
+                  errors+=int(x.attrib.get('errors','0'))
+                  skipped+=int(x.attrib.get('skipped','0'))
+          print(f'Android35 emulator: {total} tests, {fail} failures, {errors} errors, {skipped} skipped')
+          assert total>=202 and fail==0 and errors==0 and skipped==0
+          assert Path('app/src/androidTest/java/com/chroomareborn/keyboard/PredictionTapCaret364AndroidTest.java').read_text().count('@Test')==5
+          PY
+          echo "PASS Android emulator only, not Samsung performance/field confirmation; NO RELEASE."
