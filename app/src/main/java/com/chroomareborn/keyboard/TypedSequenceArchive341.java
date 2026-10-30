@@ -69,6 +69,12 @@ final class TypedSequenceArchive341 {
             return;
         }
         increase(words,word,MAX_WORDS);
+        // When the bounded store is full, do not form an orphaned pair
+        // with a word that cannot be recorded.
+        if(!words.containsKey(word)) {
+            previousInEditor=null;
+            return;
+        }
         if(previousInEditor!=null) {
             String pair=pairKey(previousInEditor,word);
             if(pair!=null)increase(pairs,pair,MAX_PAIRS);

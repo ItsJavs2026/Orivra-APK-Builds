@@ -21,7 +21,12 @@ final class TypedWordsConsent341 {
 
     static boolean setEnabled(Context c,boolean enabled) {
         if(c==null)return false;
-        return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
-                .edit().putBoolean(KEY,enabled).commit();
+        // Consent changes and pending store writes share one lock.
+        // Once disabling returns, no queued storage writer can commit
+        // with the previous enabled state.
+        synchronized(TypedWordEvidenceStore341.class) {
+            return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY,enabled).commit();
+        }
     }
 }

@@ -47,7 +47,7 @@ final class TypedWordEvidenceStore341 {
         }
     }
 
-    static Snapshot read(Context context) {
+    static synchronized Snapshot read(Context context) {
         if(context==null)throw new IllegalArgumentException("Missing context");
         Map<String,?> stored=context.getSharedPreferences(
                 PREFS,Context.MODE_PRIVATE).getAll();
@@ -74,7 +74,7 @@ final class TypedWordEvidenceStore341 {
     /** New archive for one editor session; caller MUST call on a worker.
      * Never restores prior editor context, only count evidence.
      */
-    static TypedSequenceArchive341 load(Context context) {
+    static synchronized TypedSequenceArchive341 load(Context context) {
         enforceWorker();
         Snapshot evidence=read(context);
         TypedSequenceArchive341 model=new TypedSequenceArchive341();
@@ -87,7 +87,7 @@ final class TypedWordEvidenceStore341 {
      * persisted snapshot at the start of the editor session, then updated
      * only by verified newly typed successful Space boundaries.
      */
-    static boolean persist(Context context,TypedSequenceArchive341 model,
+    static synchronized boolean persist(Context context,TypedSequenceArchive341 model,
             boolean editorAllowsLearning) {
         enforceWorker();
         if(model==null || !TypedWordsConsent341.mayRemember(
@@ -116,7 +116,7 @@ final class TypedWordEvidenceStore341 {
     }
 
     /** Explicit destructive action. Does not delete existing V1/V2/V3 data. */
-    static boolean clearAll(Context context) {
+    static synchronized boolean clearAll(Context context) {
         if(context==null)return false;
         return context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
                 .edit().clear().commit();
