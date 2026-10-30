@@ -50,4 +50,50 @@ final class LearningV2Policy {
 
     /** At least two explicit acceptances must agree before re-ranking. */
     static boolean reinforced(int count){return count>=2;}
+
+    /**
+     * V2.1 deterministic ranking for an existing V1-compatible correction map.
+     * A tie must NOT arbitrarily choose a replacement; explicit taps of
+     * competing words express uncertainty rather than a stable preference.
+     * Never upgrades a single acceptance or a malformed/same-word pair.
+     */
+    static String preferred(String typed,java.util.Map<String,Integer> acceptedCounts) {
+        String key=EnglishApostrophePolicy.canonical(typed);
+        if(key==null||acceptedCounts==null||acceptedCounts.isEmpty())return null;
+        java.util.Map<String,Integer> normalized=new java.util.HashMap<>();
+        for(java.util.Map.Entry<String,Integer> item:acceptedCounts.entrySet()){
+            String output=EnglishApostrophePolicy.canonical(item.getKey());
+            Integer count=item.getValue();
+            if(output==null||output.equals(key)||count==null||
+                    count<1||count>1000)continue;
+            // Legacy spellings may collide after straight/curly normalization.
+            // Never sum duplicated rows; that could falsely reinforce one tap.
+            normalized.merge(output,count,Math::max);
+        }
+        String best=null;
+        int highest=1,second=0;
+        for(java.util.Map.Entry<String,Integer> item:normalized.entrySet()){
+            int value=item.getValue();
+            if(value>highest){
+                second=highest;highest=value;best=item.getKey();
+            }else if(value==highest){
+                second=highest; // tied; do not guess a winner
+            }else if(value>second)second=value;
+        }
+        if(best==null||!reinforced(highest)||highest<=second)return null;
+        return displayCorrection(typed,best);
+    }
+
+    /** Preserve typing case while capitalizing first-person contractions. */
+    static String displayCorrection(String raw,String canonical) {
+        if(raw==null||canonical==null)return canonical;
+        if(raw.length()>1 && raw.equals(raw.toUpperCase(Locale.ROOT)))
+            return canonical.toUpperCase(Locale.ROOT);
+        if(!raw.isEmpty()&&Character.isUpperCase(raw.charAt(0)))
+            return Character.toUpperCase(canonical.charAt(0))+canonical.substring(1);
+        // For English contractions, the pronoun I is conventionally uppercase.
+        if(canonical.startsWith("i'"))
+            return "I"+canonical.substring(1);
+        return canonical;
+    }
 }
