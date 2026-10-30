@@ -47,7 +47,7 @@ jobs:
               assert (previous/f).read_bytes()==(root/f).read_bytes(),f'Unexpected privacy/license drift: {f}'
           gradle=(root/'build.gradle.kts').read_text()
           assert 'applicationId = "com.chroomareborn.keyboard.build323trial"' in gradle
-          assert 'versionCode = 319' in gradle
+          assert 'versionCode = 323' in gradle
           assert '"Orivra Candidate 323"' in gradle
           assert 'build310trial' not in gradle
           for key in ['src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
@@ -55,7 +55,7 @@ jobs:
               assert 'build323trial' in (root/key).read_text()
               assert 'build310trial' not in (root/key).read_text()
           assert 'Candidate 323' in (root/'src/main/java/com/chroomareborn/keyboard/MainActivity.java').read_text()
-          print('PASS: exact research319 source, isolated Candidate 323 identity, no extra permissions')
+          print('PASS: version 323 isolated candidate identity, no extra permissions')
           PY
       - uses: actions/setup-java@v4
         with:
@@ -169,28 +169,3 @@ jobs:
           path: dist/
           retention-days: 30
           if-no-files-found: error
-      - name: Publish independent prerelease only after 40+ Android tests
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          cat > "$RUNNER_TEMP/notes.md" <<'NOTES319'
-          Orivra Candidate 323 — first integrated English and typing-fluidity trial, with opt-in contextual word-pair learning.
-
-          TEST-ONLY / debug-signed prerelease. Separate Android app ID com.chroomareborn.keyboard.build323trial, versionCode 323. Installing will not overwrite Candidate 319 or Build 310. Android 35 emulator tests and verified package permissions/signature are required by this job before publishing. Real Samsung Galaxy S26 Ultra Android 17 testing is still required.
-
-          BANKING FIX: Android NUMBER/PHONE/DATETIME fields now get real 0–9 number keys instead of ABC with the ?123 switch hidden. Amount fields get decimal key, backspace, Go/Enter, and an ABC escape. Private fields keep predictions and learning off.
-          ENGLISH: broader everyday vocabulary (pinned frequency reference 627 to 780 of 1,000, 487-case A/B no regression); user-confirmed Build 310 reports such as tekk -> tell and Yesthats -> Yes that's addressed in source. Tap-only suggestions protect correctly spelled words.
-          TYPING FEEL: fewer layout rebuilds after ordinary spaces, quicker subtler key animation, and letter edits prioritized ahead of release animation; no forced insert-on-down for letters with long-press hints.
-          CONTEXT LEARNING (research): uses opt-in existing Learning toggle. Explicitly tapped suggestions can reinforce small safe preceding-word -> accepted-word relationships. Two accepted confirmations are required before personal next-word candidate appears. New unknown words can participate only after manually adding them to the local personal dictionary. No full sentences, private-name contexts, emails or typing telemetry stored. Context pairs are excluded from older V1 backup/export until a separate privacy review. The clear-learning control erases contextual pairs too.
-          PRESERVED: working Google Search/Enter/Backspace/spacebar gesture fixes, Google Keep, user text privacy protections, centered idle suggestions, optional ESDB dictionary default OFF and no INTERNET permission.
-          PHONE TEST: Keep Candidate 319 selected until you deliberately switch. In an unpaid Amount field, verify digits and decimal with no payment submission. Then try English sentence typing, tappable contractions, regular search, spacebar cursor swipe, Backspace word swipe/hold, and haptic feel. In a disposable message with Learning enabled, explicitly tap 'tell' after 'please' twice, and check whether 'tell' becomes a next-word option after 'please '. Do not test with passwords/private messages.
-          BACKUP: This separate app cannot read Candidate 319 or Build 310 private learning data. Import an explicit backup to transfer V1 learned corrections/manual words; new contextual pairs are not in that format.
-          NOTES319
-          gh release create candidate-323-20261030 \
-            dist/Orivra-Candidate-323.apk dist/Orivra-Candidate-323.apk.sha256 \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "Orivra Candidate 323 — English & Context Learning Trial" \
-            --notes-file "$RUNNER_TEMP/notes.md" --prerelease
-          gh release view candidate-323-20261030 --repo "$GITHUB_REPOSITORY"
