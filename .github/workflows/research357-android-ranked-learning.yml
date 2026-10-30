@@ -1,0 +1,149 @@
+name: Orivra Research 357 - off-thread learned-word index Android qualification (NO RELEASE)
+on:
+  push:
+    branches:
+      - research/build357-ranked-learning-worker-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research357
+  cancel-in-progress: true
+
+jobs:
+  source-and-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify scoped research changes, privacy and unchanged Candidate 354
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="d7620c6b968ea989efe4ea6bb3ee163cb7bfa673"
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          allowed={
+              "app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/RankedLearningWorker357AndroidTest.java",
+              ".github/workflows/research357-android-ranked-learning.yml",
+          }
+          assert changed==allowed, f"Unreviewed files: {changed ^ allowed}"
+          app=Path("app/src/main/java/com/chroomareborn/keyboard")
+          worker=(app/"TypedWordLearningWorker346.java").read_text()
+          assert "LearnedSuggestionIndex356.fromVerifiedEvidence(" in worker
+          assert "snapshot.index.completedWords(prefix,limit)" in worker
+          assert "snapshot.index.nextWords(preceding,limit)" in worker
+          assert "TypedWordsConsent341.mayRemember(app,true)" in worker
+          assert "TypedWordsConsent341.generation(app)" in worker
+          assert "private volatile Display display=EMPTY_DISPLAY" in worker
+          assert "if(snapshot.session!=editorSession)" in worker
+          assert "worker.execute(()->{" in worker
+          assert "getSharedPreferences" not in worker
+          assert 'android.permission.INTERNET' not in Path("app/src/main/AndroidManifest.xml").read_text()
+          gradle=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build354trial"' in gradle
+          assert "versionCode = 354" in gradle
+          assert "LearnedSuggestionIndex356" not in (app/"RebornImeService.java").read_text()
+          print("PASS: Research only, no IME layout or APK package changes")
+          PY
+      - name: Compile ranker plus 356 synthetic parity benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/TypedSequenceArchive341.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearnedSuggestionIndex356.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearnedSuggestionIndex356Research.java
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.LearnedSuggestionIndex356Research
+
+  android35-instrumentation:
+    permissions:
+      contents: read
+    needs: source-and-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Verify pinned offline dictionary source and SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Build Android 35 test APKs only, never publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable hardware-accelerated emulator when available
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Assert complete instrumentation suite passed (including 357)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,"No connected Android test reports"
+          count=failed=errors=skipped=0
+          names=set()
+          for f in reports:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith("testsuite") else [
+                  e for e in root.iter() if e.tag.endswith("testsuite")]
+              for suite in suites:
+                  count+=int(suite.attrib.get('tests','0'))
+                  failed+=int(suite.attrib.get('failures','0'))
+                  errors+=int(suite.attrib.get('errors','0'))
+                  skipped+=int(suite.attrib.get('skipped','0'))
+                  names.add(suite.attrib.get("name",""))
+          print(f'Android emulator API35: {count} tests, {failed} failures, {errors} errors, {skipped} skipped')
+          assert count>=187 and failed==0 and errors==0 and skipped==0
+          assert any("RankedLearningWorker357AndroidTest" in n for n in names),str(names)
+          PY
+          echo "Android emulator qualification ONLY. No APK published or Samsung speed claim."
