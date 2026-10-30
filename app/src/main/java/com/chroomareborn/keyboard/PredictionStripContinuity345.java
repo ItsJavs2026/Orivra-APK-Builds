@@ -1,6 +1,8 @@
 package com.chroomareborn.keyboard;
 
+import android.content.Context;
 import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
@@ -56,6 +58,27 @@ final class PredictionStripContinuity345 {
         cell.setContentDescription(null);
         cell.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         return true;
+    }
+
+    /** A quiet ordinary field is NOT a separate fourth view family.
+     * The existing three slots remain mounted but entirely hidden. This
+     * prevents removeAllViews/recreate when the next letter is entered.
+     * Return true only if this was the first structural setup.
+     */
+    static boolean clearQuietRow(LinearLayout row,Context ctx) {
+        boolean created=PredictionStripFrame344.ensureThreeSlots(row,ctx);
+        for(int i=0;i<3;i++) {
+            TextView cell=(TextView)row.getChildAt(i);
+            if(cell.length()!=0)cell.setText("");
+            if(cell.getVisibility()!=View.INVISIBLE)
+                cell.setVisibility(View.INVISIBLE);
+            cell.setOnClickListener(null);
+            cell.setOnLongClickListener(null);
+            cell.setClickable(false);
+            cell.setContentDescription(null);
+            cell.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        }
+        return created;
     }
 
     /** Re-enable access only after the caller installs a CURRENT tap handler. */
