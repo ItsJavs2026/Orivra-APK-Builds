@@ -72,6 +72,112 @@ final class LearningTransferStore {
         return LearningTransferCodec.encode(data.words,data.learnedPairs);
     }
 
+
+    // Research 325: completely optional format, keeping V1 exports unchanged.
+    private static SharedPreferences contextPrefs(Context c) {
+        return c.getSharedPreferences(PersonalContextLearning319.PREFS,
+                Context.MODE_PRIVATE);
+    }
+    private static boolean approvedTarget(String word,List<String> manual) {
+        if(PredictionLite.publicWordForContext(word))return true;
+        for(String saved:manual) {
+            if(word.equals(AcceptedContextPolicy319.acceptedWord(saved)))
+                return true;
+        }
+        return false;
+    }
+    static String exportV2(Context c) {
+        LearningTransferCodec.Bundle legacy=snapshot(c);
+        TreeMap<String,int[]> grouped=new TreeMap<>();
+        for(Map.Entry<String,?> e:contextPrefs(c).getAll().entrySet()){
+            String key=e.getKey();
+            boolean tap=key.startsWith("pair:");
+            if(!tap && !key.startsWith("used:"))continue;
+            if(!(e.getValue() instanceof Integer))continue;
+            int count=(Integer)e.getValue();
+            if(count<=0||count>1000)continue;
+            String raw=key.substring(5);
+            int sep=raw.indexOf(':');
+            if(sep<=0||sep!=raw.lastIndexOf(':'))continue;
+            String left=AcceptedContextPolicy319.safeWord(raw.substring(0,sep));
+            String target=AcceptedContextPolicy319.acceptedWord(raw.substring(sep+1));
+            if(left==null||target==null||left.equals(target)||
+                    !approvedTarget(target,legacy.words))continue;
+            int[] n=grouped.computeIfAbsent(left+":"+target,k->new int[2]);
+            n[tap?0:1]=Math.max(n[tap?0:1],count);
+        }
+        TreeMap<String,ContextBackupFormat322.Counts> contexts=new TreeMap<>();
+        for(Map.Entry<String,int[]> entry:grouped.entrySet())
+            contexts.put(entry.getKey(),new ContextBackupFormat322.Counts(
+                    entry.getValue()[0],entry.getValue()[1]));
+        return ContextBackupFormat322.encode(
+                legacy.words,legacy.learnedPairs,contexts);
+    }
+    private static final class V2Plan {
+        final Plan legacy;
+        final LinkedHashMap<String,Integer> newContext=new LinkedHashMap<>();
+        final int added,stronger;
+        V2Plan(Plan base,LinkedHashMap<String,Integer> changes,int add,int boosted){
+            legacy=base;newContext.putAll(changes);added=add;stronger=boosted;
+        }
+    }
+    private static V2Plan planV2(Context c,ContextBackupFormat322.Data input){
+        if(input==null||input.legacy==null||input.contexts==null)
+            throw new IllegalArgumentException("Invalid portable file");
+        // Validate even synthetic in-memory callers before any mutation.
+        ContextBackupFormat322.Data safe=ContextBackupFormat322.decode(
+                ContextBackupFormat322.encode(input.legacy.words,
+                        input.legacy.learnedPairs,input.contexts));
+        Plan legacy=buildPlan(c,safe.legacy);
+        List<String> known=new ArrayList<>(safe.legacy.words);
+        known.addAll(PersonalDictionary.savedWords(c));
+        Map<String,?> current=contextPrefs(c).getAll();
+        LinkedHashMap<String,Integer> changes=new LinkedHashMap<>();
+        int added=0,strengthened=0;
+        for(Map.Entry<String,ContextBackupFormat322.Counts> e:
+                safe.contexts.entrySet()){
+            String pair=e.getKey();
+            String target=pair.substring(pair.indexOf(':')+1);
+            if(!approvedTarget(target,known))
+                throw new IllegalArgumentException("Unknown context target");
+            for(int variant=0;variant<2;variant++){
+                int count=variant==0?e.getValue().accepted:e.getValue().used;
+                if(count<=0)continue;
+                String key=(variant==0?"pair:":"used:")+pair;
+                Object prior=current.get(key);
+                if(prior!=null && !(prior instanceof Integer))
+                    throw new IllegalArgumentException("Invalid existing context");
+                int old=prior==null?0:(Integer)prior;
+                if(old<0||old>1000)throw new IllegalArgumentException(
+                        "Invalid existing context count");
+                if(prior==null)added++;
+                if(count>old){
+                    changes.put(key,count);
+                    if(old>0)strengthened++;
+                }
+            }
+        }
+        if(current.size()+added>ContextBackupFormat322.MAX_CONTEXT)
+            throw new IllegalArgumentException("Context capacity exceeded");
+        return new V2Plan(legacy,changes,added,strengthened);
+    }
+    static Preview previewV2(Context c,ContextBackupFormat322.Data input){
+        return planV2(c,input).legacy.preview;
+    }
+    static Preview importV2Confirmed(Context c,ContextBackupFormat322.Data input){
+        V2Plan validated=planV2(c,input);
+        // Existing V1 path stays unchanged. Up-front validation prevents
+        // rejected V2 targets from partially importing words/corrections.
+        Preview result=importConfirmed(c,input.legacy);
+        if(!validated.newContext.isEmpty()){
+            SharedPreferences.Editor e=contextPrefs(c).edit();
+            for(Map.Entry<String,Integer> item:validated.newContext.entrySet())
+                e.putInt(item.getKey(),item.getValue());
+            if(!e.commit())throw new IllegalStateException("Context save failed");
+        }
+        return result;
+    }
+
     private static Plan buildPlan(Context context,LearningTransferCodec.Bundle bundle){
         if(context==null||bundle==null)throw new IllegalArgumentException("Missing backup");
         // Round-trip to validate the entire in-memory bundle before any
