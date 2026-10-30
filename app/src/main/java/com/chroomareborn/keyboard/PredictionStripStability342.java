@@ -19,12 +19,6 @@ final class PredictionStripStability342 {
         return sensitive || !suggestionsAllowed;
     }
 
-    static boolean autoExpandDuringTyping() {
-        // The row above the keyboard is manually expandable with the arrow.
-        // Autoshifting its height after every prediction caused noticeable lag.
-        return false;
-    }
-
     static boolean suppressExpectedCursorEcho(long ageMs,int oldStart,int oldEnd,
             int newStart,int newEnd,int expectedNewStart,
             boolean composingEmpty,boolean editorSame) {

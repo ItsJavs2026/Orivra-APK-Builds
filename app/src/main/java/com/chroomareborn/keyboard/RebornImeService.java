@@ -3255,11 +3255,33 @@ public final class RebornImeService extends InputMethodService {
             splitPhrases=java.util.Collections.emptyList();
             splitNextWords=java.util.Collections.emptyList();
         }
-        // Keep typed-word corrections in the main strip UNTIL Space.
-        // Build 340 injected generic next-word chips mid-word whenever
-        // the prefix became a recognized word. That switches layout while
-        // typing, steals the literal candidate, and can flicker repeatedly.
-        // Optional phrase alternatives remain in the manually opened row.
+        if(splitActive && (!splitNextWords.isEmpty() || !splitPhrases.isEmpty())) {
+            java.util.ArrayList<String> singles=new java.util.ArrayList<>();
+            for(String option:options) if(option.indexOf(' ')<0)singles.add(option);
+            // For a correctly spelled word, offer useful next words rather
+            // than filling the strip with near-miss spelling corrections.
+            if(!splitNextWords.isEmpty()) {
+                singles.clear();
+                // Split mode used to replace the entire suggestion strip
+                // with generic right-side words, hiding learned "con ->
+                // continue" completions. Keep personalized prefix choices
+                // visible without discarding split next-word controls.
+                if(editorAllowsPersonalLearning &&
+                        PersonalLearning.enabled(this) && !numericEditor &&
+                        !editingInMiddle && !hasSelection() &&
+                        !cursorHasTextAfter()) {
+                    String raw=input.toLowerCase(java.util.Locale.ROOT);
+                    if(PredictionLite.publicWordForContext(raw))
+                        singles.add(input);
+                    singles.addAll(personalizedPrefix340(input));
+                }
+                for(String next:splitNextWords)
+                    if(!singles.contains(next))singles.add(next);
+            }
+            // If a typo is being reconstructed into multiple words, keep
+            // sentence candidates rather than hiding all useful corrections.
+            if(!singles.isEmpty())options=singles;
+        }
         // Display-only condensation retains the highest-ranked prediction.
         // Do not change the underlying predictor scores or accepted text.
         options=SuggestionDisplayPolicy.compact(input,options);
@@ -3284,10 +3306,8 @@ public final class RebornImeService extends InputMethodService {
                 else predictionsExpanded=false;
             }
             manuallyCollapsedPredictions=false;
-        } else if(PredictionStripStability342.autoExpandDuringTyping() &&
-                !freezeRiseDuringDelete && !sensitive &&
-                !manuallyCollapsedPredictions && input.length()>=2 &&
-                (!splitPhrases.isEmpty() || options.size()>3)) {
+        } else if(!freezeRiseDuringDelete && !sensitive && !manuallyCollapsedPredictions
+                && input.length()>=2 && (!splitPhrases.isEmpty() || options.size()>3)) {
             predictionsExpanded=true;
         } else if(!freezeRiseDuringDelete && (options.isEmpty() || (splitPhrases.isEmpty() && options.size()<=3))
                 && !manuallyCollapsedPredictions) {

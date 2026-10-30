@@ -13,9 +13,6 @@ public final class PredictionStripStability342AndroidTest {
         assertTrue(PredictionStripStability342.showPrivateStatus(true,true));
         assertTrue(PredictionStripStability342.showPrivateStatus(false,false));
     }
-    @Test public void optionalRiseIsManualRatherThanPerCharacterAutoExpansion(){
-        assertFalse(PredictionStripStability342.autoExpandDuringTyping());
-    }
     @Test public void exactAsyncSingleLetterCursorEchoIsIgnoredOnce() {
         assertTrue(PredictionStripStability342.suppressExpectedCursorEcho(
                 20L,14,14,15,15,15,true,true));
