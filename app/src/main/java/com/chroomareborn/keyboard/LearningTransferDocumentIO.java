@@ -29,6 +29,10 @@ final class LearningTransferDocumentIO {
     static Intent createFrequencyIntent(){
         return createNamedIntent("orivra-word-frequency-v3-backup.txt");
     }
+    static Intent createUnifiedV4Intent() {
+        // New filename avoids overwriting a user's V3 rollback file.
+        return createNamedIntent("orivra-all-learning-v4-backup.txt");
+    }
     private static Intent createNamedIntent(String filename){
         Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
