@@ -237,7 +237,7 @@ public final class MainActivity extends Activity {
         // Build 285 — explicit local vocabulary, separate from automatic
         // correction learning. This screen never reads editor content.
         TextView dictionaryTitle=new TextView(this);
-        dictionaryTitle.setText("\nPersonal dictionary (English single words only)");
+        dictionaryTitle.setText("\nPersonal dictionary (English words, including can't and ain't)");
         dictionaryTitle.setTextSize(17);
         dictionaryTitle.setTextColor(0xFF303846);
         root.addView(dictionaryTitle);
@@ -303,7 +303,7 @@ public final class MainActivity extends Activity {
 
         // Learning controls belong to the Activity, not a modal IME window.
         TextView learningTitle = new TextView(this);
-        learningTitle.setText("Orivra Learning v1 — on-device, single-word corrections");
+        learningTitle.setText("Orivra Learning V2 — on-device, explicit word corrections");
         learningTitle.setTextColor(0xFF303846);
         learningTitle.setTextSize(16);
         root.addView(learningTitle);
