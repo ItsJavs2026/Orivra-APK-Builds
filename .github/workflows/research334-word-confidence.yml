@@ -31,6 +31,9 @@ jobs:
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/NumericKeypad323AndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/ContextBackupTransfer325AndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/PersonalPrefix328AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/StableWordConfidence334AndroidTest.java
+          grep -Fq 'StableWordTiming334.milliseconds(expected)' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'cancelStableWord329();' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/FrequencyTransfer331AndroidTest.java
           grep -Fq 'LearningTransferStore.exportV3(this)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
           grep -Fq 'LearningTransferStore.importV3Confirmed(this,parsed)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
