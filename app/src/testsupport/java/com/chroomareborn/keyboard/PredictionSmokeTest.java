@@ -58,6 +58,10 @@ public final class PredictionSmokeTest {
         top("were","were");
         top("howsitgoing","how's it going");
         top("howsotgoing","how's it going");
+        // Build 310 real-device screenshot: segmentation is correct, but
+        // the joined final contraction lost its apostrophe.
+        // Only an explicit tap may commit the new candidate.
+        includes("Yesthats","Yes that's");
         // User screenshot diagnostics: never claim these are fixed until measured.
         diagnostic("vibrstion","vibration");
         diagnostic("ofanimation","of animation");

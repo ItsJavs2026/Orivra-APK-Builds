@@ -1049,7 +1049,7 @@ final class PredictionLite {
                 suggestions.add(0,candidate);
             }
             while(suggestions.size()>8)suggestions.remove(suggestions.size()-1);
-            return suggestions;
+            return JoinedEnglishContractionPolicy.offer(input,suggestions);
         }
         // A near-exact conversational phrase is stronger evidence than a
         // speculative segmented beam. Keep the top candidate stable across
@@ -1086,14 +1086,14 @@ final class PredictionLite {
             suggestions.remove(trustedPhrase);
             suggestions.add(0,trustedPhrase);
             while(suggestions.size()>8)suggestions.remove(suggestions.size()-1);
-            return suggestions;
+            return JoinedEnglishContractionPolicy.offer(input,suggestions);
         }
         String inflection=uniqueCloseInflection(input,raw,suggestions);
         if(inflection!=null) {
             suggestions.remove(inflection);
             suggestions.add(0,inflection);
             while(suggestions.size()>8)suggestions.remove(suggestions.size()-1);
-            return suggestions;
+            return JoinedEnglishContractionPolicy.offer(input,suggestions);
         }
         // A plausible standalone word should not be buried under bizarre
         // multiword segmentation. Require matching first two letters and a
@@ -1118,7 +1118,7 @@ final class PredictionLite {
                 suggestions.remove(corrected);
                 suggestions.add(0,corrected);
                 while(suggestions.size()>8)suggestions.remove(suggestions.size()-1);
-                return suggestions;
+                return JoinedEnglishContractionPolicy.offer(input,suggestions);
             }
         }
         // Long, close single-word matches need a fair chance before the
@@ -1143,7 +1143,7 @@ final class PredictionLite {
                 suggestions.remove(corrected);
                 suggestions.add(0,corrected);
                 while(suggestions.size()>8)suggestions.remove(suggestions.size()-1);
-                return suggestions;
+                return JoinedEnglishContractionPolicy.offer(input,suggestions);
             }
         }
         // Before invoking the expensive rescue beam, give two substantial
@@ -1159,7 +1159,7 @@ final class PredictionLite {
                     suggestions.remove(pair);
                     suggestions.add(0,pair);
                     while(suggestions.size()>8)suggestions.remove(suggestions.size()-1);
-                    return suggestions;
+                    return JoinedEnglishContractionPolicy.offer(input,suggestions);
                 }
             }
         }
@@ -1208,15 +1208,15 @@ final class PredictionLite {
         // A high-confidence zero-letter-edit segmentation may repair an
         // obviously overfragmented first candidate. Never silently commit.
         ExactOnlyLanguagePack postDecodePack=researchExactOnlyPack;
-        if(postDecodePack==null || stable.isEmpty())return stable;
+        if(postDecodePack==null || stable.isEmpty())return JoinedEnglishContractionPolicy.offer(input,stable);
         String proposed=ExactOnlySegmentation.propose(raw,stable.get(0),WORDS,postDecodePack);
-        if(proposed==null)return stable;
+        if(proposed==null)return JoinedEnglishContractionPolicy.offer(input,stable);
         String candidate=caseDisplay(input,displayRecovered(proposed));
-        if(stable.contains(candidate))return stable;
+        if(stable.contains(candidate))return JoinedEnglishContractionPolicy.offer(input,stable);
         ArrayList<String> postDecodeOptions=new ArrayList<>(stable);
         postDecodeOptions.add(0,candidate);
         while(postDecodeOptions.size()>8)postDecodeOptions.remove(postDecodeOptions.size()-1);
-        return postDecodeOptions;
+        return JoinedEnglishContractionPolicy.offer(input,postDecodeOptions);
     }
     private static String displayRecovered(String plain) {
         String[] words=plain.split(" ");
