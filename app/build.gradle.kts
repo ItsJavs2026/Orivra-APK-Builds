@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build310trial"
+        applicationId = "com.chroomareborn.keyboard.build339trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 310
-        versionName = "1.0.27-build310-search-editor-gestures"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 310"
+        versionCode = 339
+        versionName = "1.0.33-build339-backspace-final-character"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 339"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 310"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 339"
         }
     }
     compileOptions {
