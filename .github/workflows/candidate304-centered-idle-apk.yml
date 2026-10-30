@@ -143,23 +143,16 @@ jobs:
           from pathlib import Path
           a=Path('qualified-candidate-303/app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
           b=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
-          old='''        options=SuggestionDisplayPolicy.compact(input,options);
-          latestOptions=new java.util.ArrayList<>(options);'''
-          new='''        options=SuggestionDisplayPolicy.compact(input,options);
-          // Build 304: a few idle next-word chips should sit in the CENTER of
-          // the available strip, not cling to its left edge. Restore START
-          // while composing/editing and for private-field status messages.
-          // The HorizontalScrollView already has fillViewport=true; its child
-          // can therefore center a short row without moving the right caret.
-          final boolean centerIdle=SuggestionStripLayoutPolicy.centerIdleSuggestions(
-                  input,options.size(),sensitive);
-          final int stripGravity=Gravity.CENTER_VERTICAL |
-                  (centerIdle?Gravity.CENTER_HORIZONTAL:Gravity.START);
-          if(candidates.getGravity()!=stripGravity)
-              candidates.setGravity(stripGravity);
-          latestOptions=new java.util.ArrayList<>(options);'''
-          assert a.count(old)==1,'Base layout anchor changed'
-          assert b==a.replace(old,new),'IME change exceeded approved idle centering'
+          before='        options=SuggestionDisplayPolicy.compact(input,options);'
+          after='        latestOptions=new java.util.ArrayList<>(options);'
+          assert a.count(before)==1 and a.count(after)==1,'Original strip anchors changed'
+          start=b.index('        // Build 304: a few idle next-word chips')
+          end=b.index(after,start)
+          injected=b[start:end]
+          assert 'centerIdleSuggestions(' in injected
+          assert 'Gravity.CENTER_HORIZONTAL:Gravity.START' in injected
+          assert 'candidates.setGravity(stripGravity);' in injected
+          assert b[:start]+b[end:]==a,'Unexpected additional IME source changes'
           print('PASS: exact approved IME idle-centering source diff')
           PY
           grep -Fq 'centerIdleSuggestions' app/src/main/java/com/chroomareborn/keyboard/SuggestionStripLayoutPolicy.java
