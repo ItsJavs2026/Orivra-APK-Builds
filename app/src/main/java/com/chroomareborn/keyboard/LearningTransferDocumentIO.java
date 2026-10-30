@@ -19,10 +19,18 @@ import java.nio.charset.StandardCharsets;
 final class LearningTransferDocumentIO {
     private LearningTransferDocumentIO() {}
     static Intent createIntent(){
+        // Existing V1 filename is frozen for rollbacks and older Orivra.
+        return createNamedIntent("orivra-local-learning-backup.txt");
+    }
+    static Intent createContextIntent(){
+        // V2 must not accidentally overwrite a previously exported V1 file.
+        return createNamedIntent("orivra-context-learning-v2-backup.txt");
+    }
+    private static Intent createNamedIntent(String filename){
         Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("text/plain");
-        intent.putExtra(Intent.EXTRA_TITLE,"orivra-local-learning-backup.txt");
+        intent.putExtra(Intent.EXTRA_TITLE,filename);
         return intent;
     }
     static Intent openIntent(){

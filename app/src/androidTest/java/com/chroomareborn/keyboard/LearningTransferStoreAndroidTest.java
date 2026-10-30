@@ -123,5 +123,14 @@ public final class LearningTransferStoreAndroidTest {
         assertEquals("text/plain",open.getType());
         assertEquals("orivra-local-learning-backup.txt",
                 create.getStringExtra(Intent.EXTRA_TITLE));
+        Intent context=LearningTransferDocumentIO.createContextIntent();
+        assertEquals(Intent.ACTION_CREATE_DOCUMENT,context.getAction());
+        assertTrue(context.hasCategory(Intent.CATEGORY_OPENABLE));
+        assertEquals("text/plain",context.getType());
+        assertEquals("orivra-context-learning-v2-backup.txt",
+                context.getStringExtra(Intent.EXTRA_TITLE));
+        assertNotEquals("V2 must not propose the V1 rollback filename",
+                create.getStringExtra(Intent.EXTRA_TITLE),
+                context.getStringExtra(Intent.EXTRA_TITLE));
     }
 }

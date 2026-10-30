@@ -412,7 +412,7 @@ public final class MainActivity extends Activity {
                     .setNegativeButton("Cancel",null)
                     .setPositiveButton("Choose location",(dialog,which)->
                             startActivityForResult(
-                                    LearningTransferDocumentIO.createIntent(),
+                                    LearningTransferDocumentIO.createContextIntent(),
                                     REQUEST_EXPORT_CONTEXT))
                     .show());
         root.addView(exportContext);
