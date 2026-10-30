@@ -2132,6 +2132,7 @@ public final class RebornImeService extends InputMethodService {
         return b;
     }
     private void type(String value) {
+        final long keyStart340=CandidateLatencyMetrics.start(getPackageName());
         cancelStableWord329();
         // A new character changes the observed word; preserve neither
         // full draft text nor a stale completed prefix.
@@ -2219,6 +2220,8 @@ public final class RebornImeService extends InputMethodService {
         if(!numericEditor && !capsLock && shiftAtStart!=shift &&
                 !symbolHoldInProgress)
             suggestionHandler.post(this::refreshView);
+        CandidateLatencyMetrics.recordKeyHandler340(
+                keyStart340,System.nanoTime());
     }
     private void deleteSwipeWords(int words,InputConnection ic,
             BackspaceSwipeSnapshotGuard.Ticket ticket,long downSession) {
