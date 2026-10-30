@@ -1,0 +1,157 @@
+name: Orivra 310 - Google search editor privacy, Search Enter and gestures
+on:
+  push:
+    branches:
+      - research/build310-editor-capability-search-enter-20261029
+    paths:
+      - .github/workflows/research310-google-search-editor-android.yml
+      - app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java
+      - app/src/main/java/com/chroomareborn/keyboard/CursorEditSnapshotGuard.java
+      - app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/CursorEditSnapshotGuardTest.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/ContractionTapOnly310Test.java
+      - app/src/androidTest/java/com/chroomareborn/keyboard/AmbiguousContractionEditorAndroidTest.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-310-tap-only-research
+  cancel-in-progress: true
+jobs:
+  source-and-java:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 871baee5ba7f82bf4f126824f8af83f35cfb2b46
+          path: qualified-candidate-309
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Protect Candidate 309 source, credentials, package and Android 17 gestures
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('qualified-candidate-309/app')
+          now=Path('app')
+          allowed={
+              'src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java',
+              'src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java',
+              'src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
+              'src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java',
+              'src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java',
+              'src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java',
+          }
+          for tree in ('src/main/java','src/testsupport','src/androidTest'):
+              for file in (base/tree).rglob('*.java'):
+                  rel=file.relative_to(base).as_posix()
+                  if rel not in allowed:
+                      assert file.read_bytes()==(now/rel).read_bytes(),f'Unexpected stable code drift: {rel}'
+          for fixed in ('build.gradle.kts','src/main/AndroidManifest.xml'):
+              assert (base/fixed).read_bytes()==(now/fixed).read_bytes(),f'Protected source changed: {fixed}'
+          s=(now/'src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          for term in (
+              'editorAllowsPersonalLearning=privacy.allowPersonalLearning;',
+              'editorAllowsSuggestions=privacy.allowSuggestions;',
+              'if(sensitive || !editorAllowsSuggestions) {',
+              'EnterKeyPolicy.tapEditorAction(info.imeOptions)',
+              'editor.performEditorAction(action)',
+              'BackspaceSwipeEditorTransaction.apply(',
+              'cursorSwipeBatch.takeFrame()',
+              'if(sensitive)return false;',
+              'sendIfExplicitlySupported();',
+              'KEYCODE_DEL',
+              'EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING'):
+              assert term in s,f'Missing protected editor/search/gesture requirement: {term}'
+          if s.count('handleEnterTap();')<1:
+              raise AssertionError('New Enter routing not actually attached to key')
+          print('PASS: Candidate 309 stable source retained and Search Enter/gesture separations present')
+          PY
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SearchEditorActionsAndroidTest.java
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+      - name: Compile and run frozen and new editor policy, Enter and contraction tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PersonalDictionaryPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorEditSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorEditSnapshotGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ContractionTapOnly309Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java
+          for suite in EnglishApostropheAndLearningV2Test CursorEditSnapshotGuardTest ContractionTapOnly309Test EditorSuggestionPrivacyPolicyTest EnterKeyPolicyTest; do
+            java -ea -Xmx128m -cp "$RUNNER_TEMP/classes" "com.chroomareborn.keyboard.$suite"
+          done
+  android-35-emulator:
+    needs: source-and-java
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Build pinned licensed English dictionary for inherited tests
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          gzip -t < app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Inspect protected Android test package and new source
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build309trial' app/build.gradle.kts
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/AmbiguousContractionEditorAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SearchEditorActionsAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/LearningTransferStoreAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+      - name: Enable KVM
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -euo pipefail
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug 2>&1 | tee build310-android35.log
+            grep -F 'Finished 44 tests' build310-android35.log
+      - name: Research result only, no user APK release
+        run: echo "44 Android emulator tests passed; no phone release or personal data collection."
