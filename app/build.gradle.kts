@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build319trial"
+        applicationId = "com.chroomareborn.keyboard.build323trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 319
-        versionName = "1.0.28-build319-English-context-fluidity"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 319"
+        versionCode = 323
+        versionName = "1.0.28-build323-bank-numeric-keypad"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 323"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 319"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 323"
         }
     }
     compileOptions {
