@@ -257,12 +257,41 @@ public final class RebornImeService extends InputMethodService {
             if(outcome==ComposingMutation340.Result.PRECONDITION &&
                     session==inputSessionGeneration &&
                     ic==getCurrentInputConnection()) {
-                // A caret move detached the previous composing word. The
-                // user's current key still belongs at the new caret, once.
-                ic.finishComposingText();
-                if(session==inputSessionGeneration &&
-                        ic==getCurrentInputConnection())
-                    ic.commitText(addition,1);
+                // Android may have a highlighted word even when the
+                // selection callback has not arrived yet. Never finish its
+                // composing span first: that can collapse the highlight and
+                // make the next letter insert an unwanted extra character.
+                // This RECOVERY path runs only for a verified precondition
+                // mismatch and does no extra editor IPC on ordinary taps.
+                composingTransaction340=true;
+                try {
+                    SelectionCommitRecovery351.recover(
+                        new SelectionCommitRecovery351.Editor() {
+                            @Override public boolean sameSession() {
+                                return session==inputSessionGeneration &&
+                                        ic==getCurrentInputConnection();
+                            }
+                            @Override public CharSequence before() {
+                                return ic.getTextBeforeCursor(
+                                        SelectionCommitRecovery351.WINDOW,0);
+                            }
+                            @Override public CharSequence after() {
+                                return ic.getTextAfterCursor(
+                                        SelectionCommitRecovery351.WINDOW,0);
+                            }
+                            @Override public CharSequence selectedText() {
+                                return ic.getSelectedText(0);
+                            }
+                            @Override public boolean finishComposing() {
+                                return ic.finishComposingText();
+                            }
+                            @Override public boolean commitOnce(String text) {
+                                return ic.commitText(text,1);
+                            }
+                        },hasSelection(),addition);
+                } finally {
+                    composingTransaction340=false;
+                }
             }
         }
     }
@@ -1565,7 +1594,12 @@ public final class RebornImeService extends InputMethodService {
         if(outside) {
             predictionDispatcher.cancel();
             InputConnection ic=getCurrentInputConnection();
-            if(ic!=null)ic.finishComposingText();
+            // A selected/highlighted range belongs to the editor. Finish
+            // composing AFTER the user's next commitText replacement, not
+            // before: some host editors collapse the highlight on finish.
+            if(ic!=null && SelectionCommitRecovery351
+                    .finishBeforeTypedReplacement(newSelStart!=newSelEnd))
+                ic.finishComposingText();
             composing="";
             editingInMiddle=true;
             showSuggestions();
@@ -1582,12 +1616,18 @@ public final class RebornImeService extends InputMethodService {
                 lastSelectionStart!=lastSelectionEnd;
     }
     private void prepareCursorEdit(InputConnection ic) {
-        if(!composing.isEmpty() && (cursorHasTextAfter() || hasSelection())) {
-            ic.finishComposingText();
+        final boolean highlighted351=hasSelection();
+        final boolean trailingText351=cursorHasTextAfter();
+        if(!composing.isEmpty() && (trailingText351 || highlighted351)) {
+            // When selection is active, commitText must be allowed to replace
+            // that range once. Finishing first can collapse host selection.
+            if(SelectionCommitRecovery351
+                    .finishBeforeTypedReplacement(highlighted351))
+                ic.finishComposingText();
             composing="";
             predictionDispatcher.cancel();
         }
-        editingInMiddle=cursorHasTextAfter() || hasSelection();
+        editingInMiddle=trailingText351 || highlighted351;
     }
     // Exposed to package-scoped Android instrumentation, no editor text access.
     static EditorSuggestionPrivacyPolicy.Decision editorPrivacyDecision(EditorInfo info) {
