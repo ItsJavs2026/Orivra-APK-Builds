@@ -1,0 +1,128 @@
+name: Orivra Candidate 339 - publish verified APK
+on:
+  push:
+    branches:
+      - candidate/build339-last-letter-backspace-20261030
+    paths:
+      - .github/workflows/candidate339-publish-verified.yml
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: orivra-candidate339-publish
+  cancel-in-progress: false
+jobs:
+  publish-only-verified-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact previously qualified source and green Android run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          confirmed=$(gh api "repos/$repo/actions/runs/41075739289" --jq '.conclusion')
+          source_sha=$(gh api "repos/$repo/actions/runs/41075739289" --jq '.head_sha')
+          test "$confirmed" = "success"
+          test "$source_sha" = "3bd2e877dc66a40efa172f7fa9e448ca476a2147"
+          test -f .github/workflows/candidate339-frequent-words-apk.yml
+          echo "PASS: verified Build 333 Android 35 test run was successful"
+      - name: Retrieve byte-identical, qualified Candidate 339 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 41075739289 --repo "$GITHUB_REPOSITORY" \
+            --name Orivra-Candidate-339-Android35-Passed --dir dist
+          test -s dist/Orivra-Candidate-339.apk
+          test -s dist/Orivra-Candidate-339.apk.sha256
+          (cd dist && sha256sum -c Orivra-Candidate-339.apk.sha256)
+          test -s dist/package.txt
+          test -s dist/permissions.txt
+          test -s dist/signature.txt
+      - name: Independently reverify original APK identity, signature, privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=dist/Orivra-Candidate-339.apk
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          apksigner="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          test -x "$aapt"
+          test -x "$apksigner"
+          "$aapt" dump badging "$apk" | head -n 1 | tee dist/reverified-package.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build339trial' versionCode='339'" dist/reverified-package.txt
+          "$apksigner" verify --verbose --print-certs "$apk" > dist/reverified-signature.txt
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' dist/reverified-signature.txt
+          "$aapt" dump permissions "$apk" > dist/reverified-permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/reverified-permissions.txt
+          "$aapt" list "$apk" | grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$aapt" list "$apk" | grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+          echo "PASS: unchanged signature, correct trial ID, no internet permission"
+      - name: Publish independently installable GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=candidate-339-20261030
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release tag already exists. Leaving existing release untouched."
+            exit 0
+          fi
+          cat > "$RUNNER_TEMP/notes.md" <<'NOTES'
+          Orivra Candidate 339 — Android 35 emulator-qualified, debug-signed test APK.
+
+          Verified 66/66 Android instrumentation tests in GitHub run 41075739289.
+          Separate application ID com.chroomareborn.keyboard.build339trial (versionCode 339).
+          Installing does NOT overwrite Candidate 319 or Build 310. Not yet Samsung Android 17 or real bank-app verified.
+
+          Key fix: deleting the final letter of an Android composing word now
+          actually removes that character on the FIRST Backspace press.
+          Candidate 333 previously called finishComposingText(), which only
+          finalized composition and left the character visible. Users saw
+          a temporary no-predictions hint and needed an extra Backspace.
+          Android BaseInputConnection and regression tests cover this case.
+
+          - Backspace now replaces the final composing character with empty
+            composing text and checks a safe fallback for rejecting editors.
+          - During a single edit, reentrant selection callbacks no longer
+            clear composition or repaint an empty suggestion hint prematurely.
+          - Keeps hold-to-delete, backspace swipe, spacebar caret movement and
+            existing responsive typing and sentence predictions.
+          - Retains adaptive short-word learning, accepted-phrase learning,
+            conservative idle word evidence and curated English contractions.
+          - Retains the private bank Amount numeric keypad and no INTERNET permission.
+          - All existing V1, V2 and V3 backups are compatible; V3 is the complete
+            portable learning backup, and older versions cannot import V3.
+
+          Phone test steps:
+          1. Export and KEEP the V3 all-in-one backup from Candidate 333.
+          2. Install Candidate 339 separately; choose it as your keyboard and
+             import your V3 backup. Enable opt-in Learning manually if desired.
+          3. In a disposable draft, type asking. Press Backspace six times:
+             asking -> askin -> aski -> ask -> as -> a -> empty.
+             No seventh press should be needed; the last a must disappear.
+          4. Test ordinary deletions, long-hold Backspace, word-swipe deletion,
+             and suggestions in a messaging draft. Do not send the draft.
+          5. Keep Candidate 333 installed for rollback.
+
+          Android 35 emulator-qualified (66/66 tests). Actual Samsung Android 17
+          and Google Messages behavior still require user verification.
+          V3 learning files are plaintext; store them privately.
+
+          APK SHA256 is in the attached .sha256 asset.
+          Source commit 3bd2e877dc66a40efa172f7fa9e448ca476a2147.
+          NOTES
+          gh release create "$tag" \
+            dist/Orivra-Candidate-339.apk dist/Orivra-Candidate-339.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target 3bd2e877dc66a40efa172f7fa9e448ca476a2147 \
+            --title "Orivra Candidate 339 — Final-letter Backspace Fix" \
+            --notes-file "$RUNNER_TEMP/notes.md" --prerelease
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY"
