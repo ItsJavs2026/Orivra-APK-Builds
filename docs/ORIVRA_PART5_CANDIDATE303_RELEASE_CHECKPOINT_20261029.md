@@ -38,3 +38,6 @@
 - Wait for user's actual phone acceptance before calling Candidate 303 stable or enabling the pack by default.
 - Improve independent, truly unseen language benchmarks, measure on-device cold/warm latency/heap and double-check lifecycle cancellation.
 - Only after English engine qualification, continue isolated Spanish auto-routing and Unicode work.
+
+## Physical Samsung user feedback — after Candidate 303 install
+The user confirmed installing Candidate 303 on their Galaxy S26 Ultra Android 17. After receiving a combined test checklist covering Google Keep, prediction ON/OFF comparisons, Backspace, Safe Enter, and responsiveness, the user replied **"All good"**. Record this as **positive user-reported handset acceptance / no problems reported**. The reply did not itemize test-case results or quantify per-case accuracy, so **do not claim all individual test scenarios passed independently, 78,942-word pack improved on-device scores, or that production stability is proven**. Candidate 303 is now the newest positively tested handset candidate. Preserve Candidate 300 as the confirmed Keep-fix rollback option, and continue language improvements in a separate branch.
