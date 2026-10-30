@@ -66,6 +66,56 @@ public final class PersonalContextLearning319AndroidTest {
             PersonalLearning.setEnabled(c,wasEnabled);
         }
     }
+    @Test public void acceptedPhraseTeachesBothWordPositionsAndSafeSavedWords() {
+        Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        SharedPreferences pairs=c.getSharedPreferences(
+                PersonalContextLearning319.PREFS,Context.MODE_PRIVATE);
+        Map<String,?> original=pairs.getAll();
+        boolean originallyEnabled=PersonalLearning.enabled(c);
+        final String synthetic="flibbertik";
+        boolean createdWord=false;
+        try {
+            pairs.edit().clear().commit();
+            PersonalLearning.setEnabled(c,true);
+            PersonalContextLearning319.recordChosenPhrase(c,"please tell me");
+            assertEquals(1,pairs.getInt("pair:please:tell",0));
+            assertEquals("second relationship follows new accepted word",
+                    1,pairs.getInt("pair:tell:me",0));
+            assertTrue(PersonalContextLearning319.suggest(c,"tell",3).isEmpty());
+            PersonalContextLearning319.recordChosenPhrase(c,"please tell me");
+            assertTrue(PersonalContextLearning319.suggest(c,"tell",3)
+                    .contains("me"));
+            assertTrue(PersonalContextLearning319.suggest(c,"please",3)
+                    .contains("tell"));
+            // Unknown target cannot become a remembered context silently.
+            PersonalContextLearning319.record(c,"like",synthetic);
+            assertFalse(pairs.contains("pair:like:"+synthetic));
+            PersonalDictionary.Add saved=PersonalDictionary.add(c,synthetic);
+            assertTrue("manual word must be saved or previously exist",
+                    saved==PersonalDictionary.Add.ADDED ||
+                    saved==PersonalDictionary.Add.EXISTS);
+            createdWord=saved==PersonalDictionary.Add.ADDED;
+            PersonalContextLearning319.record(c,"like",synthetic);
+            PersonalContextLearning319.record(c,"like",synthetic);
+            assertTrue("manually saved custom word now learns from its use",
+                    PersonalContextLearning319.suggest(c,"like",3)
+                            .contains(synthetic));
+        } finally {
+            SharedPreferences.Editor restore=pairs.edit().clear();
+            for(Map.Entry<String,?> entry:original.entrySet()) {
+                Object v=entry.getValue();
+                if(v instanceof Integer)
+                    restore.putInt(entry.getKey(),(Integer)v);
+                else if(v instanceof String)
+                    restore.putString(entry.getKey(),(String)v);
+                else if(v instanceof Boolean)
+                    restore.putBoolean(entry.getKey(),(Boolean)v);
+            }
+            restore.commit();
+            if(createdWord)PersonalDictionary.remove(c,synthetic);
+            PersonalLearning.setEnabled(c,originallyEnabled);
+        }
+    }
     @Test public void protectedAndroidEditorFlagsNeverAuthorizeContextRead() {
         EditorInfo password=new EditorInfo();
         password.inputType=InputType.TYPE_CLASS_TEXT |

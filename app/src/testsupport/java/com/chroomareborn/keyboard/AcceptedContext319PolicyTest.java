@@ -44,6 +44,34 @@ public final class AcceptedContext319PolicyTest {
                 "newlines do not form cross-sentence context");
         ok(AcceptedContextPolicy319.phraseWords("single").isEmpty(),
                 "single word learning handled separately");
+        ok("tell".equals(AcceptedContextPolicy319.precedingForNextWord(
+                "please tell ")),"accepted multiword continuation: tell -> me");
+        ok("like".equals(AcceptedContextPolicy319.precedingForNextWord(
+                "we like ")),"manually saved words learn use after like");
+        ok("please".equals(SplitNextWordContextPolicy320.safePrevious(
+                "Please",true,false,false,false,false)),
+                "split right-side suggestion qualifies as explicit learned tap");
+        ok(SplitNextWordContextPolicy320.safePrevious(
+                "please",false,false,false,false,false)==null,
+                "learning toggle off blocks split context");
+        ok(SplitNextWordContextPolicy320.safePrevious(
+                "please",true,true,false,false,false)==null,
+                "private editor blocks split context");
+        ok(SplitNextWordContextPolicy320.safePrevious(
+                "please",true,false,true,false,false)==null,
+                "editing in middle blocks split context");
+        ok(SplitNextWordContextPolicy320.safePrevious(
+                "please",true,false,false,true,false)==null,
+                "selected text blocks split context");
+        ok(SplitNextWordContextPolicy320.safePrevious(
+                "please",true,false,false,false,true)==null,
+                "text after caret blocks split context");
+        ok(SplitNextWordContextPolicy320.safePrevious(
+                "privateName",true,false,false,false,false)==null,
+                "personal name not included in split context");
+        ok(SplitNextWordContextPolicy320.safePrevious(
+                "please call",true,false,false,false,false)==null,
+                "raw multi-word composing text never persisted");
         System.out.println("PASS: AcceptedContext319PolicyTest "+n+" cases");
     }
 }

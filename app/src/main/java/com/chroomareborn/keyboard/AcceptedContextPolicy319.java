@@ -18,7 +18,13 @@ final class AcceptedContextPolicy319 {
         "would","should","do","does","did","have","has","had","need",
         "want","please","let","lets","yes","no","hello","hi","this",
         "that","these","those","some","any","all","more","less","much",
-        "really","very","so","just","now","today","tomorrow","again");
+        "really","very","so","just","now","today","tomorrow","again",
+        // Everyday safe words that can precede another accepted word.
+        // Example: tapping 'please tell me' should learn both 'please tell'
+        // AND 'tell me' without retaining the three-word phrase.
+        "tell","say","ask","know","think","like","new","write","read",
+        "work","try","call","come","go","get","make","help","give","take",
+        "see","start","stop","finish","send","show","look","feel");
     static String safeWord(String input) {
         if(input==null || input.length()<1 || input.length()>20 ||
                 !input.matches("[A-Za-z]+"))return null;

@@ -33,13 +33,13 @@ final class PersonalContextLearning319 {
         int old=prefs.getInt(key,0);
         prefs.edit().putInt(key,Math.min(1000,old+1)).apply();
     }
+    private static boolean publicTarget(String normalized) {
+        return PredictionLite.publicWordForContext(normalized) ||
+                (normalized.indexOf('\'')>=0 &&
+                 PredictionLite.publicWordForContext(normalized.replace("'","")));
+    }
     private static boolean approvedTarget(Context c,String normalized) {
-        if(PredictionLite.publicWordForContext(normalized))return true;
-        // Punctuation-normalized public contractions are safe too; reject
-        // arbitrary possessive names, since only a known base can qualify.
-        if(normalized.indexOf('\'')>=0 &&
-                PredictionLite.publicWordForContext(normalized.replace("'","")))
-            return true;
+        if(publicTarget(normalized))return true;
         // A previously unknown word is eligible only after the user manually
         // saved it, so the context store does not silently collect names.
         for(String saved:PersonalDictionary.savedWords(c)) {
@@ -60,14 +60,29 @@ final class PersonalContextLearning319 {
         SharedPreferences prefs=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
         String prefix=PREFIX+left+":";
         ArrayList<Map.Entry<String,Integer>> sorted=new ArrayList<>();
+        // A new word may be personally saved. Resolve that tiny list ONCE
+        // per suggestion refresh, never inside every stored pair lookup.
+        // The keyboard's UI thread shouldn't scan 240 x 250 words per idle
+        // prediction, particularly on fast taps after Space.
+        java.util.Set<String> personalWords=null;
         for(Map.Entry<String,?> entry:prefs.getAll().entrySet()) {
             if(!entry.getKey().startsWith(prefix) ||
                     !(entry.getValue() instanceof Integer))continue;
             int count=(Integer)entry.getValue();
             String target=entry.getKey().substring(prefix.length());
             if(count<2 || count>1000 ||
-                    !target.equals(AcceptedContextPolicy319.acceptedWord(target)) ||
-                    !approvedTarget(c,target))continue;
+                    !target.equals(AcceptedContextPolicy319.acceptedWord(target)))
+                continue;
+            if(!publicTarget(target)) {
+                if(personalWords==null) {
+                    personalWords=new java.util.HashSet<>();
+                    for(String word:PersonalDictionary.savedWords(c)) {
+                        String normalized=AcceptedContextPolicy319.acceptedWord(word);
+                        if(normalized!=null)personalWords.add(normalized);
+                    }
+                }
+                if(!personalWords.contains(target))continue;
+            }
             sorted.add(Map.entry(target,count));
         }
         sorted.sort(Comparator.<Map.Entry<String,Integer>>comparingInt(

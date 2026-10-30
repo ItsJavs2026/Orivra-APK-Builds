@@ -2372,6 +2372,15 @@ public final class RebornImeService extends InputMethodService {
                 || !splitPredictionsEnabled() || !splitNextWords.contains(next))return false;
         InputConnection ic=getCurrentInputConnection();
         if(ic==null)return false;
+        // A split next-word chip is ALSO an explicit acceptance.
+        // Candidate 319 missed this path, so users' most natural taps
+        // were not contributing to contextual learning. Capture only
+        // a closed-list safe word, not any surrounding sentence text.
+        final String acceptedPrior=SplitNextWordContextPolicy320.safePrevious(
+                expected,editorAllowsPersonalLearning &&
+                        PersonalLearning.enabled(this),sensitive,
+                editingInMiddle,hasSelection(),cursorHasTextAfter());
+        final long sourceSession=inputSessionGeneration;
         boolean committed=false;
         ic.beginBatchEdit();
         try {
@@ -2380,6 +2389,12 @@ public final class RebornImeService extends InputMethodService {
         } finally {ic.endBatchEdit();}
         if(committed) {
             composing="";
+            // Editor can switch while a split chip completes; never learn
+            // from a stale input session or a rejected host commit.
+            if(acceptedPrior!=null && sourceSession==inputSessionGeneration &&
+                    ic==getCurrentInputConnection() &&
+                    editorAllowsPersonalLearning && !sensitive)
+                PersonalContextLearning319.record(this,acceptedPrior,next);
             confirmSuggestionTap(source);
             updateSentenceShift();
             showSuggestions();
