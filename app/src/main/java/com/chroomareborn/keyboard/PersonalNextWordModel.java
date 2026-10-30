@@ -155,9 +155,13 @@ final class PersonalNextWordModel {
     private static void addScores(Map<String,Double> scores,
                                   Map<String,Integer> counts,double weight) {
         if(counts==null)return;
-        for(Map.Entry<String,Integer> e:counts.entrySet())
+        for(Map.Entry<String,Integer> e:counts.entrySet()) {
+            // Never promote a one-off tap sequence. Two independently
+            // completed repetitions are the minimum for session learning.
+            if(e.getValue()<2)continue;
             scores.put(e.getKey(),scores.getOrDefault(e.getKey(),0.0)
                     +weight*e.getValue());
+        }
     }
 
     synchronized int observationCount() { return observations; }
