@@ -3349,13 +3349,11 @@ public final class RebornImeService extends InputMethodService {
         if(options.isEmpty()) {
             if(!PredictionStripStability342.showPrivateStatus(
                     sensitive,editorAllowsSuggestions)) {
-                // No "Keep typing" or "NW OFF" message in an ordinary editor.
-                // Leave the fixed-height prediction strip quiet. Repeated
-                // callbacks must NOT recreate views/force keyboard relayout.
-                if(!"quiet342".equals(candidates.getTag())) {
-                    candidates.removeAllViews();
-                    candidates.setTag("quiet342");
-                }
+                // No "Keep typing" or "NW OFF" in an ordinary editor.
+                // Keep the SAME three TextViews hidden, rather than tearing
+                // down the strip when a fast backspace temporarily clears it.
+                // This also prevents an extra rebuild at the next letter.
+                PredictionStripContinuity345.clearQuietRow(candidates,this);
                 return;
             }
             String status=sensitive?"Private field • predictions off":
