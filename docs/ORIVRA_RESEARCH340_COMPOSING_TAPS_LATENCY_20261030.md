@@ -30,8 +30,13 @@ source commit `3bd2e877dc66a40efa172f7fa9e448ca476a2147`.
   successfully committed words at Space boundaries (with editor privacy,
   opt-in, selection and same-session gates). New words can contribute to
   **in-memory** bigram/trigram suggestions after repeated observed sequences.
-  One occurrence is insufficient. This transient memory clears on editor
-  changes and opt-out, and never auto-replaces typed text.
+  One occurrence is insufficient. The display can join several confident
+  next words into one explicitly tappable phrase chip (for example,
+  `I need to continue` can later suggest `need to continue` after `I`).
+  The single-letter standalone words `I` and `a` are allowed through
+  a special verified tap boundary; arbitrary one-letter fragments are not.
+  This transient memory clears on editor changes and opt-out, and never
+  auto-replaces typed text.
 - `CandidateLatencyMetrics` additionally measures synchronous typed-key UI
   work, with opt-in in-memory duration statistics only (median/p95/max).
   No key identity, text, editor content or app identifiers are recorded.
