@@ -54,18 +54,21 @@ final class PersonalLearning {
         if(input==null)return null;
         String prefix = PREFIX + input + ":";
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String best = null;
-        int bestCount = 1; // Require at least two intentional acceptances.
+        // V2.1: preserve the V1 key schema, but never promote a tied
+        // correction based on SharedPreferences iteration order. We only
+        // read learned pairs; no editor contents or full sentences persist.
+        Map<String,Integer> acceptedCounts=new HashMap<>();
         for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
             if (!entry.getKey().startsWith(prefix) || !(entry.getValue() instanceof Integer))
                 continue;
-            int count = (Integer) entry.getValue();
-            if (LearningV2Policy.reinforced(count) && count > bestCount) {
-                best = entry.getKey().substring(prefix.length());
-                bestCount = count;
-            }
+            String choice=entry.getKey().substring(prefix.length());
+            String canonical=EnglishApostrophePolicy.canonical(choice);
+            int count=(Integer)entry.getValue();
+            if(canonical==null||canonical.equals(input)||count<1||count>1000)
+                continue;
+            acceptedCounts.merge(canonical,count,Math::max);
         }
-        return best;
+        return LearningV2Policy.preferred(typed,acceptedCounts);
     }
 
     /** Safe aggregate diagnostics: no typed words, phrases, or editor content. */
