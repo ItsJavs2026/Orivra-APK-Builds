@@ -3038,7 +3038,7 @@ public final class RebornImeService extends InputMethodService {
                                     initial,personalizedPrefix340(cursorWord),
                                     PredictionLite.publicWordForContext(
                                             cursorWord.toLowerCase(java.util.Locale.ROOT)));
-                        renderSuggestions(cursorWord,initial);
+                        renderImmediateSuggestions345(cursorWord,initial);
                         visibleEditingTicket=ticket;
                         final long startedAt=CandidateLatencyMetrics.start(getPackageName());
                         predictionDispatcher.scheduleEditing(cursorWord,(id,input,options)->{
@@ -3082,7 +3082,7 @@ public final class RebornImeService extends InputMethodService {
                 java.util.List<String> immediately=
                         CursorWordCorrectionPolicy.safeOptions(word,
                                 EnglishApostrophePolicy.suggestions(word));
-                renderSuggestions(word,immediately);
+                renderImmediateSuggestions345(word,immediately);
                 if(editTicket==null)return; // No trustworthy editor snapshot.
                 visibleEditingTicket=editTicket;
                 final long startedAt=CandidateLatencyMetrics.start(getPackageName());
