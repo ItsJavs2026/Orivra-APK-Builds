@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build340trial"
+        applicationId = "com.chroomareborn.keyboard.build342trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 340
-        versionName = "1.0.34-build340-composing-tap-learning"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 340"
+        versionCode = 342
+        versionName = "1.0.35-build342-stable-prediction-strip"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 342"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 340"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 342"
         }
     }
     compileOptions {
