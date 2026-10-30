@@ -112,6 +112,10 @@ public final class RebornImeService extends InputMethodService {
         } catch(RuntimeException detachedEditor) { return false; }
     }
     private String latestSnapshot="";
+    // Last settled candidate batch for one live editor only. Used to keep
+    // side-chip visuals stable during the short immediate->async gap.
+    private long lastSettledStripTime345=-1L;
+    private long lastSettledStripSession345=-1L;
     private String manualCollapseSnapshot="";
     private boolean toolbarExpanded = false;
     private static final String HAPTIC_PREF = "orivra_haptic_enabled";
@@ -1381,6 +1385,9 @@ public final class RebornImeService extends InputMethodService {
         personalPrefixCache340.clear();
         splitSnapshot340=null;
         idleWordTicket340=null;
+        lastSettledStripTime345=-1L;
+        lastSettledStripSession345=-1L;
+        latestSnapshot="";
         resetKeyEcho342();
         tappedSequence340.clear();
         clearTapSequence340();
@@ -1427,6 +1434,9 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onFinishInput() {
+        lastSettledStripTime345=-1L;
+        lastSettledStripSession345=-1L;
+        latestSnapshot="";
         cancelStableWord329();
         stableWordCounted329="";
         stableWordSession329=-1L;
@@ -3158,7 +3168,7 @@ public final class RebornImeService extends InputMethodService {
         java.util.ArrayList<String> immediate342=new java.util.ArrayList<>();
         immediate342.add(snapshot);
         immediate342.addAll(EnglishApostrophePolicy.suggestions(snapshot));
-        renderSuggestions(snapshot,AdaptivePrefixPolicy328.merge(
+        renderImmediateSuggestions345(snapshot,AdaptivePrefixPolicy328.merge(
                 snapshot,immediate342,personalized328,
                 PredictionLite.publicWordForContext(
                         snapshot.toLowerCase(java.util.Locale.ROOT))));
@@ -3221,7 +3231,17 @@ public final class RebornImeService extends InputMethodService {
                 CandidateLatencyMetrics.recordFrame(startedAt,System.nanoTime());
         });
     }
+    private void renderImmediateSuggestions345(String input,List<String> options) {
+        renderSuggestions(input,options,true);
+    }
     private void renderSuggestions(String input,List<String> options) {
+        renderSuggestions(input,options,false);
+    }
+    private void renderSuggestions(String input,List<String> options,
+            boolean preliminary345) {
+        // Preserve the previous visual word only within this editor. The
+        // intermediate (fast) row is not a final prediction result.
+        final String priorVisualInput345=latestSnapshot;
         visibleEditingTicket=null;
         idleWordTicket340=null;
         if(candidates==null)return;
@@ -3384,6 +3404,21 @@ public final class RebornImeService extends InputMethodService {
         final int emphasizedIndex=primarySentence?0:1;
         final boolean stableWord344=PredictionStripFrame344.stableWord(
                 input,sensitive,editorAllowsSuggestions,longPhrase,stableSentenceStrip);
+        final long timeNow345=android.os.SystemClock.uptimeMillis();
+        final boolean keepSides345=PredictionStripContinuity345.preserveInterimSideChips(
+                priorVisualInput345,input,preliminary345,stableWord344,
+                lastSettledStripSession345==inputSessionGeneration,
+                lastSettledStripTime345<0?-1L:
+                        timeNow345-lastSettledStripTime345);
+        if(!preliminary345){
+            if(stableWord344 && options.size()>=2) {
+                lastSettledStripTime345=timeNow345;
+                lastSettledStripSession345=inputSessionGeneration;
+            } else if(!stableWord344) {
+                lastSettledStripTime345=-1L;
+                lastSettledStripSession345=-1L;
+            }
+        }
         final int shownCount=stableWord344?3:
                 SuggestionStripLayoutPolicy.shownCount(
                         options.size(),stableSentenceStrip);
@@ -3413,6 +3448,14 @@ public final class RebornImeService extends InputMethodService {
             int childIndex=SuggestionStripLayoutPolicy.chipChildIndex(i,emptyInput);
             TextView option=reuseCells?(TextView)candidates.getChildAt(childIndex):new TextView(this);
             if(stableWord344 && suggestion.isEmpty()){
+                // The original 344 fix retained the VIEWS, but hid both side
+                // chips on every immediate one-choice frame. That visible
+                // 3->1->3 change is the flicker in the Samsung recording.
+                // Keep prior side-chip visuals briefly, NEVER their tap
+                // actions, until the real current async result arrives.
+                if(i>0 && keepSides345 &&
+                        PredictionStripContinuity345.holdVisualOnly(option))
+                    continue;
                 // INVISIBLE is intentional: unlike GONE, it does not resize
                 // adjacent predictions as the async model adds/removes chips.
                 if(option.getVisibility()!=View.INVISIBLE)
@@ -3434,6 +3477,7 @@ public final class RebornImeService extends InputMethodService {
             }
             if(option.getVisibility()!=View.VISIBLE)
                 option.setVisibility(View.VISIBLE);
+            PredictionStripContinuity345.currentChip(option);
             String shownSuggestion=suggestionCase(suggestion);
             if(!TextUtils.equals(option.getText(),shownSuggestion))
                 option.setText(shownSuggestion);
