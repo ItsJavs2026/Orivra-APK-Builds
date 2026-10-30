@@ -280,6 +280,10 @@ final class PredictionLite {
         // inflections only when base+past+participle evidence already exists.
         // Installed IME behavior, text-edit semantics and UI are unchanged.
         LexiconFamilyExpander.enrich(WORDS);
+        // Research 316: curated general-purpose words found absent by a
+        // reproducible frequency-list audit. Keep every previously ranked
+        // word's original frequency, and avoid names or private user text.
+        EverydayEnglishCore316.enrich(WORDS);
 
         for(Map.Entry<String,Integer> entry:WORDS.entrySet()) {
             int length=entry.getKey().length();

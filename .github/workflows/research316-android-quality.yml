@@ -1,0 +1,128 @@
+name: Orivra Research 316 - everyday English vocabulary
+on:
+  push:
+    branches:
+      - research/build316-everyday-english-coverage-audit-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research316-everyday
+  cancel-in-progress: true
+jobs:
+  source-and-java:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify privacy invariants and compile all existing Java regression policies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java
+          grep -Fq 'personalDataVariation' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'TYPE_TEXT_VARIATION_POSTAL_ADDRESS' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -sourcepath app/src/main/java:app/src/testsupport/java -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/JoinedEnglishContractionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/NeighborDoubleKeyCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
+            app/src/main/java/com/chroomareborn/keyboard/EverydayEnglishCore316.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PersonalDictionaryPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CommittedEnglishCursorPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorEditSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningTransferCodec.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningV21ConflictTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningTransferCodecTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorEditSnapshotGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ContractionTapOnly309Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CommittedEnglishCursorPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/JoinedEnglishContraction314Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/NeighborDoubleKey315Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EverydayEnglishCoverageAudit316.java
+          for suite in EverydayEnglishCoverageAudit316 NeighborDoubleKey315Test JoinedEnglishContraction314Test CommittedEnglishCursorPolicyTest EnglishApostropheAndLearningV2Test LearningV21ConflictTest LearningTransferCodecTest CursorEditSnapshotGuardTest ContractionTapOnly309Test EditorSuggestionPrivacyPolicyTest EnterKeyPolicyTest; do
+            java -ea -Xmx128m -cp "$RUNNER_TEMP/classes" "com.chroomareborn.keyboard.$suite"
+          done
+  android-compilation:
+    needs: source-and-java
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile Android IME and framework test source; no APK publication
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:compileDebugJavaWithJavac :app:compileDebugAndroidTestJavaWithJavac
+
+  android-35-english-caret:
+    needs: [source-and-java, android-compilation]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Build pinned attributed offline dictionary for full instrumented tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Enable KVM when available
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: >-
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest > research316-android35.log 2>&1;
+            code=$?;
+            cat research316-android35.log;
+            test "$code" -eq 0 &&
+            grep -F "BUILD SUCCESSFUL" research316-android35.log &&
+            grep -F "Finished " research316-android35.log &&
+            ! grep -E "([1-9][0-9]* failure\\(s\\)|[[:space:]]FAILED[[:space:]]|Tests on .* failed)" research316-android35.log
