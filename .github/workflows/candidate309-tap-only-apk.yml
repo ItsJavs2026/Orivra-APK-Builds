@@ -1,0 +1,215 @@
+name: Orivra Candidate 309 - Tap-only ambiguous contractions and Android prerelease
+on:
+  push:
+    branches:
+      - candidate/build309-tap-only-contractions-trial-20261029
+    paths:
+      - .github/workflows/candidate309-tap-only-apk.yml
+      - app/**
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate309-release
+  cancel-in-progress: true
+jobs:
+  source-and-java:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 00f73902cf16776c68b9f4978839703b5ea20cb8
+          path: qualified-309
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Require exact qualified Build 309 code except independent package and label
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('qualified-309/app')
+          actual=Path('app')
+          excluded={
+              'src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+              'src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
+              'src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java'
+          }
+          for tree in ('src/main/java','src/testsupport','src/androidTest'):
+              for p in (base/tree).rglob('*.java'):
+                  rel=p.relative_to(base).as_posix()
+                  if rel in excluded:continue
+                  assert p.read_bytes()==(actual/rel).read_bytes(),f'Unapproved IME/security/data source drift: {rel}'
+          assert (base/'src/main/AndroidManifest.xml').read_bytes()==(actual/'src/main/AndroidManifest.xml').read_bytes()
+          old=(base/'build.gradle.kts').read_text()
+          old=old.replace('build308trial','build309trial').replace(
+              'versionCode = 308','versionCode = 309').replace(
+              '1.0.25-build308-learning-export-import',
+              '1.0.26-build309-tap-only-contractions').replace(
+              'Orivra Candidate 308','Orivra Candidate 309')
+          assert (actual/'build.gradle.kts').read_text()==old,'APK metadata/permission drift'
+          p='src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java'
+          transformed=(base/p).read_text().replace('build308trial','build309trial')
+          assert (actual/p).read_text()==transformed,'Latency diagnostic package mismatch'
+          p='src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java'
+          transformed=(base/p).read_text().replace('build308trial','build309trial')
+          assert (actual/p).read_text()==transformed,'Android test package mismatch'
+          p='src/main/java/com/chroomareborn/keyboard/MainActivity.java'
+          transformed=(base/p).read_text().replace('Candidate 308','Candidate 309').replace(
+              'Candidate 309: Export and Import manually saved words and learned corrections',
+              "Candidate 309: Tap-only we're and how's choices now appear promptly when you type Were or hows, even after punctuation. No silent changes to correctly typed words. Export and Import manually saved words and learned corrections")
+          assert (actual/p).read_text()==transformed,'Unexpected app Settings/backup behavior difference'
+          assert (actual/'src/androidTest/java/com/chroomareborn/keyboard/AmbiguousContractionEditorAndroidTest.java').exists()
+          print('PASS: Build 309 candidate matches qualified research except independent identity and label')
+          PY
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          grep -Fq 'orivra_personal_learning_v1' app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java
+          grep -Fq 'LearningTransferStore.importConfirmed(this,parsed)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          grep -Fq '.setPositiveButton("Import locally"' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          grep -Fq 'OfflineDictionaryActivationPolicy.KEY,false' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'editorAllowsPersonalLearning' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+      - name: Re-run learning, contraction, caret and backup policy suites
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PersonalDictionaryPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorEditSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningTransferCodec.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningV21ConflictTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningTransferCodecTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorEditSnapshotGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ContractionTapOnly309Test.java
+          java -ea -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.EnglishApostropheAndLearningV2Test
+          java -ea -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.LearningV21ConflictTest
+          java -ea -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.LearningTransferCodecTest
+          java -ea -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.CursorEditSnapshotGuardTest
+          java -ea -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.ContractionTapOnly309Test
+  android-35-emulator:
+    needs: source-and-java
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Build verified offline source and include ESDB license
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          gzip -t < app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Verify independent package before emulator testing
+        run: |
+          set -euo pipefail
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/LearningTransferStoreAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PersonalLearningV2AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/IdleSuggestionCenterAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/AmbiguousContractionEditorAndroidTest.java
+          grep -Fq 'com.chroomareborn.keyboard.build309trial' app/build.gradle.kts
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          gradle --no-daemon --stacktrace :app:assembleDebug
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1 |
+            grep -Fq "package: name='com.chroomareborn.keyboard.build309trial' versionCode='309'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" | grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+      - name: Enable KVM
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -euo pipefail
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug 2>&1 | tee candidate308-android35.log
+            grep -F 'Finished 38 tests' candidate308-android35.log
+      - name: Verify tested APK identity, signer, permissions, licensed asset and SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -n "$apk" && test -s "$apk"
+          cp "$apk" dist/Orivra-Candidate-309.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" |
+            head -n 1 | tee dist/package.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build309trial' versionCode='309'" dist/package.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" |
+            tee dist/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" |
+            tee dist/permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/permissions.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+          cd dist
+          sha256sum Orivra-Candidate-309.apk > Orivra-Candidate-309.apk.sha256
+          cat Orivra-Candidate-309.apk.sha256
+      - name: Preserve verified Candidate 308 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate-308-Android35-Passed
+          path: dist/
+          retention-days: 21
+          if-no-files-found: error
+      - name: Publish isolated debug prerelease only after all Android tests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/notes.md" <<'ORIVRA_309'
+          Orivra Candidate 309 — optional contraction suggestions for Were/We're and hows/how's.
+
+          Experimental debug-signed APK, not production stable and not yet verified on the user's Samsung Android 17. Android 35 emulator qualification: 38/38 instrumentation tests, source and Java regressions. Separate application ID com.chroomareborn.keyboard.build309trial (versionCode 309). Installs alongside previous Candidate 308 and phone-tested Candidate 304 without overwriting either.
+
+          FIX: typing Were now offers a distinct, tap-only We're candidate while keeping literal Were valid. Typing Hello there. hows can offer how's even when a text editor commits each character rather than leaving an active composing span. Candidate hints appear before the slow full-sentence predictor returns. Neither alternative changes text automatically. A live caret ticket and bounded editor snapshot are revalidated before any tapped replacement, including proper apostrophe boundaries. No automatic learning of raw typing.
+
+          Preserves Candidate 304 centered idle suggestions; 300 Google Keep compatibility; 305 English contractions, 306 Learning V2.1 conflict safety, 307 explicit portable learning export/import, Safe Enter, Backspace, and optional licensed offline vocabulary.
+
+          PHONE CHECK: use a disposable ChatGPT draft, Samsung Notes or Google Keep. Type Were and check both Were/We're; type Hello there. hows and check how's. Tap the optional alternative once, verify only the current word changes. Repeat with HOWS and curly apostrophe. Check that Enter, Backspace, idle centering and Keep predictions still work. If an issue appears, switch back to Candidate 308.
+
+          Learning and offline dictionary remain opt-in; exported learning files are plaintext. No INTERNET permission, no keystroke telemetry, and no release of a stable production keyboard. CI debug signing keys may vary between releases.
+          ORIVRA_309
+          gh release create candidate-309-20261029 \
+            dist/Orivra-Candidate-309.apk dist/Orivra-Candidate-309.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 309 — Tap-Only Contraction Fix" \
+            --notes-file "$RUNNER_TEMP/notes.md" --prerelease
+          gh release view candidate-309-20261029 --repo "$GITHUB_REPOSITORY"
