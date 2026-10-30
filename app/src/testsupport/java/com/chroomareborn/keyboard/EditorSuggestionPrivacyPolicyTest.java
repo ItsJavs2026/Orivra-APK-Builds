@@ -13,6 +13,24 @@ public final class EditorSuggestionPrivacyPolicyTest {
     }
     public static void main(String[] args) {
         final String keep=EditorSuggestionPrivacyPolicy.GOOGLE_KEEP_PACKAGE;
+        // Privacy regression: a name or physical address field must remain
+        // editable, and can display ephemeral suggestions, but cannot learn.
+        for(String field:new String[]{"person-name","postal-address","phonetic-name"}) {
+            EditorSuggestionPrivacyPolicy.Decision personal=
+                    EditorSuggestionPrivacyPolicy.decide(
+                            "com.example.contacts",true,false,false,false,
+                            false,true);
+            check(!personal.sensitive,field+" is not a password editor");
+            check(personal.allowSuggestions,field+" keeps suggestions");
+            check(!personal.allowPersonalLearning,field+" never learns");
+            EditorSuggestionPrivacyPolicy.Decision searchPersonal=
+                    EditorSuggestionPrivacyPolicy.decide(
+                            "com.example.search",true,false,true,false,
+                            true,true);
+            check(!searchPersonal.sensitive,field+" gestures remain available");
+            check(searchPersonal.allowSuggestions,field+" explicit Search UI");
+            check(!searchPersonal.allowPersonalLearning,field+" cannot learn from Search");
+        }
         EditorSuggestionPrivacyPolicy.Decision normal=decide(keep,true,false,false,false);
         check(!normal.sensitive,"Keep normal notes must suggest");
         check(normal.allowSuggestions,"Keep normal notes display suggestions");
