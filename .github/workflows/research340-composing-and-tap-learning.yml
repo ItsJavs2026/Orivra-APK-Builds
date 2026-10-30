@@ -28,10 +28,12 @@ jobs:
           test -s "$root/PrefixCandidateCache340.java"
           test -s "$root/PersonalNextWordModel.java"
           test -s "$root/TappedWordBoundary340.java"
+          test -s "$root/SessionPhraseDisplay340.java"
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/ComposingMutation340AndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/PrefixCandidateCache340AndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/TappedSequence340AndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/TappedWordBoundary340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SessionPhraseDisplay340AndroidTest.java
           grep -Fq 'ComposingMutation340.append(' "$root/RebornImeService.java"
           grep -Fq 'personalizedPrefix340(input)' "$root/RebornImeService.java"
           grep -Fq 'tappedSequence340.observeCommittedWord(' "$root/RebornImeService.java"
@@ -44,7 +46,8 @@ jobs:
             "$root/ComposingMutation340.java" \
             "$root/PrefixCandidateCache340.java" \
             "$root/PersonalNextWordModel.java" \
-            "$root/TappedWordBoundary340.java"
+            "$root/TappedWordBoundary340.java" \
+            "$root/SessionPhraseDisplay340.java"
           echo 'PASS: pure-Java research classes compile; no new permission or backup schema'
 
   android35-instrumentation:
