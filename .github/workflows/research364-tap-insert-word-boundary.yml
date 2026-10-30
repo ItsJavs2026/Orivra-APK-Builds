@@ -66,7 +66,7 @@ jobs:
           helper=Path("app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java").read_text()
           assert "getSharedPreferences" not in helper
           assert "android." not in helper
-          assert "commitText(" in helper # documented only, never code
+          assert "commitText(" not in helper # pure policy; editor commits only in IME service
           assert "private static final int WINDOW=48" in helper
           manifest=Path("app/src/main/AndroidManifest.xml").read_text()
           assert "android.permission.INTERNET" not in manifest
