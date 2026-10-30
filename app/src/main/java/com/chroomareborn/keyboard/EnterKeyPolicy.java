@@ -25,11 +25,16 @@ public final class EnterKeyPolicy {
 
     /**
      * Only an explicitly declared SEARCH/GO action may execute on a short
-     * Enter tap. NO_ENTER_ACTION wins; SEND still requires a deliberate hold.
-     * Returns 0 when the host did not explicitly request a search/navigation.
+     * Enter tap. Some editable search fields are MULTI_LINE and Android
+     * automatically adds NO_ENTER_ACTION; the app's explicit SEARCH or GO
+     * declaration is still more specific than that generic formatting hint.
+     * SEND always requires a deliberate hold; no unspecified action submits.
+     * Returns 0 when no explicit search/navigation action is declared.
      */
     static int tapEditorAction(int imeOptions) {
-        if((imeOptions & IME_FLAG_NO_ENTER_ACTION)!=0)return 0;
+        // Explicit Search/Go is intent; NO_ENTER_ACTION can be automatically
+        // attached by Android for multi-line-capable search editors.
+        // Do not promote SEND, DONE, NEXT or unspecified actions.
         int action=imeOptions & IME_MASK_ACTION;
         return action==IME_ACTION_SEARCH || action==IME_ACTION_GO?action:0;
     }
