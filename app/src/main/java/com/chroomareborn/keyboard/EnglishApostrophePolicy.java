@@ -83,6 +83,10 @@ final class EnglishApostrophePolicy {
         return composing!=null && composing.matches("[A-Za-z]{1,28}");
     }
 
+    static boolean isTokenChar(char c) {
+        return Character.isLetter(c) || c=='\'' || c=='\u2019';
+    }
+
     static boolean containsApostrophe(String value) {
         return value!=null && (value.indexOf('\'')>=0 || value.indexOf('\u2019')>=0);
     }
