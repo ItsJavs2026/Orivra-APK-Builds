@@ -1,0 +1,154 @@
+name: Orivra Research 360 - caret return and whole-word prediction (NO APK)
+on:
+  push:
+    branches:
+      - research/build360-cursor-resume-composing-boundary-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research360
+  cancel-in-progress: true
+
+jobs:
+  code-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Research scope, source no-touch stability and privacy checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="9878e7e7424db87ed460227686e71a285e5997e7"
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          allowed={
+              "app/src/main/java/com/chroomareborn/keyboard/CommittedWordBoundary360.java",
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/CommittedWordBoundary360Research.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/CommittedWordBoundary360AndroidTest.java",
+              ".github/workflows/research360-cursor-resume-composition.yml",
+          }
+          assert changed==allowed,f"Unexpected / missing research files: {changed ^ allowed}"
+          old=subprocess.check_output(["git","show",base+":app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java"],text=True)
+          new=Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          assert old.count("hintPressOrder353")==new.count("hintPressOrder353")
+          assert old.count("PredictionDispatcher")==new.count("PredictionDispatcher")
+          assert "CommittedWordBoundary360.resumeWholeWordCorrection(" in new
+          assert "final CharSequence beforeKey360=ic.getTextBeforeCursor(1,0);" in new
+          assert "PunctuationSpacing.insertSpaceBeforeLetter(beforeKey360," in new
+          assert "if (!composing.isEmpty()) currentFinish();" in new
+          assert "CandidateLatencyMetrics.recordKeyHandler340(" in new
+          assert "safeComposing358" in new and "safeIdle358" in new
+          assert "SuggestionContinuity353.centerCurrentWord(input,options)" in new
+          helper=Path("app/src/main/java/com/chroomareborn/keyboard/CommittedWordBoundary360.java").read_text()
+          assert "InputConnection" in helper   # explanatory comment only
+          assert "android." not in helper
+          assert "getSharedPreferences" not in helper
+          assert "commitText(" not in helper
+          assert "setComposingText(" not in helper
+          assert "android.permission.INTERNET" not in Path("app/src/main/AndroidManifest.xml").read_text()
+          gradle=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build359trial"' in gradle
+          assert "versionCode = 359" in gradle
+          print("PASS: research only, no Candidate 359 release or touch/prediction latency changes")
+          PY
+      - name: Run 120k+ deterministic cursor-reentry regression assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/CommittedWordBoundary360.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CommittedWordBoundary360Research.java
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.CommittedWordBoundary360Research
+
+  android35-emulator:
+    needs: code-and-synthetic
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Materialize pinned offline dictionary; verify SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile research app and emulator instrumentation APKs (not released)
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Check full regression suite including five new Android cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,"Missing emulator reports"
+          total=fail=err=skip=0
+          suiteNames=[]
+          for p in reports:
+              node=ET.parse(p).getroot()
+              suites=[node] if node.tag.endswith('testsuite') else [
+                  x for x in node.iter() if x.tag.endswith('testsuite')]
+              for x in suites:
+                  total+=int(x.attrib.get('tests',0))
+                  fail+=int(x.attrib.get('failures',0))
+                  err+=int(x.attrib.get('errors',0))
+                  skip+=int(x.attrib.get('skipped',0))
+                  suiteNames.append(x.attrib.get('name',''))
+          print(f'Android35: {total} tests, {fail} failures, {err} errors, {skip} skipped')
+          assert total>=192 and fail==0 and err==0 and skip==0
+          assert any('CommittedWordBoundary360AndroidTest' in n for n in suiteNames)
+          PY
+          echo "PASS Android emulator ONLY: not Samsung proof. No APK publication."
