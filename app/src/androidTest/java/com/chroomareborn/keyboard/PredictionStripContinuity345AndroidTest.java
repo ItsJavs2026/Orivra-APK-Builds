@@ -102,6 +102,33 @@ public final class PredictionStripContinuity345AndroidTest {
                 "word","wordlongtext",true,true,true,30));
     }
 
+    @Test public void clearingOrdinarySuggestionsNeverTearsDownThreeChips(){
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            Context ctx=InstrumentationRegistry.getInstrumentation().getTargetContext();
+            LinearLayout row=new LinearLayout(ctx);
+            assertTrue(PredictionStripFrame344.ensureThreeSlots(row,ctx));
+            TextView[] stable={(TextView)row.getChildAt(0),
+                    (TextView)row.getChildAt(1),(TextView)row.getChildAt(2)};
+            for(int i=0;i<3;i++) {
+                stable[i].setText("current"+i);
+                stable[i].setVisibility(View.VISIBLE);
+                stable[i].setOnClickListener(v->fail("stale text was actionable"));
+            }
+            for(int key=0;key<300;key++) {
+                assertFalse(PredictionStripContinuity345.clearQuietRow(row,ctx));
+                assertEquals(3,row.getChildCount());
+                for(int i=0;i<3;i++){
+                    assertSame(stable[i],row.getChildAt(i));
+                    assertEquals(View.INVISIBLE,stable[i].getVisibility());
+                    assertEquals("",stable[i].getText().toString());
+                    assertFalse(stable[i].isClickable());
+                }
+                stable[0].setText("letter");
+                stable[0].setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
     @Test public void emptyOrInvisibleChipMustNeverBeFrozen(){
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
             Context ctx=InstrumentationRegistry.getInstrumentation().getTargetContext();
