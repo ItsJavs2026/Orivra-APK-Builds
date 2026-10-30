@@ -422,7 +422,7 @@ public final class MainActivity extends Activity {
         refreshTyped341.setAllCaps(false);
         refreshTyped341.setText("Refresh typed-word research counts");
         refreshTyped341.setOnClickListener(v->learningTransferIo.execute(()->{
-            final String summary;
+            String summary;
             try {
                 TypedWordEvidenceStore341.Snapshot s=
                         TypedWordEvidenceStore341.read(this);
@@ -433,9 +433,10 @@ public final class MainActivity extends Activity {
             } catch(RuntimeException invalidEvidence) {
                 summary="Local research data is invalid; clear it before reuse.";
             }
+            final String displaySummary=summary;
             runOnUiThread(()->{
                 if(isFinishing()||isDestroyed())return;
-                typedEvidenceCount341.setText(summary);
+                typedEvidenceCount341.setText(displaySummary);
             });
         }));
         root.addView(refreshTyped341);
