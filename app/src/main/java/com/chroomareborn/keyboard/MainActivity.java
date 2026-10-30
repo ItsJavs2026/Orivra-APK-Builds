@@ -591,12 +591,105 @@ public final class MainActivity extends Activity {
         scroll.addView(root);
         setContentView(scroll);
     }
+    /** Strict user-selected URI access. No broad storage permissions. */
+    @Override @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode,int resultCode,Intent result){
+        super.onActivityResult(requestCode,resultCode,result);
+        if(resultCode!=RESULT_OK || result==null || result.getData()==null)
+            return;
+        final Uri selected=result.getData();
+        if(requestCode==REQUEST_EXPORT_LEARNING){
+            learningTransferIo.execute(()->{
+                boolean saved=false;
+                try{
+                    String content=LearningTransferStore.exportText(this);
+                    LearningTransferDocumentIO.write(this,selected,content);
+                    saved=true;
+                }catch(Exception invalidOrWriteFailed){
+                    // No raw words, document path or correction values are logged.
+                }
+                final boolean success=saved;
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed())return;
+                    android.widget.Toast.makeText(this,
+                            success?"Learning backup saved to selected document.":
+                                    "Backup could not be saved.",
+                            android.widget.Toast.LENGTH_LONG).show();
+                });
+            });
+        }else if(requestCode==REQUEST_IMPORT_LEARNING){
+            learningTransferIo.execute(()->{
+                final LearningTransferCodec.Bundle parsed;
+                try{
+                    String file=LearningTransferDocumentIO.read(this,selected);
+                    parsed=LearningTransferCodec.decode(file);
+                }catch(Exception malformed){
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed())return;
+                        android.widget.Toast.makeText(this,
+                                "Invalid, damaged or oversized Orivra learning backup.",
+                                android.widget.Toast.LENGTH_LONG).show();
+                    });
+                    return;
+                }
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed())return;
+                    final LearningTransferStore.Preview preview;
+                    try{preview=LearningTransferStore.preview(this,parsed);}
+                    catch(IllegalArgumentException atCapacity){
+                        android.widget.Toast.makeText(this,
+                                "Not enough space in personal learning for this backup.",
+                                android.widget.Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    new android.app.AlertDialog.Builder(this)
+                        .setTitle("Review local learning import")
+                        .setMessage("Validated backup: "+
+                                parsed.words.size()+" saved words and "+
+                                parsed.learnedPairs.size()+" accepted correction pairs.\n"+
+                                "Will add "+preview.newWords+" words, "+preview.newPairs+
+                                " corrections and strengthen "+preview.strongerPairs+
+                                " previous counts. Importing again does not duplicate "+
+                                "or inflate entries. Learning stays in its current ON/OFF "+
+                                "state. Proceed only with a backup you recognize.")
+                        .setNegativeButton("Cancel",null)
+                        .setPositiveButton("Import locally",(dialog,which)->
+                                learningTransferIo.execute(()->{
+                                    boolean completed=false;
+                                    try{
+                                        LearningTransferStore.importConfirmed(this,parsed);
+                                        completed=true;
+                                    }catch(Exception rejected){
+                                        // No raw learned words or selected URI logged.
+                                    }
+                                    final boolean success=completed;
+                                    runOnUiThread(()->{
+                                        if(isFinishing()||isDestroyed())return;
+                                        if(learningStatsView!=null)
+                                            learningStatsView.setText(
+                                                    PersonalLearning.diagnosticSummary(this));
+                                        if(dictionaryInfoView!=null)
+                                            dictionaryInfoView.setText(
+                                                    PersonalDictionary.summary(this));
+                                        android.widget.Toast.makeText(this,
+                                                success?"Learning imported locally.":
+                                                        "Learning import could not be completed.",
+                                                android.widget.Toast.LENGTH_LONG).show();
+                                    });
+                                }))
+                        .show();
+                });
+            });
+        }
+    }
+
     @Override protected void onStop() {
         previewDispatcher.cancel();
         super.onStop();
     }
     @Override protected void onDestroy() {
         previewDispatcher.close();
+        learningTransferIo.shutdownNow();
         super.onDestroy();
     }
 }
