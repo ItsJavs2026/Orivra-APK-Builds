@@ -165,23 +165,17 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            bash -euo pipefail -c '
-              if gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug > candidate310-android35.log 2>&1; then
-                cat candidate310-android35.log
-              else
-                code=$?
-                cat candidate310-android35.log
-                echo "Android instrumentation failed. APK release BLOCKED."
-                exit "$code"
-              fi
-              grep -F "Finished 44 tests" candidate310-android35.log
-              grep -F "BUILD SUCCESSFUL" candidate310-android35.log
-              if grep -Eq "([1-9][0-9]* failure\\(s\\)|[[:space:]]FAILED[[:space:]]|Tests on .* failed)" candidate310-android35.log; then
-                echo "Failure marker found despite task success. APK release BLOCKED."
-                exit 1
-              fi
-            '
+          # The emulator action executes script through /bin/sh -c. Keep this
+          # as one folded shell command; unquoted multiline scripts can give
+          # false-green test results when only the last grep succeeds.
+          script: >-
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug > candidate310-android35.log 2>&1;
+            code=$?;
+            cat candidate310-android35.log;
+            test "$code" -eq 0 &&
+            grep -F "Finished 44 tests" candidate310-android35.log &&
+            grep -F "BUILD SUCCESSFUL" candidate310-android35.log &&
+            ! grep -E "([1-9][0-9]* failure\\(s\\)|[[:space:]]FAILED[[:space:]]|Tests on .* failed)" candidate310-android35.log
       - name: Verify tested APK identity, signer, permissions, licensed asset and SHA
         shell: bash
         run: |
