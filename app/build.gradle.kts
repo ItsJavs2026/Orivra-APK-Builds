@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build344trial"
+        applicationId = "com.chroomareborn.keyboard.build345trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 344
-        versionName = "1.0.37-build344-normal-strip-stability"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 344"
+        versionCode = 345
+        versionName = "1.0.38-build345-video-flicker"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 345"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 344"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 345"
         }
     }
     compileOptions {
