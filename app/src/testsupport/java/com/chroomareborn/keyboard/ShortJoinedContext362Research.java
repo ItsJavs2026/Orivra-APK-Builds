@@ -59,8 +59,6 @@ public final class ShortJoinedContext362Research {
                 "Punctuation not interpreted as missing space");
         eq(List.of(),suggest("https://secret"),
                 "URLs never interpreted");
-        eq(List.of(),suggest("Iam"),
-                "Disabled feature control checked below");
         eq(List.of(),ShortJoinedContext362.suggestions("Iam",
                 WORDS,Map.of()),"No supported context means no speculation");
         eq(List.of(),ShortJoinedContext362.suggestions("Iwikk",
