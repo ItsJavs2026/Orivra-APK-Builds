@@ -36,7 +36,9 @@ jobs:
               'src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java',
               'src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
               'src/main/java/com/chroomareborn/keyboard/LearningTransferDocumentIO.java',
-              'src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java'
+              'src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java',
+              'src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java',
+              'src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java'
           }
           for f in old.rglob('*'):
               if not f.is_file():continue
