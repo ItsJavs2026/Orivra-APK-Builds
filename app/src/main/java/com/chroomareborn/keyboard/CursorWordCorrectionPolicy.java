@@ -78,8 +78,15 @@ final class CursorWordCorrectionPolicy {
             i+=Character.charCount(cp);
         }
         java.util.Locale root=java.util.Locale.ROOT;
-        if(letters>0 && lower==letters)
-            return suggestion.toLowerCase(root);
+        if(letters>0 && lower==letters) {
+            String normalized=suggestion.toLowerCase(root);
+            // A first-person contraction is always written with capital I:
+            // im -> I'm, i've -> I've. Do not lower-case the chosen chip
+            // simply because the text field committed the raw word as lower.
+            if(normalized.startsWith("i'") || normalized.startsWith("i’"))
+                return "I"+normalized.substring(1);
+            return normalized;
+        }
         if(letters>=2 && upper==letters)
             return suggestion.toUpperCase(root);
         if(Character.isUpperCase(first) && upper==1 && lower==letters-1) {

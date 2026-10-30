@@ -2498,21 +2498,39 @@ public final class RebornImeService extends InputMethodService {
         }
         if(snapshot.isEmpty()) {
             predictionDispatcher.cancel();
-            // Some apps commit each key immediately and leave Orivra with no
-            // composing span. In that case a known contraction alternative
-            // must still be reachable at the live caret. The verified cursor
-            // ticket and live edit plan prevent stale or cross-editor edits.
+            // Editors that commit every character (Search/Keep and others)
+            // have no composing span. Offer ordinary English spelling
+            // corrections as well as contractions, always as explicit taps.
+            // The same immutable caret ticket protects the live word; do not
+            // replace text using an old suggestion after typing or navigating.
             if(!editingInMiddle && !hasSelection() && !cursorHasTextAfter()) {
                 final String cursorWord=wordAtCursor();
-                if(EnglishApostrophePolicy.hasDistinctSuggestion(cursorWord)) {
+                if(CommittedEnglishCursorPolicy.eligible(
+                        cursorWord,false,editingInMiddle,false,false,
+                        sensitive,editorAllowsSuggestions)) {
                     final CursorEditSnapshotGuard.Ticket ticket=
                             captureEditingTicket(cursorWord);
                     if(ticket!=null) {
                         renderSuggestions(cursorWord,
-                                CursorWordCorrectionPolicy.safeOptions(
-                                        cursorWord,
-                                        EnglishApostrophePolicy.suggestions(cursorWord)));
+                                CommittedEnglishCursorPolicy.immediate(cursorWord));
                         visibleEditingTicket=ticket;
+                        final long startedAt=CandidateLatencyMetrics.start(getPackageName());
+                        predictionDispatcher.scheduleEditing(cursorWord,(id,input,options)->{
+                            final long computedAt=startedAt==0L?0L:System.nanoTime();
+                            suggestionHandler.post(()->{
+                                if(!predictionDispatcher.isCurrent(id) ||
+                                        candidates==null || sensitive ||
+                                        !editorAllowsSuggestions || !composing.isEmpty() ||
+                                        !input.equals(wordAtCursor()) ||
+                                        !isEditingTicketCurrent(ticket))return;
+                                renderSuggestions(input,
+                                        CommittedEnglishCursorPolicy.merge(input,options));
+                                visibleEditingTicket=ticket;
+                                if(CandidateLatencyMetrics.recordReady(
+                                        startedAt,computedAt,System.nanoTime()))
+                                    recordNextCandidateFrame(id,startedAt);
+                            });
+                        });
                         return;
                     }
                 }
