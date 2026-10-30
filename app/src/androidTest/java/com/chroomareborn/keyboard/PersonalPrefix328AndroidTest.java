@@ -52,6 +52,27 @@ public final class PersonalPrefix328AndroidTest {
             for(int i=0;i<7;i++)PersonalWordFrequency328.recordCommitted(c,"my");
             assertTrue("short words can learn",PersonalWordFrequency328
                     .matching(c,"m",3).contains("my"));
+            PersonalWordFrequency328.recordCommitted(c,"can't");
+            PersonalWordFrequency328.recordCommitted(c,"ain't");
+            PersonalWordFrequency328.recordCommitted(c,"that's");
+            PersonalWordFrequency328.recordCommitted(c,"I'm");
+            assertEquals(1,p.getInt("word:can't",0));
+            assertEquals(1,p.getInt("word:ain't",0));
+            assertEquals(1,p.getInt("word:that's",0));
+            assertEquals(1,p.getInt("word:i'm",0));
+            PersonalWordFrequency328.recordCommitted(c,"javier's");
+            PersonalWordFrequency328.recordCommitted(c,"someone's");
+            assertFalse("unapproved possessive cannot be learned",
+                    p.contains("word:javier's"));
+            assertFalse(p.contains("word:someone's"));
+            // Existing V3 export must carry approved contractions without
+            // adding a new backup format.
+            FrequencyBackupFormat330.Data verified=FrequencyBackupFormat330.decode(
+                    LearningTransferStore.exportV3(c));
+            assertEquals(1,(int)verified.frequencies.get("can't"));
+            assertEquals(1,(int)verified.frequencies.get("ain't"));
+            assertEquals(1,(int)verified.frequencies.get("that's"));
+            assertEquals(1,(int)verified.frequencies.get("i'm"));
             PersonalWordFrequency328.recordCommitted(c,"1234");
             PersonalWordFrequency328.recordCommitted(c,"privateunknown");
             assertFalse(p.contains("word:1234"));

@@ -26,6 +26,9 @@ final class EnglishApostrophePolicy {
             "who'll","who's","won't","wouldn't","you'd","you'll",
             "you're","you've","y'all"
     ));
+    // Exact, curated contractions are public English vocabulary, not a
+    // guess from someone's possessive name or surrounding private text.
+    private static final java.util.Set<String> PUBLIC_CONTRACTIONS;
     private static final Map<String,String> UNAMBIGUOUS_MISSING_MARK;
     // These exact normal English words are valid as typed. Their
     // apostrophized meanings are OPTIONAL tap-only choices, never silent
@@ -33,12 +36,15 @@ final class EnglishApostrophePolicy {
     private static final Map<String,String> AMBIGUOUS_TAP_ONLY;
     static {
         Map<String,String> words=new LinkedHashMap<>();
+        java.util.HashSet<String> known=new java.util.HashSet<>();
         for(String original:FORMS){
             String key=canonical(original);
             if(key==null)throw new AssertionError("Invalid built-in form");
+            known.add(key);
             // Already-valid ordinary words like "were", "its", "well",
             // "shell", "id", "ill" must NOT be converted automatically.
         }
+        PUBLIC_CONTRACTIONS=Collections.unmodifiableSet(known);
         for(String pair:new String[]{
                 "aint=ain't","arent=aren't","cant=can't",
                 "couldnt=couldn't","didnt=didn't","doesnt=doesn't",
@@ -74,6 +80,15 @@ final class EnglishApostrophePolicy {
             if(Character.isLetter(value.charAt(i)))letters++;
         if(letters<2||letters>28)return null;
         return value.toLowerCase(Locale.ROOT);
+    }
+
+    /** Treat ONLY bundled, exact English contractions as public words in
+     * opt-in frequency/context learning and portable backup validation.
+     * Possessive names and arbitrary apostrophe tokens remain unapproved.
+     */
+    static boolean publicContraction(String normalized) {
+        return normalized!=null && normalized.equals(canonical(normalized)) &&
+                PUBLIC_CONTRACTIONS.contains(normalized);
     }
 
     /** An incomplete in-progress word is permitted to end in apostrophe. */
