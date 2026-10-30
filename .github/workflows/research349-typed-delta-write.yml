@@ -1,0 +1,173 @@
+name: Orivra Research 349 - incremental verified-word storage (no phone APK)
+on:
+  push:
+    branches:
+      - research/build349-delta-typed-evidence-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research349
+  cancel-in-progress: true
+jobs:
+  java-and-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: candidate/build347-typed-learning-v4-test-20261030
+          path: frozen347
+          persist-credentials: false
+      - name: Preserve Candidate 347 release code except tested revocation classes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C frozen347 rev-parse HEAD)" = "1a1b694a12ca4d4e3bf70be6bf25c6ea0c398022"
+          python3 - <<'PY'
+          from pathlib import Path
+          old=Path('frozen347/app')
+          root=Path('app')
+          permitted={
+              'src/main/java/com/chroomareborn/keyboard/PersonalLearning.java',
+              'src/main/java/com/chroomareborn/keyboard/TypedWordsConsent341.java',
+              'src/main/java/com/chroomareborn/keyboard/TypedWordBoundaryStore346.java',
+              'src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java'
+          }
+          for f in old.rglob('*'):
+              if not f.is_file():continue
+              rel=f.relative_to(old)
+              current=root/rel
+              assert current.exists(),f'Missing baseline file: {rel}'
+              if rel.as_posix() in permitted:continue
+              assert f.read_bytes()==current.read_bytes(),f'Unapproved Candidate 347 drift: {rel}'
+          stem=root/'src/main/java/com/chroomareborn/keyboard'
+          consent=(stem/'TypedWordsConsent341.java').read_text()
+          worker=(stem/'TypedWordLearningWorker346.java').read_text()
+          boundary=(stem/'TypedWordBoundaryStore346.java').read_text()
+          old_learning=(stem/'PersonalLearning.java').read_text()
+          assert 'LIVE_REVISION' in consent
+          assert 'invalidateLiveSessions()' in consent
+          assert 'TypedWordsConsent341.invalidateLiveSessions()' in old_learning
+          assert 'visibleRevision!=TypedWordsConsent341.liveRevision()' in worker
+          assert 'workerRevision!=capturedRevision' in worker
+          assert 'capturedLiveRevision' in boundary
+          assert (root/'src/androidTest/java/com/chroomareborn/keyboard/TypedWordRevocation348AndroidTest.java').exists()
+          delta=(stem/'TypedWordDelta349.java')
+          assert delta.is_file()
+          assert 'changedEntries(' in delta.read_text()
+          assert 'TypedWordDelta349.changedEntries(' in boundary
+          assert '.edit().clear()' not in boundary
+          assert (root/'src/androidTest/java/com/chroomareborn/keyboard/TypedWordDelta349AndroidTest.java').exists()
+          assert 'android.permission.INTERNET' not in (root/'src/main/AndroidManifest.xml').read_text()
+          assert 'android:allowBackup="false"' in (root/'src/main/AndroidManifest.xml').read_text()
+          print('PASS: Candidate 347 release files unchanged except verified word-worker privacy and incremental store classes')
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Validate privacy, incremental changes, and unchanged prediction bar
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=app/src/main/java/com/chroomareborn/keyboard
+          grep -Fq 'LIVE_REVISION' "$root/TypedWordsConsent341.java"
+          grep -Fq 'TypedWordsConsent341.liveRevision()' "$root/TypedWordLearningWorker346.java"
+          grep -Fq 'TypedWordsConsent341.liveRevision()!=capturedLiveRevision' "$root/TypedWordBoundaryStore346.java"
+          grep -Fq 'TypedWordsConsent341.invalidateLiveSessions()' "$root/PersonalLearning.java"
+          grep -Fq 'TypedWordBoundaryStore346.record(' "$root/TypedWordLearningWorker346.java"
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TypedWordRevocation348AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TypedWordDelta349AndroidTest.java
+          test -s "$root/TypedWordDelta349.java"
+          grep -Fq 'TypedWordDelta349.changedEntries(' "$root/TypedWordBoundaryStore346.java"
+          ! grep -Fq '.edit().clear()' "$root/TypedWordBoundaryStore346.java"
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          echo 'PASS: no change to keyboard code; live permission revocation, verified delta-only storage'
+  android35-instrumentation:
+    needs: java-and-privacy
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Materialize pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile research 349 Java and Android tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration when present
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Check test report exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d app/build/outputs/androidTest-results/connected
+          ! grep -R -E '<failure|<error' app/build/outputs/androidTest-results/connected --include='*.xml'
+      - name: Upload anonymized test reports only (no APK or user data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Research349-TestReports
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Verify all Android regression tests; do not publish an APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          count=failed=errors=skipped=0
+          for f in reports:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  x for x in root.iter() if x.tag.endswith('testsuite')]
+              for x in suites:
+                  count+=int(x.attrib.get('tests',0))
+                  failed+=int(x.attrib.get('failures',0))
+                  errors+=int(x.attrib.get('errors',0))
+                  skipped+=int(x.attrib.get('skipped',0))
+          print(f'Research 349 Android 35 emulator: {count} tests, {failed} failures, {errors} errors, {skipped} skips')
+          assert count>=153 and failed==0 and errors==0 and skipped==0,'Unqualified tests'
+          PY
+          echo 'PASS: Research 349 qualified. No APK release created; Candidates 347 and 350 remain unchanged.'
