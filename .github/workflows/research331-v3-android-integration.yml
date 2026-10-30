@@ -34,6 +34,9 @@ jobs:
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/FrequencyTransfer331AndroidTest.java
           grep -Fq 'LearningTransferStore.exportV3(this)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
           grep -Fq 'LearningTransferStore.importV3Confirmed(this,parsed)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          grep -Fq 'FrequencyBackupFormat330.decode(file)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          grep -Fq 'Preview importV2Confirmed' app/src/main/java/com/chroomareborn/keyboard/LearningTransferStore.java || grep -Fq 'static Preview importV2Confirmed' app/src/main/java/com/chroomareborn/keyboard/LearningTransferStore.java
+          grep -Fq 'static Preview importConfirmed' app/src/main/java/com/chroomareborn/keyboard/LearningTransferStore.java
           grep -Fq 'orivra-word-frequency-v3-backup.txt' app/src/main/java/com/chroomareborn/keyboard/LearningTransferDocumentIO.java
           grep -Fq 'LearningTransferStore.exportV2(this)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
           grep -Fq 'LearningTransferStore.exportText(this)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
@@ -45,8 +48,6 @@ jobs:
           grep -Fq 'orivra-context-learning-v2-backup.txt' app/src/main/java/com/chroomareborn/keyboard/LearningTransferDocumentIO.java
 
           grep -Fq 'LearningTransferStore.exportV2(this)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
-          grep -Fq 'ContextBackupFormat322.decode(file)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
-          grep -Fq 'LearningTransferStore.importV2Confirmed(this,parsed)' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
           grep -Fq 'LearningTransferStore.exportV2' app/src/androidTest/java/com/chroomareborn/keyboard/ContextBackupTransfer325AndroidTest.java
           grep -Fq 'static String exportText(Context context)' app/src/main/java/com/chroomareborn/keyboard/LearningTransferStore.java
 
