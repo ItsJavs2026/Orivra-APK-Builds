@@ -1,0 +1,150 @@
+name: Orivra Research 341 - gated Android typed-word memory and consent
+on:
+  push:
+    branches:
+      - research/build341-android-gated-store-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research341-android
+  cancel-in-progress: true
+jobs:
+  java-and-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Check regression files, offline permissions and source wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=app/src/main/java/com/chroomareborn/keyboard
+          test -s "$root/ComposingMutation340.java"
+          test -s "$root/PrefixCandidateCache340.java"
+          test -s "$root/PersonalNextWordModel.java"
+          test -s "$root/TappedWordBoundary340.java"
+          test -s "$root/SessionPhraseDisplay340.java"
+          test -s "$root/NextWordTapTicket340.java"
+          test -s "$root/TypedSequenceArchive341.java"
+          test -s "$root/TypedLearningV4Codec341.java"
+          test -s "$root/TypedWordsConsent341.java"
+          test -s "$root/TypedWordEvidenceStore341.java"
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TypedWordEvidenceStore341AndroidTest.java
+          ! grep -Fq 'TypedWordEvidenceStore341.persist(' "$root/RebornImeService.java"
+          grep -Fq 'Research only — typed-word storage permission' "$root/MainActivity.java"
+          git fetch --no-tags --depth=1 origin 141b6275df50bd8853e9a47503387862b3a4e37e
+          git show 141b6275df50bd8853e9a47503387862b3a4e37e:app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java |
+            cmp - "$root/RebornImeService.java"
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ComposingMutation340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PrefixCandidateCache340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TappedSequence340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TappedWordBoundary340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SessionPhraseDisplay340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/NextWordTapTicket340AndroidTest.java
+          grep -Fq 'ComposingMutation340.append(' "$root/RebornImeService.java"
+          grep -Fq 'personalizedPrefix340(input)' "$root/RebornImeService.java"
+          grep -Fq 'tappedSequence340.observeCommittedWord(' "$root/RebornImeService.java"
+          grep -Fq 'LearningTransferStore.exportV3(this)' "$root/MainActivity.java"
+          grep -Fq 'LearningTransferStore.importV3Confirmed(this,parsed)' "$root/MainActivity.java"
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          ! grep -Fq 'inputSessionGeneration==inputSessionGeneration' "$root/RebornImeService.java"
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -sourcepath app/src/main/java -d "$RUNNER_TEMP/classes" \
+            "$root/ComposingMutation340.java" \
+            "$root/PrefixCandidateCache340.java" \
+            "$root/PersonalNextWordModel.java" \
+            "$root/TappedWordBoundary340.java" \
+            "$root/SessionPhraseDisplay340.java" \
+            "$root/NextWordTapTicket340.java" \
+            "$root/TypedSequenceArchive341.java" \
+            "$root/TypedLearningV4Codec341.java"
+          echo 'PASS: pure-Java research classes compile; no new permission or backup schema'
+
+  android35-instrumentation:
+    needs: java-and-privacy
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Materialize pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile Android research branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration when present
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Verify 98+ instrumented tests and no skips
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          count=fail=errors=skipped=0
+          for p in reports:
+              root=ET.parse(p).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [x for x in root.iter() if x.tag.endswith('testsuite')]
+              for x in suites:
+                  count+=int(x.attrib.get('tests','0'))
+                  fail+=int(x.attrib.get('failures','0'))
+                  errors+=int(x.attrib.get('errors','0'))
+                  skipped+=int(x.attrib.get('skipped','0'))
+          print(f'Android research 341: {count} tests, {fail} failures, {errors} errors, {skipped} skips')
+          assert count>=98 and fail==0 and errors==0 and skipped==0, 'Android suite incomplete or failing'
+          PY
+      - name: Check test report exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d app/build/outputs/androidTest-results/connected
+          ! grep -R -E '<failure|<error' app/build/outputs/androidTest-results/connected --include='*.xml'
+      - name: Upload anonymized test reports only (no APK or user data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Research341-Android-TestReports
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          retention-days: 7
+          if-no-files-found: ignore
