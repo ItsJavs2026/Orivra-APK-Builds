@@ -91,6 +91,8 @@ public final class SearchEditorActionsAndroidTest {
             assertNotNull(connection);
             var privacy=RebornImeService.editorPrivacyDecision(info);
             assertFalse("ordinary search is not a private password",privacy.sensitive);
+            assertTrue("explicit Search still permits ephemeral predictions",
+                    privacy.allowSuggestions);
             assertFalse("NO_SUGGESTIONS must not learn",privacy.allowPersonalLearning);
             CharSequence before=connection.getTextBeforeCursor(64,0);
             CharSequence after=connection.getTextAfterCursor(64,0);
