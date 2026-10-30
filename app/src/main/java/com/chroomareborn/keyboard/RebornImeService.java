@@ -2163,6 +2163,9 @@ public final class RebornImeService extends InputMethodService {
                 value, sensitive, editingInMiddle, hasSelection(), cursorHasTextAfter())) {
             if (!composing.isEmpty()) currentFinish();
             ic.commitText(" ", 1);
+            lastTappedWord340="";
+            lastTappedSession340=-1L;
+            tappedSequence340.resetContext();
             // The same keystroke should use sentence-case after ! or ?.
             // Commas remain lowercase; the pure-Java boundary detector decides.
             updateSentenceShift();
@@ -2200,25 +2203,23 @@ public final class RebornImeService extends InputMethodService {
             appendComposing340(ic,value);
         }
         if (!value.matches("[A-Za-z]")) updateSentenceShift();
-        // Only an actual key entered through this IME can teach the transient
-        // word sequence. Do not infer learning from pasted/editor-only text.
-        if(value.matches("[A-Za-z]") &&
-                editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
-                !sensitive && !editingInMiddle && !hasSelection() &&
-                !cursorHasTextAfter() && !numericEditor && !symbols) {
-            String visible=composing.isEmpty()?wordAtCursor():composing;
-            CharSequence before=ic.getTextBeforeCursor(96,0);
-            String normalized=TappedWordBoundary340.verified(visible,before);
-            if(normalized!=null &&
-                    ic==getCurrentInputConnection() &&
-                    typeSession340==inputSessionGeneration &&
-                    before!=null && before.toString().endsWith(value)) {
-                lastTappedWord340=normalized;
-                lastTappedSession340=inputSessionGeneration;
-            } else {
-                lastTappedWord340="";
-                lastTappedSession340=-1L;
-            }
+        // An actual letter tap extends only the current short in-memory
+        // candidate. Do NOT do an extra editor IPC/regex scan per keystroke:
+        // a single live boundary verification happens when Space commits.
+        boolean safeTap340=editorAllowsPersonalLearning &&
+                PersonalLearning.enabled(this) && !sensitive &&
+                !editingInMiddle && !hasSelection() &&
+                !numericEditor && !symbols &&
+                ic==getCurrentInputConnection() &&
+                typeSession340==inputSessionGeneration;
+        boolean wordChar340=value.length()==1 &&
+                ((value.charAt(0)>='A' && value.charAt(0)<='Z') ||
+                 (value.charAt(0)>='a' && value.charAt(0)<='z') ||
+                 (apostropheInsideWord && value.charAt(0)=='\''));
+        if(safeTap340 && wordChar340 && lastTappedWord340.length()<32) {
+            if(lastTappedSession340!=typeSession340)lastTappedWord340="";
+            lastTappedWord340+=value;
+            lastTappedSession340=typeSession340;
         } else {
             lastTappedWord340="";
             lastTappedSession340=-1L;
@@ -2402,9 +2403,10 @@ public final class RebornImeService extends InputMethodService {
             try {
                 String verified=TappedWordBoundary340.verified(
                         visible,ic.getTextBeforeCursor(96,0));
-                if(lastTappedWord340.equals(verified) &&
+                if(verified!=null &&
+                        verified.equalsIgnoreCase(lastTappedWord340) &&
                         ic==getCurrentInputConnection())
-                    tappedWord340=lastTappedWord340;
+                    tappedWord340=verified;
             } catch(RuntimeException detached) { tappedWord340=null; }
         }
         if(editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
