@@ -22,20 +22,30 @@ final class EditorSuggestionPrivacyPolicy {
         final boolean sensitive;
         final boolean allowPersonalLearning;
         final boolean keepCompatibility;
-        Decision(boolean privateField,boolean allowLearning,boolean keep) {
+        final boolean allowSuggestions;
+        Decision(boolean privateField,boolean allowLearning,boolean keep,
+                 boolean showSuggestions) {
             sensitive=privateField;
             allowPersonalLearning=allowLearning;
             keepCompatibility=keep;
+            allowSuggestions=showSuggestions;
         }
     }
 
     static Decision decide(String editorPackage,boolean isTextClass,
             boolean isPasswordOrIdentifier,boolean noSuggestions,
             boolean noPersonalizedLearning) {
+        return decide(editorPackage,isTextClass,isPasswordOrIdentifier,
+                noSuggestions,noPersonalizedLearning,false);
+    }
+
+    static Decision decide(String editorPackage,boolean isTextClass,
+            boolean isPasswordOrIdentifier,boolean noSuggestions,
+            boolean noPersonalizedLearning,boolean searchOrGoAction) {
         // A password-style variation, URI/email or non-text input always
         // remains private—even inside Google Keep itself.
         if(!isTextClass || isPasswordOrIdentifier)
-            return new Decision(true,false,false);
+            return new Decision(true,false,false,false);
         final boolean keep=GOOGLE_KEEP_PACKAGE.equals(editorPackage);
         // This flag is a suggestion preference, not a password signal.
         // Treating it as "sensitive" broke ordinary Google search fields,
@@ -43,6 +53,12 @@ final class EditorSuggestionPrivacyPolicy {
         // No app-name allowlist is needed; only trustworthy InputType
         // credential/identifier signals above can mark the editor private.
         final boolean allowLearning=!noSuggestions && !noPersonalizedLearning;
-        return new Decision(false,allowLearning,keep && noSuggestions);
+        // Only a declared Search/Go intent or the already-qualified Keep
+        // note exception can override the host's NO_SUGGESTIONS UI hint.
+        // Other normal text fields honor the hint, but their editing
+        // controls remain functional; NO_SUGGESTIONS is not 'sensitive'.
+        final boolean allowSuggestions=!noSuggestions || keep || searchOrGoAction;
+        return new Decision(false,allowLearning,keep && noSuggestions,
+                allowSuggestions);
     }
 }
