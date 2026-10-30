@@ -2550,6 +2550,13 @@ public final class RebornImeService extends InputMethodService {
                         PersonalLearning.enabled(this),sensitive,
                 editingInMiddle,hasSelection(),cursorHasTextAfter());
         final long sourceSession=inputSessionGeneration;
+        // Capture safety BEFORE commit. Editor callbacks can update cursor
+        // flags synchronously during commitText(), even when this tap was
+        // genuinely safe. Never infer the pre-commit state afterward.
+        final boolean eligibleAtTap=editorAllowsPersonalLearning &&
+                PersonalLearning.enabled(this) && !sensitive &&
+                !editingInMiddle && !hasSelection() && !cursorHasTextAfter() &&
+                !numericEditor && !symbols;
         boolean committed=false;
         ic.beginBatchEdit();
         try {
@@ -2560,11 +2567,10 @@ public final class RebornImeService extends InputMethodService {
             composing="";
             // Editor can switch while a split chip completes; never learn
             // from a stale input session or a rejected host commit.
-            if(sourceSession==inputSessionGeneration &&
+            if(eligibleAtTap && sourceSession==inputSessionGeneration &&
                     ic==getCurrentInputConnection() &&
                     editorAllowsPersonalLearning && !sensitive &&
-                    !editingInMiddle && !hasSelection() &&
-                    !cursorHasTextAfter() && PersonalLearning.enabled(this)) {
+                    PersonalLearning.enabled(this)) {
                 if(acceptedPrior!=null)
                     PersonalContextLearning319.record(this,acceptedPrior,next);
                 // Split next-word chips are explicitly chosen words too.
