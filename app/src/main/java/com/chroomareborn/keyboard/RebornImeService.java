@@ -161,7 +161,8 @@ public final class RebornImeService extends InputMethodService {
             closeOptionalDictionary();
             return;
         }
-        if(!OfflineDictionaryActivationPolicy.usable(optedIn,sensitive)){
+        if(!editorAllowsSuggestions ||
+                !OfflineDictionaryActivationPolicy.usable(optedIn,sensitive)){
             // Protected fields NEVER use the supplemental dictionary.
             PredictionLite.setResearchExactOnlyPack(null);
             return;
@@ -2641,7 +2642,8 @@ public final class RebornImeService extends InputMethodService {
         if(manuallyCollapsedPredictions && !input.equals(manualCollapseSnapshot))
             manuallyCollapsedPredictions=false;
         latestSnapshot=input;
-        boolean splitActive=splitPredictionsEnabled() && !sensitive && !input.isEmpty()
+        boolean splitActive=splitPredictionsEnabled() && !sensitive &&
+                editorAllowsSuggestions && !input.isEmpty()
                 && !editingInMiddle && !cursorHasTextAfter();
         splitPhrases=splitActive?PredictionLite.splitPhraseSuggestions(input):
                 java.util.Collections.emptyList();
@@ -2696,7 +2698,8 @@ public final class RebornImeService extends InputMethodService {
         candidates.setAlpha(1f);
         if(suggestionScroll!=null && suggestionScroll.getScrollX()!=0)
             suggestionScroll.scrollTo(0,0);
-        if(options.isEmpty() && !input.isEmpty() && !sensitive) {
+        if(options.isEmpty() && !input.isEmpty() && !sensitive &&
+                editorAllowsSuggestions) {
             options=java.util.Collections.singletonList(input);
         }
         if(options.isEmpty()) {
