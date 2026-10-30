@@ -20,9 +20,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          ref: c16e8169b84c46902970bec07ec71fc7d65c0c9
+          # Checkout by advertised branch ref (GitHub Actions cannot
+          # shallow-fetch an old bare commit SHA as if it were a ref).
+          ref: research/build310-editor-capability-search-enter-20261029
           path: qualified-310
           persist-credentials: false
+      - name: Verify exactly which qualified research source is pinned
+        run: |
+          set -euo pipefail
+          test "$(git -C qualified-310 rev-parse HEAD)" = "abeb967656d29acaa39cffdace2e7626f2fce431"
+          echo "PASS: exact Build 310 research source checkout pinned"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
