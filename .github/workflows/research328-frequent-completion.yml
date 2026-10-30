@@ -29,6 +29,7 @@ jobs:
           ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/PersonalContextLearning319AndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/NumericKeypad323AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/FrequentWordLearning328AndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/ContextBackupTransfer325AndroidTest.java
           grep -Fq 'REQUEST_EXPORT_CONTEXT' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
           grep -Fq 'LearningTransferDocumentIO.createContextIntent()' app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
