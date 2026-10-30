@@ -21,7 +21,7 @@ The explicit accepted correction engine had an iteration-order-dependent tie: tw
 ## Quality status
 - https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40988582233
 - Java regression job **passed**.
-- Android 35 emulator job was **in progress** when this checkpoint was created; verify final result and test count before claiming Android qualified.
+- Android 35 emulator qualification **SUCCESS**: [GitHub Actions run 40988582233](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/40988582233) confirmed **32 tests started and 32 finished**, Gradle BUILD SUCCESSFUL. The Java job passed **89 original contraction checks** and **266 new Learning V2.1 conflict/case assertions**. No user-facing APK was published; these remain Android 35 emulator and source results, not Samsung field acceptance.
 
 ## Next improvement
 Personal learning and explicitly saved words should be portable across the separately installed trial APKs, but Android app sandboxing forbids silent cross-package import. Design an opt-in, reviewable **Export learning / Import learning** flow using Android's Storage Access Framework. Export only manually saved words and deliberately accepted *word-pair* corrections, never editor history/passwords. Require file-size/record-count validation, confirm before import, keep learning OFF unless user separately enables it, protect existing V1 counts and avoid repeated-import inflation. Warn that backup files are plain text and user-controlled. Build this on a separate branch after confirming 306 regression tests. Do not replace Candidate 304 or auto-import private files.
