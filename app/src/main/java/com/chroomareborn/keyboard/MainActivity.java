@@ -28,6 +28,8 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_IMPORT_LEARNING=3072;
     private static final int REQUEST_EXPORT_CONTEXT=3073;
     private static final int REQUEST_EXPORT_FREQUENCY=3074;
+    private static final int REQUEST_EXPORT_UNIFIED_V4=3471;
+    private static final int REQUEST_IMPORT_UNIFIED_V4=3472;
     private TextView learningStatsView;
     private TextView dictionaryInfoView;
     private int dp(float n) { return Math.round(getResources().getDisplayMetrics().density * n); }
@@ -80,13 +82,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Candidate 345 Test");
+        title.setText("Orivra — Candidate 347 Test");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nCandidate 345: SCREEN-RECORDING NORMAL BAR FLICKER FIX: The normal three-slot bar now retains its side-chip visuals during the immediate-word-to-background-prediction handoff, but stale options cannot be tapped. Fast Backspace leaves the existing blank chip row mounted. Automatic Rise and split predictions are unchanged. Candidate 344: STABLE NORMAL PREDICTION BAR: Fast typing retains three persistent prediction chip views, showing updated text in place without frequent view rebuilding, and avoids repeated unchanged style layout work. Automatic Rise, split-mode, word learning, Backspace, V3 backup and security gates remain. Candidate 343: FAST TYPING / NO KEEP TYPING FLICKER: Empty prediction rows remain quiet, the literal typed word appears immediately, automatic Rise and split next-word choices are preserved, while the unwanted empty placeholder and redundant cursor echoes are addressed. BACKSPACE AND COMPOSING FIXES RETAINED. Candidate 345: COMPOSING SAFETY, TAPPED-WORD CONTEXT & LATENCY: This trial guards against double composing writes, learns repeated typed-word sequences and multiword phrase completions when Learning is ON, and records opt-in memory-only typed-key latency. Novel sequence learning is session-only and NOT included in V3 backup yet. BACKSPACE LAST-LETTER FIX: A single Backspace really deletes the final composing character instead of only ending composition. No extra press or misleading empty-suggestions flash while a letter remains. Retains Candidate 333 frequent/short-word learning, committed phrase learning, safer pause timing, curated can't/ain't/that's contractions, private numeric banking keypad and V1/V2/V3 all-in-one backup. GOOGLE SEARCH FIX: normal Search/Go fields no longer inherit private-field restrictions from NO_SUGGESTIONS. A Search/Go Enter tap now performs the host action, not a newline. Backspace and spacebar cursor gestures remain available regardless of suggestion UI hints, and actual password/email/URI fields remain private. Tap-only we're and how's choices now appear promptly when you type Were or hows, even after punctuation. No silent changes to correctly typed words. Export and Import manually saved words and learned corrections via the Android document picker, with preview, approval, and safe merge. Learning V2 supports explicit accepted contractions like can't, ain't and we're; preserves V1 learning format within the same application. Idle next-word suggestions remain centered; active corrections and the right caret stay unchanged. Includes the optional, default-OFF offline English dictionary trial. Google Keep compatibility from Candidate 300 remains intact. Ordinary Google Keep notes can show offline predictions when Android requests no suggestions, while password, email, URL, numeric and private fields remain protected. Personal correction learning is disabled where the editor requests no suggestions or no personalized learning. This trial keeps the Candidate 298 SentenceFlow prediction engine, cleaned one-arrow UI, Safe Enter, Backspace and theme behavior. Test in a disposable note. Spanish remains research-only; letter-to-letter swipe typing remains incomplete. This is a separate trial keyboard; keep the stable Orivra installed. Avoid entering passwords or other sensitive text during testing.\n");
+        notes.setText("\nCandidate 347: Opt-in typed-word learning across sessions and unified V4 backup. The verified Space-boundary worker runs off the typing thread; only ordinary allowed fields are eligible. The main prediction bar retains the Candidate 345 Samsung-tested visual continuity. Remember typed words defaults OFF and requires Learning ON. Reopen a text field after changing the setting. V4 includes pending learned words and their counts. New trial installs separately, so import a previous V3 backup here if needed. Candidate 345: SCREEN-RECORDING NORMAL BAR FLICKER FIX: The normal three-slot bar now retains its side-chip visuals during the immediate-word-to-background-prediction handoff, but stale options cannot be tapped. Fast Backspace leaves the existing blank chip row mounted. Automatic Rise and split predictions are unchanged. Candidate 344: STABLE NORMAL PREDICTION BAR: Fast typing retains three persistent prediction chip views, showing updated text in place without frequent view rebuilding, and avoids repeated unchanged style layout work. Automatic Rise, split-mode, word learning, Backspace, V3 backup and security gates remain. Candidate 343: FAST TYPING / NO KEEP TYPING FLICKER: Empty prediction rows remain quiet, the literal typed word appears immediately, automatic Rise and split next-word choices are preserved, while the unwanted empty placeholder and redundant cursor echoes are addressed. BACKSPACE AND COMPOSING FIXES RETAINED. Candidate 345: COMPOSING SAFETY, TAPPED-WORD CONTEXT & LATENCY: This trial guards against double composing writes, learns repeated typed-word sequences and multiword phrase completions when Learning is ON, and records opt-in memory-only typed-key latency. Novel sequence learning is session-only and NOT included in V3 backup yet. BACKSPACE LAST-LETTER FIX: A single Backspace really deletes the final composing character instead of only ending composition. No extra press or misleading empty-suggestions flash while a letter remains. Retains Candidate 333 frequent/short-word learning, committed phrase learning, safer pause timing, curated can't/ain't/that's contractions, private numeric banking keypad and V1/V2/V3 all-in-one backup. GOOGLE SEARCH FIX: normal Search/Go fields no longer inherit private-field restrictions from NO_SUGGESTIONS. A Search/Go Enter tap now performs the host action, not a newline. Backspace and spacebar cursor gestures remain available regardless of suggestion UI hints, and actual password/email/URI fields remain private. Tap-only we're and how's choices now appear promptly when you type Were or hows, even after punctuation. No silent changes to correctly typed words. Export and Import manually saved words and learned corrections via the Android document picker, with preview, approval, and safe merge. Learning V2 supports explicit accepted contractions like can't, ain't and we're; preserves V1 learning format within the same application. Idle next-word suggestions remain centered; active corrections and the right caret stay unchanged. Includes the optional, default-OFF offline English dictionary trial. Google Keep compatibility from Candidate 300 remains intact. Ordinary Google Keep notes can show offline predictions when Android requests no suggestions, while password, email, URL, numeric and private fields remain protected. Personal correction learning is disabled where the editor requests no suggestions or no personalized learning. This trial keeps the Candidate 298 SentenceFlow prediction engine, cleaned one-arrow UI, Safe Enter, Backspace and theme behavior. Test in a disposable note. Spanish remains research-only; letter-to-letter swipe typing remains incomplete. This is a separate trial keyboard; keep the stable Orivra installed. Avoid entering passwords or other sensitive text during testing.\n");
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
@@ -128,7 +130,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra Candidate 345 keyboard");
+        picker.setText("2. Choose Orivra Candidate 347 keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
@@ -368,6 +370,147 @@ public final class MainActivity extends Activity {
                     learningStats.setText(PersonalLearning.diagnosticSummary(this));
                 }).show());
         root.addView(resetLearning);
+
+        // Candidate 347: independent consent for remembering verified typed
+        // words across sessions. Unlike V1 correction learning, this may
+        // include names; explain clearly and default OFF. No raw text display.
+        TextView typedInfo347=new TextView(this);
+        typedInfo347.setText("\nTyped-word memory (Candidate 347, optional)\n"
+                +"After repeated successful Space commits, the keyboard can "
+                +"learn manually typed words—including short words and word "
+                +"pairs—across sessions. Words may include names. Stored "
+                +"privately on this device; never sent to a server. This "
+                +"setting is separate from Learning and starts OFF. "
+                +"Reopen a text field to apply changes.");
+        typedInfo347.setTextColor(0xFF303846);
+        typedInfo347.setTextSize(14);
+        root.addView(typedInfo347);
+
+        Button remember347=new Button(this);
+        remember347.setAllCaps(false);
+        remember347.setText("Remember words I type: "+
+                (TypedWordsConsent341.enabled(this)?"ON":"OFF"));
+        remember347.setOnClickListener(v->{
+            if(TypedWordsConsent341.enabled(this)){
+                if(TypedWordsConsent341.setEnabled(this,false))
+                    remember347.setText("Remember words I type: OFF");
+                return;
+            }
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("Remember verified typed words?")
+                .setMessage("This option can remember names or personal "
+                        +"words, even if they are not passwords. Only words "
+                        +"typed with Orivra in allowed ordinary text fields "
+                        +"and committed by a successful Space are eligible. "
+                        +"It stays on your device, uses no network, and can "
+                        +"be erased separately. Your existing Learning toggle "
+                        +"must also be ON. You can export the data manually "
+                        +"as part of a V4 plaintext backup. Enable?")
+                .setNegativeButton("Not now",null)
+                .setPositiveButton("Enable typed-word memory",(dialog,which)->{
+                    if(TypedWordsConsent341.setEnabled(this,true)) {
+                        remember347.setText("Remember words I type: ON");
+                        android.widget.Toast.makeText(this,
+                                "Reopen a text field to activate.",
+                                android.widget.Toast.LENGTH_LONG).show();
+                    }
+                }).show();
+        });
+        root.addView(remember347);
+
+        TextView typedCounts347=new TextView(this);
+        typedCounts347.setText("Stored typed-word counts: select Refresh. "
+                +"Individual words are never displayed in these statistics.");
+        typedCounts347.setTextColor(0xFF455263);
+        root.addView(typedCounts347);
+
+        Button typedRefresh347=new Button(this);
+        typedRefresh347.setAllCaps(false);
+        typedRefresh347.setText("Refresh saved typed-word counts");
+        typedRefresh347.setOnClickListener(v->learningTransferIo.execute(()->{
+            String summary;
+            try {
+                TypedWordEvidenceStore341.Snapshot e=
+                        TypedWordEvidenceStore341.read(this);
+                summary="On device: "+e.vocabulary()+" typed words ("
+                        +e.confirmedWords()+" learned 3+ times), "
+                        +e.associations()+" word pairs ("
+                        +e.confirmedPairs()+" learned 3+ times).";
+            } catch(RuntimeException invalid) {
+                summary="Typed-word storage is invalid; clear it before reuse.";
+            }
+            final String ready=summary;
+            runOnUiThread(()->{
+                if(!isFinishing()&&!isDestroyed())typedCounts347.setText(ready);
+            });
+        }));
+        root.addView(typedRefresh347);
+
+        Button typedClear347=new Button(this);
+        typedClear347.setAllCaps(false);
+        typedClear347.setText("Turn OFF and erase typed-word memory");
+        typedClear347.setOnClickListener(v->
+                new android.app.AlertDialog.Builder(this)
+                .setTitle("Erase verified typed-word memory?")
+                .setMessage("Disable new typed-word learning and delete "
+                        +"only its separate on-device counts. Existing "
+                        +"V1/V2/V3 learning, saved dictionary and exported "
+                        +"backup files are not deleted. You can cancel.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Disable and erase",(dialog,which)->
+                    learningTransferIo.execute(()->{
+                        boolean ok=TypedWordsConsent341.setEnabled(this,false)
+                                &&TypedWordEvidenceStore341.clearAll(this);
+                        runOnUiThread(()->{
+                            if(isFinishing()||isDestroyed())return;
+                            remember347.setText("Remember words I type: OFF");
+                            typedCounts347.setText(ok?
+                                    "Typed-word counts erased. Reopen keyboard.":
+                                    "Could not erase the typed-word data.");
+                        });
+                    })).show());
+        root.addView(typedClear347);
+
+        // One unified V4 is the RECOMMENDED current backup; older V1/V2/V3
+        // controls remain for export compatibility and rollback testing.
+        TextView unifiedInfo347=new TextView(this);
+        unifiedInfo347.setText("\nRecommended: one all-in-one V4 backup\n"
+                +"Includes the older V1 dictionary/corrections, V2 context, "
+                +"V3 word frequencies and V4 verified typed words/pairs. "
+                +"It also saves counts for words typed just 1–2 times. "
+                +"Plaintext may contain names and personal words: choose a "
+                +"trusted location. Older Orivra releases cannot import V4; "
+                +"keep your previous V3 export for rollback.");
+        unifiedInfo347.setTextColor(0xFF303846);
+        unifiedInfo347.setTextSize(15);
+        root.addView(unifiedInfo347);
+
+        Button unifiedExport347=new Button(this);
+        unifiedExport347.setAllCaps(false);
+        unifiedExport347.setText("Export ONE complete learning backup (V4)");
+        unifiedExport347.setOnClickListener(v->
+                new android.app.AlertDialog.Builder(this)
+                .setTitle("Export one complete learning backup?")
+                .setMessage("The V4 text file includes saved words, "
+                        +"corrections, contexts, frequencies and verified "
+                        +"typed-word/pair evidence—even counts of 1 or 2. "
+                        +"It could reveal names or typing habits. "
+                        +"You choose the file and location. Export?")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Choose trusted location",(dialog,which)->
+                        startActivityForResult(
+                                LearningTransferDocumentIO.createUnifiedV4Intent(),
+                                REQUEST_EXPORT_UNIFIED_V4))
+                .show());
+        root.addView(unifiedExport347);
+
+        Button unifiedImport347=new Button(this);
+        unifiedImport347.setAllCaps(false);
+        unifiedImport347.setText("Import V4 (or earlier V1/V2/V3) backup");
+        unifiedImport347.setOnClickListener(v->startActivityForResult(
+                LearningTransferDocumentIO.openIntent(),
+                REQUEST_IMPORT_UNIFIED_V4));
+        root.addView(unifiedImport347);
 
         // Build 307 research: explicit user-selected backup, never automatic.
         TextView transferNotice=new TextView(this);
@@ -642,14 +785,17 @@ public final class MainActivity extends Activity {
         final Uri selected=result.getData();
         if(requestCode==REQUEST_EXPORT_LEARNING ||
                 requestCode==REQUEST_EXPORT_CONTEXT ||
-                requestCode==REQUEST_EXPORT_FREQUENCY){
+                requestCode==REQUEST_EXPORT_FREQUENCY ||
+                requestCode==REQUEST_EXPORT_UNIFIED_V4){
             final boolean portable=requestCode==REQUEST_EXPORT_CONTEXT;
             final boolean includeFrequencies=requestCode==REQUEST_EXPORT_FREQUENCY;
+            final boolean unifiedV4=requestCode==REQUEST_EXPORT_UNIFIED_V4;
             learningTransferIo.execute(()->{
                 boolean saved=false;
                 try{
-                    String content=includeFrequencies?
-                            LearningTransferStore.exportV3(this):
+                    String content=unifiedV4?
+                            TypedLearningV4Transfer347.exportV4(this):
+                            includeFrequencies?LearningTransferStore.exportV3(this):
                             portable?LearningTransferStore.exportV2(this):
                             LearningTransferStore.exportText(this);
                     LearningTransferDocumentIO.write(this,selected,content);
@@ -730,6 +876,77 @@ public final class MainActivity extends Activity {
                                                 android.widget.Toast.LENGTH_LONG).show();
                                     });
                                 }))
+                        .show();
+                });
+            });
+        }else if(requestCode==REQUEST_IMPORT_UNIFIED_V4) {
+            learningTransferIo.execute(()->{
+                final TypedLearningV4Codec341.Data parsed;
+                final TypedLearningV4Transfer347.Preview preview;
+                try{
+                    String file=LearningTransferDocumentIO.read(this,selected);
+                    parsed=TypedLearningV4Codec341.decode(file);
+                    preview=TypedLearningV4Transfer347.preview(this,parsed);
+                }catch(Exception malformedOrFull){
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed())return;
+                        android.widget.Toast.makeText(this,
+                                "Backup invalid, damaged, incompatible or over capacity.",
+                                android.widget.Toast.LENGTH_LONG).show();
+                    });
+                    return;
+                }
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed())return;
+                    new android.app.AlertDialog.Builder(this)
+                        .setTitle("Review one-file local learning import")
+                        .setMessage("Validated file: "+
+                            parsed.previous.earlier.legacy.words.size()
+                            +" dictionary words, "+
+                            parsed.previous.earlier.legacy.learnedPairs.size()
+                            +" corrections, "+
+                            parsed.previous.earlier.contexts.size()
+                            +" context patterns, "+
+                            parsed.previous.frequencies.size()
+                            +" frequency entries, "+
+                            preview.savedTypedWords+" typed words and "+
+                            preview.savedTypedPairs+" typed word pairs.\n"
+                            +"New typed records: "+preview.newTypedWords+" words, "+
+                            preview.newTypedPairs+" pairs; stronger counts: "+
+                            preview.strongerWords+" words, "+
+                            preview.strongerPairs+" pairs. Counts merge by MAX "
+                            +"to avoid duplicate learning when reimported. "
+                            +"This import will not enable typed-word memory "
+                            +"or other Learning preferences. Reopen the "
+                            +"keyboard afterward. Only import files you trust.")
+                        .setNegativeButton("Cancel",null)
+                        .setPositiveButton("Import approved backup",
+                                (dialog,which)->learningTransferIo.execute(()->{
+                            boolean completed=false;
+                            try{
+                                TypedLearningV4Transfer347.importConfirmed(
+                                        this,parsed);
+                                completed=true;
+                            }catch(Exception storageIssue){
+                                // A rare filesystem failure could partially
+                                // import across legacy V1/V2/V3 preferences.
+                                // No raw personal words or URIs are logged.
+                            }
+                            final boolean success=completed;
+                            runOnUiThread(()->{
+                                if(isFinishing()||isDestroyed())return;
+                                if(learningStatsView!=null)
+                                    learningStatsView.setText(
+                                            PersonalLearning.diagnosticSummary(this));
+                                if(dictionaryInfoView!=null)
+                                    dictionaryInfoView.setText(
+                                            PersonalDictionary.summary(this));
+                                android.widget.Toast.makeText(this,success?
+                                    "V4 learning imported. Reopen keyboard.":
+                                    "Import not completed. Review data before retrying.",
+                                    android.widget.Toast.LENGTH_LONG).show();
+                            });
+                        }))
                         .show();
                 });
             });
