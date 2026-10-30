@@ -1,0 +1,104 @@
+name: Orivra Candidate 327 - publish verified APK
+on:
+  push:
+    branches:
+      - candidate/build327-adaptive-context-backup-20261030
+    paths:
+      - .github/workflows/candidate327-publish-verified.yml
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: orivra-candidate327-publish
+  cancel-in-progress: false
+jobs:
+  publish-only-verified-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact previously qualified source and green Android run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          confirmed=$(gh api "repos/$repo/actions/runs/41057605973" --jq '.conclusion')
+          source_sha=$(gh api "repos/$repo/actions/runs/41057605973" --jq '.head_sha')
+          test "$confirmed" = "success"
+          test "$source_sha" = "a6f3a6863645d0844b3c46d12f53dfbf9b446a67"
+          test -f .github/workflows/candidate327-combined-apk.yml
+          echo "PASS: verified Build 327 Android 35 test run was successful"
+      - name: Retrieve byte-identical, qualified Candidate 327 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 41057605973 --repo "$GITHUB_REPOSITORY" \
+            --name Orivra-Candidate-327-Android35-Passed --dir dist
+          test -s dist/Orivra-Candidate-327.apk
+          test -s dist/Orivra-Candidate-327.apk.sha256
+          (cd dist && sha256sum -c Orivra-Candidate-327.apk.sha256)
+          test -s dist/package.txt
+          test -s dist/permissions.txt
+          test -s dist/signature.txt
+      - name: Independently reverify original APK identity, signature, privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=dist/Orivra-Candidate-327.apk
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          apksigner="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          test -x "$aapt"
+          test -x "$apksigner"
+          "$aapt" dump badging "$apk" | head -n 1 | tee dist/reverified-package.txt
+          grep -Fq "package: name='com.chroomareborn.keyboard.build327trial' versionCode='327'" dist/reverified-package.txt
+          "$apksigner" verify --verbose --print-certs "$apk" > dist/reverified-signature.txt
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' dist/reverified-signature.txt
+          "$aapt" dump permissions "$apk" > dist/reverified-permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/reverified-permissions.txt
+          "$aapt" list "$apk" | grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$aapt" list "$apk" | grep -Fxq 'assets/dictionaries/ESDB_COPYRIGHT.txt'
+          echo "PASS: unchanged signature, correct trial ID, no internet permission"
+      - name: Publish independently installable GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=candidate-327-20261030
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release tag already exists. Leaving existing release untouched."
+            exit 0
+          fi
+          cat > "$RUNNER_TEMP/notes.md" <<'NOTES'
+          Orivra Candidate 327 — Android 35 emulator-qualified, debug-signed test APK.
+
+          Verified 55/55 Android instrumentation tests in GitHub run 41057605973.
+          Separate application ID com.chroomareborn.keyboard.build327trial (versionCode 327).
+          Installing does NOT overwrite Candidate 319 or Build 310. Not yet Samsung Android 17 or real bank-app verified.
+
+          New in this combined build:
+          - Numeric Amount/phone/date editor layouts show actual digits, with decimal, Backspace, Go/Enter and an ABC fallback. Numeric private/PIN fields keep predictions and learning disabled.
+          - Keeps the faster, subtler Candidate 319 touch feel, existing Google Search/Keep, Enter, Space and Backspace gesture improvements.
+          - Opt-in local learning can reinforce accepted words from correctly completed word usage and safe adjacent word relationships. No passive full-sentence storage.
+          - Original V1 backup/export remains for rollback: orivra-local-learning-backup.txt.
+          - New explicit V2 context backup/export: orivra-context-learning-v2-backup.txt. The import picker supports validated V1 and V2. Older Orivra candidates cannot read V2.
+          - No INTERNET permission or automatic backup/synchronization.
+
+          Trial steps: On Candidate 319, export and keep your V1 dictionary backup. Install Candidate 327 as a second keyboard, select it, import your V1 file. Keep 319 installed for rollback. Test numeric digits/decimal in a bank Amount field WITHOUT submitting any payment. Test everyday typing and V1/V2 export separately using disposable examples. A fresh 327 package cannot automatically read 319's app-private word usage context. Older V1 backups do not contain context counts. V2 backup files are plaintext and may reveal word habits; store privately.
+
+          APK SHA256 is in the attached .sha256 asset.
+          Source commit a6f3a6863645d0844b3c46d12f53dfbf9b446a67.
+          NOTES
+          gh release create "$tag" \
+            dist/Orivra-Candidate-327.apk dist/Orivra-Candidate-327.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target a6f3a6863645d0844b3c46d12f53dfbf9b446a67 \
+            --title "Orivra Candidate 327 — Numeric + Adaptive English + V2 Backups" \
+            --notes-file "$RUNNER_TEMP/notes.md" --prerelease
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY"
