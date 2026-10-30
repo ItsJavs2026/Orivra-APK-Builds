@@ -62,17 +62,20 @@ final class PersonalDictionary {
         return words;
     }
     static List<String> matching(Context ctx,String prefix) {
-        String normalized=PersonalDictionaryPolicy.canonical(prefix);
+        String normalized=EnglishApostrophePolicy.prefix(prefix);
         if(normalized==null)return List.of();
         List<String> matches=new ArrayList<>();
         for(String word:savedWords(ctx)) {
-            if(word.toLowerCase(Locale.ROOT).startsWith(normalized))
+            if(PersonalDictionaryPolicy.canonical(word).startsWith(normalized))
                 matches.add(word);
             if(matches.size()>=PersonalDictionaryPolicy.MAX_SUGGESTIONS)break;
         }
         // Explicit exact word should outrank prefix completions.
         matches.sort((a,b)->{
-            boolean ae=a.equalsIgnoreCase(prefix),be=b.equalsIgnoreCase(prefix);
+            boolean ae=PersonalDictionaryPolicy.canonical(a).equals(
+                    EnglishApostrophePolicy.canonical(prefix));
+            boolean be=PersonalDictionaryPolicy.canonical(b).equals(
+                    EnglishApostrophePolicy.canonical(prefix));
             if(ae!=be)return ae?-1:1;
             return Integer.compare(a.length(),b.length());
         });
