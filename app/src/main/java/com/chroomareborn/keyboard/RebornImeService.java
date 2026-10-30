@@ -1772,9 +1772,12 @@ public final class RebornImeService extends InputMethodService {
                 case MotionEvent.ACTION_UP:
                     suggestionHandler.removeCallbacks(hold);
                     key.setPressed(false);
-                    animateKeyPress(key,false);
+                    // Text commitment has priority over release cosmetics.
+                    // The symbol-hold gesture still owns the original key:
+                    // never type a second letter after a long press/cancel.
                     if(!cancelled[0]&&!triggered[0])type(letter);
                     else if(triggered[0])suggestionHandler.post(this::refreshView);
+                    animateKeyPress(key,false);
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                 case MotionEvent.ACTION_POINTER_DOWN:
@@ -2089,9 +2092,14 @@ public final class RebornImeService extends InputMethodService {
         // A normal space typed after repositioning must not switch back to
         // end-of-document composition when content remains after the cursor.
         editingInMiddle=cursorHasTextAfter() || hasSelection();
+        // Previously every space destroyed and rebuilt the full key layout.
+        // A normal word boundary does not change any key labels. Only a
+        // sentence-boundary Shift change requires a deferred rebuild.
+        boolean previousShift=shift;
         updateSentenceShift();
         showSuggestions();
-        refreshView();
+        if(previousShift!=shift && !capsLock && !symbols)
+            suggestionHandler.post(this::refreshView);
     }
     private void insertNewlineSafely() {
         InputConnection ic = getCurrentInputConnection();
