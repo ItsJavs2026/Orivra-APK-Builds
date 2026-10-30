@@ -27,9 +27,11 @@ jobs:
           test -s "$root/ComposingMutation340.java"
           test -s "$root/PrefixCandidateCache340.java"
           test -s "$root/PersonalNextWordModel.java"
+          test -s "$root/TappedWordBoundary340.java"
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/ComposingMutation340AndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/PrefixCandidateCache340AndroidTest.java
           test -s app/src/androidTest/java/com/chroomareborn/keyboard/TappedSequence340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TappedWordBoundary340AndroidTest.java
           grep -Fq 'ComposingMutation340.append(' "$root/RebornImeService.java"
           grep -Fq 'personalizedPrefix340(input)' "$root/RebornImeService.java"
           grep -Fq 'tappedSequence340.observeCommittedWord(' "$root/RebornImeService.java"
@@ -38,10 +40,11 @@ jobs:
           ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
           ! grep -Fq 'inputSessionGeneration==inputSessionGeneration' "$root/RebornImeService.java"
           mkdir -p "$RUNNER_TEMP/classes"
-          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+          javac -encoding UTF-8 -sourcepath app/src/main/java -d "$RUNNER_TEMP/classes" \
             "$root/ComposingMutation340.java" \
             "$root/PrefixCandidateCache340.java" \
-            "$root/PersonalNextWordModel.java"
+            "$root/PersonalNextWordModel.java" \
+            "$root/TappedWordBoundary340.java"
           echo 'PASS: pure-Java research classes compile; no new permission or backup schema'
 
   android35-instrumentation:
