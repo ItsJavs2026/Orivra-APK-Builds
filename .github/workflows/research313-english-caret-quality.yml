@@ -69,3 +69,53 @@ jobs:
         run: |
           set -euo pipefail
           gradle --no-daemon :app:compileDebugJavaWithJavac :app:compileDebugAndroidTestJavaWithJavac
+
+  android-35-english-caret:
+    needs: [source-and-java, android-compilation]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Build pinned attributed offline dictionary for full instrumented tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Enable KVM when available
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: >-
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest > research313-android35.log 2>&1;
+            code=$?;
+            cat research313-android35.log;
+            test "$code" -eq 0 &&
+            grep -F "BUILD SUCCESSFUL" research313-android35.log &&
+            grep -F "Finished " research313-android35.log &&
+            ! grep -E "([1-9][0-9]* failure\\(s\\)|[[:space:]]FAILED[[:space:]]|Tests on .* failed)" research313-android35.log
