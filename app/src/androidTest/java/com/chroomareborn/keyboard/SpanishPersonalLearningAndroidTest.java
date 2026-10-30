@@ -56,7 +56,7 @@ public final class SpanishPersonalLearningAndroidTest {
                     PersonalDictionary.add(c,word));
             assertTrue(PersonalDictionary.matching(c,"Ni").contains(word));
             assertTrue(PersonalDictionaryPolicy.merge("ni",List.of("ni"),
-                    List.of(word)).contains("niño"));
+                    List.of(word)).contains(word));
         } finally {
             if(!already)PersonalDictionary.remove(c,word);
         }
