@@ -7,6 +7,14 @@ package com.chroomareborn.keyboard;
 final class SuggestionStripLayoutPolicy {
     private SuggestionStripLayoutPolicy() {}
 
+    /** Center compact next-word tiles only when no editor text is composing.
+     * Keep active correction, cursor-edit and protected-field rows unchanged.
+     * HorizontalScrollView.fillViewport supplies the extra row width.
+     */
+    static boolean centerIdleSuggestions(String input,int count,boolean sensitive) {
+        return !sensitive && (input==null || input.isEmpty()) && count>0;
+    }
+
     static int shownCount(int optionCount, boolean stableSentenceStrip) {
         int count=Math.max(0,optionCount);
         return stableSentenceStrip ? Math.min(1,count) : count;
