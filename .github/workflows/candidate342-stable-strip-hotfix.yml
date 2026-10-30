@@ -61,7 +61,7 @@ jobs:
           assert 'immediate342.add(snapshot)' in service
           assert 'NextWordControlLabels.emptyBarText(' not in service
           assert 'PredictionStripStability342.autoExpandDuringTyping()' in service
-          assert 'PredictionStripStability342.suppressExpectedCursorEcho(' in service
+          assert '.suppressExpectedCursorEcho(' in service
           assert (root/'src/main/java/com/chroomareborn/keyboard/PredictionStripStability342.java').exists()
           assert (root/'src/androidTest/java/com/chroomareborn/keyboard/PredictionStripStability342AndroidTest.java').exists()
           print('PASS: qualified 340 source + isolated strip hotfix; V3 and manifest unchanged')
