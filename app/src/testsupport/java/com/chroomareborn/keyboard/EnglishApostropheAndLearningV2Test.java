@@ -79,6 +79,18 @@ public final class EnglishApostropheAndLearningV2Test {
         ok(sentence!=null && sentence.typed.equals("cant") &&
                 sentence.accepted.equals("can't"),
                 "learn exactly one word pair, not whole sentence");
+        LearningV2Policy.Pair withPronoun=LearningV2Policy.extract(
+                "I cant go","I can't go");
+        ok(withPronoun!=null && withPronoun.typed.equals("cant") &&
+                withPronoun.accepted.equals("can't"),
+                "unchanged single-letter pronoun must permit one-word learning");
+        LearningV2Policy.Pair withArticle=LearningV2Policy.extract(
+                "a cant moment","a can't moment");
+        ok(withArticle!=null && withArticle.typed.equals("cant"),
+                "unchanged article must permit one-word learning");
+        ok(LearningV2Policy.extract("I go","A go")==null,
+                "never learn a one-letter correction");
+
         for(String[] input:new String[][]{
                 {"thisisjoined","this is joined"},
                 {"can you type","could you speak"},
