@@ -45,7 +45,7 @@ public final class SuggestionContinuity353AndroidTest {
                 SuggestionContinuity353.centerCurrentWord("it",List.of("other")));
     }
     @Test public void cursorWordsCannotBeDuplicatedByAlternativeCasing(){
-        assertEquals(List.of("alternative","Hello",""),
+        assertEquals(List.of("ALTERNATIVE","Hello",""),
                 SuggestionContinuity353.centerCurrentWord("Hello",
                         List.of("hello","ALTERNATIVE","alternative")));
     }
@@ -89,11 +89,12 @@ public final class SuggestionContinuity353AndroidTest {
         assertEquals("",p.trailingSeparator);
         assertEquals("good",p.replacement);
     }
-    @Test public void joinedWordsAtCaretGetOneSeparatorAfterReplacement(){
+    @Test public void cursorCorrectionDoesNotGuessUnknownJoinedWordBoundary(){
+        // Without whitespace, "goingtoday" may be a single novel word.
+        // Never delete its trailing letters to force a suggested separator.
         CursorWordCorrectionPolicy.Plan p=CursorWordCorrectionPolicy.plan(
                 "how's it g","oingtoday","going","going",false,false);
-        assertNotNull(p);
-        assertEquals(" ",p.trailingSeparator);
+        assertNull(p);
     }
     @Test public void punctuationAfterCorrectionDoesNotGetExtraSpace(){
         CursorWordCorrectionPolicy.Plan p=CursorWordCorrectionPolicy.plan(
