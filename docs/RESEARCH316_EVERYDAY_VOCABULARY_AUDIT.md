@@ -14,7 +14,7 @@ runtime lexicon coverage or full-sentence model accuracy.
 
 Research 316 adds a conservatively curated English vocabulary of general
 grammar, communication, work, technology, and everyday-action words.
-Existing frequencies unchanged; new words have low baseline 14.
+Existing frequencies unchanged; new words have minimal fuzzy evidence (1). This adjustment eliminated a one-case top-three regression in the 60-case joined-three-typos holdout group.
 
 A Java reflection audit measures *actual runtime* map coverage against the
 pinned list and prints missing counts for before/after. The full 147+340
@@ -27,3 +27,11 @@ distinct problems.
 
 This is research source only; do not change the Samsung Build 310 keyboard
 or release until Android and emulator tests qualify.
+
+## Verified pinned CI A/B at experimental frequency 1
+
+- Actual initialized base vocabulary: 2,298 entries; Build 316: 2,542.
+- Top-1,000 pinned frequency reference recognized: 627 -> 780 (+153).
+- Existing 147-case benchmark: all six category top-1 and top-3 counts unchanged.
+- Independent 340-case holdout: exact and one-typo joins improved by one top-1/top-3 case each; all other categories remained non-regressing, including 26/60 top-three for joined-three-typo.
+- Frequency source is web-oriented; these measurements do not establish everyday messaging accuracy or real-device feel.

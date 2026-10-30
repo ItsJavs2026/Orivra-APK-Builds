@@ -7,8 +7,8 @@ import java.util.Map;
  * Written as general source vocabulary, NOT copied from a third-party list,
  * actual user typing, private messages, contact names, or passwords.
  *
- * Prior known words keep their frequencies. New entries have modest evidence
- * (14), allowing full-word recognition and conservative fuzzy candidates.
+ * Prior known words keep their frequencies. New entries have very low speculative evidence
+ * (1), allowing full-word recognition and conservative fuzzy candidates.
  * Do not insert generated suffixes or preserve full user sentences.
  */
 final class EverydayEnglishCore316 {
