@@ -2,6 +2,10 @@ package com.chroomareborn.keyboard;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import android.os.Bundle;
 import android.graphics.Color;
 import android.text.InputType;
@@ -17,6 +21,13 @@ public final class MainActivity extends Activity {
     // Standalone preview worker: separate from the IME's own prediction queue.
     // Does not persist or transmit entered strings or prediction results.
     private final PredictionDispatcher previewDispatcher=new PredictionDispatcher();
+    // Explicit user-selected documents only. No IME access or auto-export.
+    private final ExecutorService learningTransferIo=
+            Executors.newSingleThreadExecutor();
+    private static final int REQUEST_EXPORT_LEARNING=3071;
+    private static final int REQUEST_IMPORT_LEARNING=3072;
+    private TextView learningStatsView;
+    private TextView dictionaryInfoView;
     private int dp(float n) { return Math.round(getResources().getDisplayMetrics().density * n); }
 
     /**
@@ -247,6 +258,7 @@ public final class MainActivity extends Activity {
                 +"\nSave names or words you use often. Do not save passwords.");
         dictionaryInfo.setTextColor(0xFF455263);
         root.addView(dictionaryInfo);
+        dictionaryInfoView=dictionaryInfo;
 
         EditText dictionaryWord=new EditText(this);
         dictionaryWord.setSingleLine(true);
@@ -322,6 +334,7 @@ public final class MainActivity extends Activity {
         learningStats.setText(PersonalLearning.diagnosticSummary(this));
         learningStats.setTextColor(0xFF455263);
         root.addView(learningStats);
+        learningStatsView=learningStats;
 
         Button refreshLearning = new Button(this);
         refreshLearning.setAllCaps(false);
