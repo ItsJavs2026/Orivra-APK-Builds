@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build343trial"
+        applicationId = "com.chroomareborn.keyboard.build344trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 343
-        versionName = "1.0.36-build343-keep-typing-hotfix"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 343"
+        versionCode = 344
+        versionName = "1.0.37-build344-normal-strip-stability"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 344"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 343"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 344"
         }
     }
     compileOptions {
