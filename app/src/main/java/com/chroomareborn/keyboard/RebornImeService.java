@@ -3456,9 +3456,10 @@ public final class RebornImeService extends InputMethodService {
         if(manuallyCollapsedPredictions && !input.equals(manualCollapseSnapshot))
             manuallyCollapsedPredictions=false;
         latestSnapshot=input;
-        boolean splitActive=splitPredictionsEnabled() && !sensitive &&
-                editorAllowsSuggestions && !input.isEmpty()
-                && !editingInMiddle && !cursorHasTextAfter();
+        boolean splitActive=splitPredictionsEnabled() &&
+                SuggestionContinuity353.splitNextWordsOnlyDuringLiveComposition(
+                        !composing.isEmpty(),sensitive,editorAllowsSuggestions,
+                        !input.isEmpty(),editingInMiddle,cursorHasTextAfter());
         if(splitActive) {
             if(!input.equals(splitSnapshot340)) {
                 splitSnapshot340=input;
