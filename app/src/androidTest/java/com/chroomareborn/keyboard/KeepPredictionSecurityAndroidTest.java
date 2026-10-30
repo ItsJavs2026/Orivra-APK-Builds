@@ -25,6 +25,7 @@ public final class KeepPredictionSecurityAndroidTest {
                                 InputType.TYPE_TEXT_FLAG_MULTI_LINE |
                                 InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,0));
         assertFalse(choice.sensitive);
+        assertTrue(choice.allowSuggestions);
         assertTrue(choice.keepCompatibility);
         assertFalse(choice.allowPersonalLearning);
     }
@@ -64,6 +65,8 @@ public final class KeepPredictionSecurityAndroidTest {
                             EditorInfo.IME_ACTION_SEARCH));
             assertFalse("Google web search may display ephemeral suggestions",
                     search.sensitive);
+            assertTrue("Search action explicitly permits offline suggestions",
+                    search.allowSuggestions);
             assertFalse("NO_SUGGESTIONS must prohibit personal learning",
                     search.allowPersonalLearning);
             assertFalse(search.keepCompatibility);
@@ -79,7 +82,18 @@ public final class KeepPredictionSecurityAndroidTest {
                         EditorInfo.IME_ACTION_SEARCH |
                                 EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING));
         assertFalse(d.sensitive);
+        assertTrue(d.allowSuggestions);
         assertFalse(d.allowPersonalLearning);
+    }
+    @Test public void ordinaryNonSearchNoSuggestionsDisablesOnlySuggestionUi() {
+        var other=RebornImeService.editorPrivacyDecision(info(
+                "com.example.note",
+                InputType.TYPE_CLASS_TEXT|
+                        InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
+                EditorInfo.IME_ACTION_NONE));
+        assertFalse("NoSuggestions is not a credential",other.sensitive);
+        assertFalse("Normal field may decline suggestion UI",other.allowSuggestions);
+        assertFalse("NoSuggestions never enables learning",other.allowPersonalLearning);
     }
     @Test public void nonTextAndCredentialTypesAlwaysRemainProtected() {
         assertTrue(RebornImeService.editorPrivacyDecision(
@@ -97,6 +111,7 @@ public final class KeepPredictionSecurityAndroidTest {
                             InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
                     EditorInfo.IME_ACTION_SEARCH));
             assertTrue(choice.sensitive);
+            assertFalse(choice.allowSuggestions);
             assertFalse(choice.allowPersonalLearning);
         }
     }
