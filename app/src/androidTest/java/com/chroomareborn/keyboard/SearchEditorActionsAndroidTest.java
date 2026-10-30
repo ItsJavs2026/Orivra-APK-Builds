@@ -115,7 +115,10 @@ public final class SearchEditorActionsAndroidTest {
             assertEquals(newPosition,field.getSelectionStart());
             assertTrue("Backspace should delete at the selected position",
                     connection.deleteSurroundingTextInCodePoints(1,0));
-            assertEquals("keyboar search",field.getText().toString());
+            String original="keyboard search";
+            assertEquals("single Backspace must delete one character at live caret",
+                    original.substring(0,newPosition-1)+original.substring(newPosition),
+                    field.getText().toString());
         });
     }
 }
