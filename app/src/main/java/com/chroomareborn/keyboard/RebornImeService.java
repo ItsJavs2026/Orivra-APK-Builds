@@ -1067,7 +1067,7 @@ public final class RebornImeService extends InputMethodService {
             boolean next = !PersonalLearning.enabled(this);
             PersonalLearning.setEnabled(this, next);
             android.widget.Toast.makeText(this,
-                    next ? "Orivra learning ON (local single-word corrections)"
+                    next ? "Orivra Learning V2 ON (local explicit corrections)"
                          : "Orivra learning OFF",
                     android.widget.Toast.LENGTH_LONG).show();
             return true;
@@ -1926,6 +1926,9 @@ public final class RebornImeService extends InputMethodService {
         boolean shiftAtStart=shift;
         boolean usedShift=shift && value.matches("[A-Za-z]");
         if (usedShift) { value = value.toUpperCase(); if(!capsLock)shift=false; }
+        final boolean apostropheInsideWord=!editingInMiddle && !sensitive &&
+                !hasSelection() && !cursorHasTextAfter() &&
+                EnglishApostrophePolicy.canAppendApostrophe(composing,value);
         if (PunctuationSpacing.isClosingPunctuation(value)) {
             // Suggestion taps and Space can leave a trailing separator.
             // Attach a closing mark to the preceding text without deleting
@@ -1940,6 +1943,14 @@ public final class RebornImeService extends InputMethodService {
                 ic.commitText(addSpace ? value + " " : value,1);
             } finally {
                 ic.endBatchEdit();
+            }
+        } else if (apostropheInsideWord) {
+            // Keep a contraction or possessive as ONE composing span.
+            // The normal symbol-page apostrophe previously ended composing.
+            composing+=value;
+            if(!ic.setComposingText(composing,1)) {
+                ic.commitText(value,1);
+                composing="";
             }
         } else if (editingInMiddle || sensitive || symbols || !value.matches("[A-Za-z]")) {
             if (!composing.isEmpty()) currentFinish();
@@ -2385,8 +2396,9 @@ public final class RebornImeService extends InputMethodService {
         CharSequence after=ic.getTextAfterCursor(64,0);
         if(before==null||after==null)return "";
         int left=before.length(),right=0;
-        while(left>0 && Character.isLetter(before.charAt(left-1)))left--;
-        while(right<after.length() && Character.isLetter(after.charAt(right)))right++;
+        while(left>0 && EnglishApostrophePolicy.isTokenChar(before.charAt(left-1)))left--;
+        while(right<after.length() &&
+                EnglishApostrophePolicy.isTokenChar(after.charAt(right)))right++;
         if(left==before.length() && right==0)return "";
         return before.subSequence(left,before.length()).toString()+after.subSequence(0,right).toString();
     }
@@ -2418,7 +2430,8 @@ public final class RebornImeService extends InputMethodService {
                                 ||!input.equals(wordAtCursor())
                                 ||!isEditingTicketCurrent(editTicket))return;
                         java.util.List<String> wordOptions=
-                                CursorWordCorrectionPolicy.safeOptions(input,options);
+                                CursorWordCorrectionPolicy.safeOptions(input,
+                                        EnglishApostrophePolicy.merge(input,options));
                         // Read only bounded, live current-editor context for
                         // ranking already proposed words. Strong evidence on
                         // BOTH sides is required; otherwise keep the same row.
@@ -2472,9 +2485,13 @@ public final class RebornImeService extends InputMethodService {
                 // A manually saved personal word is considered only for the
                 // matching prefix, never from ambient typing or editor history.
                 // This runs on the IME UI callback, reading at most 250 entries.
+                // A contraction with straight/curly apostrophe stays intact;
+                // missing-mark options are tap-only, never silent autocorrect.
+                java.util.List<String> withContractions=
+                        EnglishApostrophePolicy.merge(input,options);
                 java.util.List<String> withPersonal=editorAllowsPersonalLearning
-                        ?PersonalDictionaryPolicy.merge(input,options,
-                                PersonalDictionary.matching(this,input)):options;
+                        ?PersonalDictionaryPolicy.merge(input,withContractions,
+                                PersonalDictionary.matching(this,input)):withContractions;
                 // Existing opt-in Learning v1 remains independent: only a
                 // twice-accepted explicit single-word correction may outrank.
                 String preferred=editorAllowsPersonalLearning ?
