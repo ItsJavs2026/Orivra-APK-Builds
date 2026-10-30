@@ -7,10 +7,16 @@ on:
       - .github/workflows/research310-google-search-editor-android.yml
       - app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java
       - app/src/main/java/com/chroomareborn/keyboard/CursorEditSnapshotGuard.java
+      - app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java
+      - app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java
+      - app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+      - app/src/androidTest/java/com/chroomareborn/keyboard/SearchEditorActionsAndroidTest.java
       - app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
       - app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java
       - app/src/testsupport/java/com/chroomareborn/keyboard/CursorEditSnapshotGuardTest.java
-      - app/src/testsupport/java/com/chroomareborn/keyboard/ContractionTapOnly310Test.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/ContractionTapOnly309Test.java
       - app/src/androidTest/java/com/chroomareborn/keyboard/AmbiguousContractionEditorAndroidTest.java
   workflow_dispatch:
 permissions:
@@ -150,8 +156,22 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            set -euo pipefail
-            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug 2>&1 | tee build310-android35.log
-            grep -F 'Finished 44 tests' build310-android35.log
-      - name: Research result only, no user APK release
-        run: echo "44 Android emulator tests passed; no phone release or personal data collection."
+            bash -euo pipefail -c '
+              if gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest :app:assembleDebug > build310-android35.log 2>&1; then
+                cat build310-android35.log
+              else
+                code=$?
+                cat build310-android35.log
+                echo "Android instrumented tests FAILED. Refusing build qualification."
+                exit "$code"
+              fi
+              grep -F "Finished 44 tests" build310-android35.log
+              grep -F "BUILD SUCCESSFUL" build310-android35.log
+              if grep -Eq "([1-9][0-9]* failure\\(s\\)|[[:space:]]FAILED[[:space:]]|Tests on .* failed)" build310-android35.log; then
+                echo "Unexpected test-failure marker; refusing qualification"
+                exit 1
+              fi
+            '
+      - name: Mark research qualified only after green Gradle and all 44 tests
+        if: success()
+        run: echo "44 Android emulator tests passed with BUILD SUCCESSFUL, no user APK released."
