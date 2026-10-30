@@ -475,6 +475,16 @@ public final class RebornImeService extends InputMethodService {
                 typedWords347.completedWords(prefix,3,typedWordsSession347),3);
     }
     private final Handler suggestionHandler = new Handler(Looper.getMainLooper());
+    // Research 353: alpha keys retain down-order when two thumbs overlap.
+    // Never store touch/text history; cancel the transient queue on lifecycle.
+    private final HintKeyPressOrder353 hintPressOrder353=new HintKeyPressOrder353();
+    private boolean refreshAfterHint353=false;
+    private void requestRefreshAfterHint353() {
+        if(!hintPressOrder353.hasOpenPresses() && refreshAfterHint353) {
+            refreshAfterHint353=false;
+            suggestionHandler.post(this::refreshView);
+        }
+    }
     // A single tap deletes once; holding for 380 ms starts repeated deletion.
     // All callbacks run on the IME main thread and are cancelled on release/exit.
     private static final long DELETE_HOLD_DELAY_MS = 380L;
@@ -1447,6 +1457,8 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onStartInput(EditorInfo info, boolean restarting) {
+        hintPressOrder353.cancelAll();
+        refreshAfterHint353=false;
         endTypedWords347();
         cancelStableWord329();
         stableWordCounted329="";
@@ -1508,6 +1520,8 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onFinishInput() {
+        hintPressOrder353.cancelAll();
+        refreshAfterHint353=false;
         endTypedWords347();
         lastSettledStripTime345=-1L;
         lastSettledStripSession345=-1L;
@@ -1525,6 +1539,8 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInput();
     }
     @Override public void onFinishInputView(boolean finishingInput) {
+        hintPressOrder353.cancelAll();
+        refreshAfterHint353=false;
         endTypedWords347();
         // A hidden keyboard must not interpret a remaining draft as a
         // completed word. An app's own Send button is not proof of delivery.
@@ -1538,6 +1554,8 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInputView(finishingInput);
     }
     @Override public void onDestroy() {
+        hintPressOrder353.cancelAll();
+        refreshAfterHint353=false;
         endTypedWords347();
         if(typedWords347!=null)typedWords347.close();
         typedWords347=null;
@@ -1922,6 +1940,13 @@ public final class RebornImeService extends InputMethodService {
                 enterTouchActive ||
                 !BackspaceRepeatGuard.mayRebuildKeys(backspaceTouchActive,deleteHeld))
             return;
+        // Keep both alphabet key touch targets mounted until their ACTION_UP.
+        // Rebuilding during an overlapping press can cancel the other finger
+        // and lose a letter. The final release schedules exactly one refresh.
+        if(hintPressOrder353.hasOpenPresses()) {
+            refreshAfterHint353=true;
+            return;
+        }
         base.setBackgroundColor(background);
         if (paletteBar != null) paletteBar.setBackgroundColor(background);
         if (paletteControls != null) paletteControls.setBackgroundColor(background);
@@ -2100,13 +2125,18 @@ public final class RebornImeService extends InputMethodService {
         cell.addView(hintLabel,hintParams);
         key.setContentDescription(visible+", hold for "+hint);
         final boolean[] triggered={false},cancelled={false};
+        final long[] pressToken={-1L},pressSession={-1L};
+        final int[] primaryPointer={-1};
+        final InputConnection[] pressEditor={null};
         final Runnable hold=()->{
-            if(!cancelled[0]&&key.isPressed()&&getCurrentInputConnection()!=null) {
+            if(!cancelled[0] && pressToken[0]>0 &&
+                    key.isPressed() &&
+                    pressSession[0]==inputSessionGeneration &&
+                    pressEditor[0]==getCurrentInputConnection()) {
+                // Choose the secondary symbol now. Commit only on release,
+                // through the down-order sequencer, never a second letter.
                 triggered[0]=true;
                 keyHaptic(key);
-                symbolHoldInProgress=true;
-                try { type(hint); }
-                finally { symbolHoldInProgress=false; }
             }
         };
         key.setOnTouchListener((view,event)->{
@@ -2114,38 +2144,69 @@ public final class RebornImeService extends InputMethodService {
                 case MotionEvent.ACTION_DOWN:
                     cancelled[0]=false;
                     triggered[0]=false;
+                    primaryPointer[0]=event.getPointerId(0);
+                    pressEditor[0]=getCurrentInputConnection();
+                    pressSession[0]=inputSessionGeneration;
+                    pressToken[0]=hintPressOrder353.begin();
                     key.setPressed(true);
                     animateKeyPress(key,true);
                     keyHaptic(key);
-                    suggestionHandler.postDelayed(hold,ViewConfiguration.getLongPressTimeout());
+                    suggestionHandler.postDelayed(
+                            hold,ViewConfiguration.getLongPressTimeout());
                     return true;
-                case MotionEvent.ACTION_MOVE:
-                    if(event.getPointerCount()!=1 ||
-                            event.getX() < -dp(10) ||
-                            event.getX()>key.getWidth()+dp(10) ||
-                            event.getY() < -dp(10) ||
-                            event.getY()>key.getHeight()+dp(10)) {
+                case MotionEvent.ACTION_MOVE: {
+                    int index=event.findPointerIndex(primaryPointer[0]);
+                    if(index<0 || event.getX(index)<-dp(10) ||
+                            event.getX(index)>key.getWidth()+dp(10) ||
+                            event.getY(index)<-dp(10) ||
+                            event.getY(index)>key.getHeight()+dp(10)) {
                         cancelled[0]=true;
                         suggestionHandler.removeCallbacks(hold);
                     }
+                    // A secondary finger never cancels the key owned by
+                    // the primary pointer, unlike Candidate 352.
                     return true;
-                case MotionEvent.ACTION_UP:
-                    suggestionHandler.removeCallbacks(hold);
-                    key.setPressed(false);
-                    // Text commitment has priority over release cosmetics.
-                    // The symbol-hold gesture still owns the original key:
-                    // never type a second letter after a long press/cancel.
-                    if(!cancelled[0]&&!triggered[0])type(letter);
-                    else if(triggered[0])suggestionHandler.post(this::refreshView);
-                    animateKeyPress(key,false);
-                    return true;
-                case MotionEvent.ACTION_CANCEL:
+                }
                 case MotionEvent.ACTION_POINTER_DOWN:
+                    return true;
                 case MotionEvent.ACTION_POINTER_UP:
-                    cancelled[0]=true;
+                    if(event.getPointerId(event.getActionIndex())!=
+                            primaryPointer[0])return true;
+                    // Primary lifted while another pointer remains; resolve
+                    // this key exactly as a normal ACTION_UP.
+                case MotionEvent.ACTION_UP: {
                     suggestionHandler.removeCallbacks(hold);
                     key.setPressed(false);
                     animateKeyPress(key,false);
+                    final long token=pressToken[0];
+                    pressToken[0]=-1L;
+                    final InputConnection editor=pressEditor[0];
+                    final long session=pressSession[0];
+                    final boolean useHint=triggered[0];
+                    if(cancelled[0] || editor==null){
+                        hintPressOrder353.cancel(token);
+                    } else {
+                        hintPressOrder353.complete(token,()->suggestionHandler.post(()->{
+                            if(session!=inputSessionGeneration ||
+                                    editor!=getCurrentInputConnection())return;
+                            if(useHint) {
+                                symbolHoldInProgress=true;
+                                try {type(hint);}
+                                finally {symbolHoldInProgress=false;}
+                            }else type(letter);
+                        }));
+                    }
+                    requestRefreshAfterHint353();
+                    return true;
+                }
+                case MotionEvent.ACTION_CANCEL:
+                    suggestionHandler.removeCallbacks(hold);
+                    cancelled[0]=true;
+                    key.setPressed(false);
+                    animateKeyPress(key,false);
+                    hintPressOrder353.cancel(pressToken[0]);
+                    pressToken[0]=-1L;
+                    requestRefreshAfterHint353();
                     return true;
                 default:return true;
             }
