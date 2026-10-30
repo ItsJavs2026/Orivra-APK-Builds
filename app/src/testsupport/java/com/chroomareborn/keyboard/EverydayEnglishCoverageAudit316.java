@@ -26,7 +26,7 @@ public final class EverydayEnglishCoverageAudit316 {
     }
     public static void main(String[] args)throws Exception {
         Map<String,Integer> words=dictionary();
-        boolean gate=args.length>1 && "--gate".equals(args[1]);
+        boolean gate=java.util.Arrays.asList(args).contains("--gate");
         if(gate) {
             for(String literal:new String[]{
                 "tell","tells","telling","told","must","under","between",
@@ -48,9 +48,11 @@ public final class EverydayEnglishCoverageAudit316 {
             }
         }
         System.out.println("SOURCE_WORDS\t"+words.size());
-        if(args.length>=1) {
+        String referenceFile=null;
+        for(String arg:args)if(!"--gate".equals(arg))referenceFile=arg;
+        if(referenceFile!=null) {
             List<String> frequency=new ArrayList<>();
-            try(BufferedReader input=new BufferedReader(new FileReader(args[0]))) {
+            try(BufferedReader input=new BufferedReader(new FileReader(referenceFile))) {
                 String value;
                 while((value=input.readLine())!=null && frequency.size()<1000) {
                     if(value.matches("[a-z]{2,20}"))frequency.add(value);

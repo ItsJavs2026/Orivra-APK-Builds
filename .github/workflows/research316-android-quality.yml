@@ -56,7 +56,8 @@ jobs:
             app/src/testsupport/java/com/chroomareborn/keyboard/JoinedEnglishContraction314Test.java \
             app/src/testsupport/java/com/chroomareborn/keyboard/NeighborDoubleKey315Test.java \
             app/src/testsupport/java/com/chroomareborn/keyboard/EverydayEnglishCoverageAudit316.java
-          for suite in EverydayEnglishCoverageAudit316 NeighborDoubleKey315Test JoinedEnglishContraction314Test CommittedEnglishCursorPolicyTest EnglishApostropheAndLearningV2Test LearningV21ConflictTest LearningTransferCodecTest CursorEditSnapshotGuardTest ContractionTapOnly309Test EditorSuggestionPrivacyPolicyTest EnterKeyPolicyTest; do
+          java -ea -Xmx256m -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.EverydayEnglishCoverageAudit316 --gate
+          for suite in NeighborDoubleKey315Test JoinedEnglishContraction314Test CommittedEnglishCursorPolicyTest EnglishApostropheAndLearningV2Test LearningV21ConflictTest LearningTransferCodecTest CursorEditSnapshotGuardTest ContractionTapOnly309Test EditorSuggestionPrivacyPolicyTest EnterKeyPolicyTest; do
             java -ea -Xmx128m -cp "$RUNNER_TEMP/classes" "com.chroomareborn.keyboard.$suite"
           done
   android-compilation:
