@@ -58,6 +58,11 @@ public final class PredictionSmokeTest {
         top("were","were");
         top("howsitgoing","how's it going");
         top("howsotgoing","how's it going");
+        // Build 310 real-device report: "tekk" should offer "tell".
+        top("tekk","tell");
+        // It must also work in editors that commit every character.
+        expect(PredictionLite.editingSuggestions("tekk").contains("tell"),
+                "Committed-text English correction must include tell");
         // Build 310 real-device screenshot: segmentation is correct, but
         // the joined final contraction lost its apostrophe.
         // Only an explicit tap may commit the new candidate.

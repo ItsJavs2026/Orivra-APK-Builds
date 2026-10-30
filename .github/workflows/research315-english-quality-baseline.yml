@@ -1,0 +1,70 @@
+name: Orivra Research 315 - English adjacent-key quality baseline (487 synthetic cases)
+on:
+  push:
+    branches:
+      - research/build315-english-neighbor-key-typos-20261030
+    paths:
+      - .github/workflows/research315-english-quality-baseline.yml
+      - app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java
+      - app/src/main/java/com/chroomareborn/keyboard/SentenceRescue.java
+      - app/src/main/java/com/chroomareborn/keyboard/SentenceFlowEvidenceRanker.java
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compile actual offline English decoder and independent holdout
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          mkdir -p "$RUNNER_TEMP/english-classes"
+          javac -encoding UTF-8 \
+            -sourcepath app/src/main/java:app/src/testsupport/java \
+            -d "$RUNNER_TEMP/english-classes" \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PredictionSmokeTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/JoinedEnglishContraction314Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/NeighborDoubleKey315Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowAccuracyBenchmark.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SentenceFlowHoldoutBenchmark.java
+      - name: Verify existing known-word / English smoke expectations
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 120s java -Xmx1g -ea -cp "$RUNNER_TEMP/english-classes" \
+            com.chroomareborn.keyboard.PredictionSmokeTest
+          java -Xmx1g -ea -cp "$RUNNER_TEMP/english-classes" \
+            com.chroomareborn.keyboard.JoinedEnglishContraction314Test
+          java -Xmx1g -ea -cp "$RUNNER_TEMP/english-classes" \
+            com.chroomareborn.keyboard.NeighborDoubleKey315Test
+      - name: Measure English segmentation, typos and protected known words
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 600s java -Xmx1g -ea -cp "$RUNNER_TEMP/english-classes" \
+            com.chroomareborn.keyboard.SentenceFlowAccuracyBenchmark \
+            | tee "$RUNNER_TEMP/english-existing-cases.txt"
+          timeout 600s java -Xmx1g -ea -cp "$RUNNER_TEMP/english-classes" \
+            com.chroomareborn.keyboard.SentenceFlowHoldoutBenchmark \
+            | tee "$RUNNER_TEMP/english-independent-holdout.txt"
+          echo "## English research baseline (synthetic, not real typing accuracy)" >> "$GITHUB_STEP_SUMMARY"
+          grep -E '^(GROUP|HOLDOUT)' "$RUNNER_TEMP/english-existing-cases.txt" >> "$GITHUB_STEP_SUMMARY"
+          grep -E '^(GROUP|HOLDOUT)' "$RUNNER_TEMP/english-independent-holdout.txt" >> "$GITHUB_STEP_SUMMARY"
+      - name: Store full reproducible English report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-315-English-SentenceFlow-Baseline
+          path: |
+            ${{ runner.temp }}/english-existing-cases.txt
+            ${{ runner.temp }}/english-independent-holdout.txt
+          retention-days: 30
+          if-no-files-found: warn
