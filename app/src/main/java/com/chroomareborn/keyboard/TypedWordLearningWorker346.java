@@ -39,8 +39,10 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
     private String priorWord;
     private long workerSession=-1L;
     private long consentEpoch=-1L;
+    private long workerRevision=-1L;
     // UI-only reads; updated with immutable snapshots on the worker.
     private volatile long visibleSession=-1L;
+    private volatile long visibleRevision=-1L;
     private volatile TypedWordEvidenceStore341.Snapshot visible=EMPTY;
     private volatile boolean closed;
 
@@ -54,28 +56,41 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
      */
     void beginEditor(long session,boolean editorAllowsLearning) {
         if(closed)return;
+        final long requestedRevision=TypedWordsConsent341.liveRevision();
         visible=EMPTY;
+        visibleRevision=-1L;
         visibleSession=session;
         worker.execute(()->{
             workerSession=session;
             priorWord=null;
             consentEpoch=-1L;
+            workerRevision=-1L;
             try{
-                if(editorAllowsLearning && TypedWordsConsent341.mayRemember(
+                if(requestedRevision==TypedWordsConsent341.liveRevision() &&
+                        editorAllowsLearning && TypedWordsConsent341.mayRemember(
                         app,true)) {
                     long epoch=TypedWordsConsent341.generation(app);
                     TypedWordEvidenceStore341.Snapshot snap=
                             TypedWordEvidenceStore341.read(app);
                     if(TypedWordsConsent341.mayRemember(app,true) &&
-                            epoch==TypedWordsConsent341.generation(app)) {
+                            epoch==TypedWordsConsent341.generation(app) &&
+                            requestedRevision==TypedWordsConsent341.liveRevision()) {
                         consentEpoch=epoch;
-                        if(visibleSession==session)visible=snap;
+                        workerRevision=requestedRevision;
+                        if(visibleSession==session) {
+                            visible=snap;
+                            visibleRevision=requestedRevision;
+                        }
                     }
                 }
             } catch(RuntimeException malformedOrUnavailable) {
                 // Fail CLOSED: never modify corrupt private storage.
                 consentEpoch=-1L;
-                if(visibleSession==session)visible=EMPTY;
+                workerRevision=-1L;
+                if(visibleSession==session) {
+                    visible=EMPTY;
+                    visibleRevision=-1L;
+                }
             }
         });
     }
@@ -87,29 +102,42 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
     void committedSpace(String verifiedWord,long editorSession,
             boolean editorAllowsLearning,boolean successfullyCommitted) {
         if(closed)return;
+        final long capturedRevision=TypedWordsConsent341.liveRevision();
         final String word=TypedSequenceArchive341.canonical(verifiedWord);
         worker.execute(()->{
             if(workerSession!=editorSession || !editorAllowsLearning ||
-                    !successfullyCommitted || consentEpoch<0L || word==null) {
+                    !successfullyCommitted || consentEpoch<0L || word==null ||
+                    workerRevision!=capturedRevision ||
+                    capturedRevision!=TypedWordsConsent341.liveRevision()) {
                 priorWord=null;
                 return;
             }
             try {
                 TypedWordBoundaryStore346.Result updated=
                         TypedWordBoundaryStore346.record(
-                        app,word,priorWord,true,true,consentEpoch);
+                        app,word,priorWord,true,true,consentEpoch,
+                        capturedRevision);
                 if(!updated.stored) {
                     priorWord=null;
                     if(visibleSession==editorSession && !TypedWordsConsent341
-                            .mayRemember(app,true))visible=EMPTY;
+                            .mayRemember(app,true)) {
+                        visible=EMPTY;
+                        visibleRevision=-1L;
+                    }
                     return;
                 }
                 priorWord=word;
-                if(visibleSession==editorSession)visible=updated.evidence;
+                if(visibleSession==editorSession &&
+                        capturedRevision==TypedWordsConsent341.liveRevision() &&
+                        visibleRevision==capturedRevision)
+                    visible=updated.evidence;
             } catch(RuntimeException invalidState) {
                 // Never delete/rewrite unknown data. No user text in logs.
                 priorWord=null;
-                if(visibleSession==editorSession)visible=EMPTY;
+                if(visibleSession==editorSession) {
+                    visible=EMPTY;
+                    visibleRevision=-1L;
+                }
             }
         });
     }
@@ -127,6 +155,7 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
     void endEditor(long session) {
         if(visibleSession==session) {
             visibleSession=-1L;
+            visibleRevision=-1L;
             visible=EMPTY;
         }
         if(closed)return;
@@ -135,6 +164,7 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
                 workerSession=-1L;
                 priorWord=null;
                 consentEpoch=-1L;
+                workerRevision=-1L;
             }
         });
     }
@@ -143,7 +173,9 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
      * No SharedPreferences accesses or locks on this code path.
      */
     List<String> nextWords(String preceding,int limit,long editorSession) {
-        if(visibleSession!=editorSession || limit<=0)return List.of();
+        if(visibleSession!=editorSession || limit<=0 ||
+                visibleRevision!=TypedWordsConsent341.liveRevision())
+            return List.of();
         String key=TypedSequenceArchive341.canonical(preceding);
         if(key==null)return List.of();
         TypedWordEvidenceStore341.Snapshot s=visible;
@@ -168,7 +200,9 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
      * Display-only; never inserts or silently autocorrects anything.
      */
     List<String> completedWords(String prefix,int limit,long editorSession) {
-        if(visibleSession!=editorSession || limit<=0 || prefix==null ||
+        if(visibleSession!=editorSession ||
+                visibleRevision!=TypedWordsConsent341.liveRevision() ||
+                limit<=0 || prefix==null ||
                 prefix.length()<2 || prefix.length()>24 ||
                 !prefix.matches("[A-Za-z]{2,24}"))
             return List.of();
@@ -191,7 +225,9 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
     }
 
     int visibleWordCount(long editorSession) {
-        return editorSession==visibleSession?visible.words.size():0;
+        return editorSession==visibleSession &&
+                visibleRevision==TypedWordsConsent341.liveRevision()?
+                visible.words.size():0;
     }
 
     /** Deterministic Android test seam. Never call from the IME main thread. */
@@ -203,6 +239,7 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
         if(closed)return;
         closed=true;
         visible=EMPTY;
+        visibleRevision=-1L;
         visibleSession=-1L;
         // Do not abandon previously queued verified Space commits.
         worker.shutdown();
