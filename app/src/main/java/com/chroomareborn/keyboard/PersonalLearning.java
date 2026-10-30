@@ -26,12 +26,22 @@ final class PersonalLearning {
     }
 
     static void setEnabled(Context context, boolean enabled) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putBoolean(ENABLED, enabled).apply();
+        // This setting ALSO gates the new separately opt-in word memory.
+        // Serialize changes with its private store so queued writes cannot
+        // win a race after Learning has been disabled.
+        synchronized(TypedWordEvidenceStore341.class) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(ENABLED, enabled).apply();
+            TypedWordsConsent341.invalidateLiveSessions();
+        }
     }
 
     static void clear(Context context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply();
+        synchronized(TypedWordEvidenceStore341.class) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().clear().apply();
+            TypedWordsConsent341.invalidateLiveSessions();
+        }
         PersonalContextLearning319.clear(context);
         PersonalWordFrequency328.clear(context);
     }
