@@ -31,3 +31,10 @@ Date 2026-10-29 CDT. Continuation from Candidate 308 in the user's Orivra develo
 6. If any issue recurs, switch back to Samsung-tested Candidate 308. Do not delete previous APKs to test this one.
 
 Other project directions remain: broad multi-typo SentenceFlow benchmarking, separate Spanish research, and privacy-safe portable learning improvements. No automatic background typing data capture or forced autocorrect.
+
+## FINAL — Verified, separately installable Candidate 309 prerelease
+
+- [Release CI 41001544375](https://github.com/ItsJavs2026/Orivra-APK-Builds/actions/runs/41001544375) **SUCCESS**: protected code parity against research source, Java tests passed (95 inherited contraction assertions, **75,035** cursor snapshot checks, **105** tap-only alternative checks) and Android 35 emulator **38 tests started / 38 tests finished / BUILD SUCCESSFUL**. This is a second native verification in addition to research run 41001117856.
+- User download: https://github.com/ItsJavs2026/Orivra-APK-Builds/releases/download/candidate-309-20261029/Orivra-Candidate-309.apk . GitHub verified release: https://github.com/ItsJavs2026/Orivra-APK-Builds/releases/tag/candidate-309-20261029
+- APK size **473,975 bytes**, SHA-256 **`277af10ad2e81dee67ed9f072b56e8710a2b5a560ee723d89f61b1ac2ef44753`**. Published separate `Orivra-Candidate-309.apk.sha256` checksum file. Debug-signed and separate app ID `com.chroomareborn.keyboard.build309trial`, versionCode 309, versionName `1.0.26-build309-tap-only-contractions`, no INTERNET permission, bundled pinned ESDB license and wordpack verified.
+- **Not yet Samsung 309 accepted.** The last phone-positive version is **Candidate 308**, user generally said all good except the two screenshots. Candidate 304 remains an older confirmed centered-strip baseline; Candidate 300 remains the Keep regression fallback. Preserve all previous installs. New trial requires explicit user phone tests before stable claim.
