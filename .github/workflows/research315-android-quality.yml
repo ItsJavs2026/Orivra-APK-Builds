@@ -28,10 +28,11 @@ jobs:
           grep -Fq 'TYPE_TEXT_VARIATION_POSTAL_ADDRESS' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
           ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
           mkdir -p "$RUNNER_TEMP/classes"
-          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+          javac -encoding UTF-8 -sourcepath app/src/main/java:app/src/testsupport/java -d "$RUNNER_TEMP/classes" \
             app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
             app/src/main/java/com/chroomareborn/keyboard/JoinedEnglishContractionPolicy.java \
             app/src/main/java/com/chroomareborn/keyboard/NeighborDoubleKeyCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java \
             app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java \
             app/src/main/java/com/chroomareborn/keyboard/PersonalDictionaryPolicy.java \
             app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
