@@ -1,0 +1,152 @@
+name: Orivra Research 358 - long draft prediction continuity (NO APK RELEASE)
+on:
+  push:
+    branches:
+      - research/build358-long-draft-prediction-continuity-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research358
+  cancel-in-progress: true
+
+jobs:
+  source-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify Candidate 354 is untouched, only research files changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="378af284207b02c3fb50bbeab273aaede6648837"
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          allowed={
+              "app/src/main/java/com/chroomareborn/keyboard/LongDraftPrediction358.java",
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/LongDraftPrediction358Research.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/LongDraftPrediction358AndroidTest.java",
+              ".github/workflows/research358-long-draft-continuity.yml"
+          }
+          assert changed==allowed, f"Unexpected/missing research files: {changed ^ allowed}"
+          base_service=subprocess.check_output([
+              "git","show",base+":app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java"],
+              text=True)
+          service=Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          assert "safeComposing358" in service and "safeIdle358" in service
+          assert service.count("LongDraftPrediction358.afterCommittedBoundary(")==2
+          assert service.count("LongDraftPrediction358.whileComposing(")==2
+          assert "hintPressOrder353.cancelAll();" in base_service
+          assert "hintPressOrder353.cancelAll();" in service
+          assert service.count("hintPressOrder353") == base_service.count("hintPressOrder353")
+          assert "private void type(" in service
+          assert "PredictionDispatcher" in service
+          assert "sensitive || !editorAllowsSuggestions" in service
+          source=Path("app/src/main/java/com/chroomareborn/keyboard/LongDraftPrediction358.java").read_text()
+          assert "No" not in ""  # fail-closed sanity
+          assert "InputConnection" in source  # documentation only, no imported editor API
+          assert "android." not in source
+          assert "getSharedPreferences" not in source
+          assert "commitText(" not in source
+          assert "android.permission.INTERNET" not in Path("app/src/main/AndroidManifest.xml").read_text()
+          gradle=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build354trial"' in gradle
+          print("PASS: standalone research, no APK release or typing touch-path change")
+          PY
+      - name: Compile and execute synthetic long-draft tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/LongDraftPrediction358.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LongDraftPrediction358Research.java
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.LongDraftPrediction358Research
+
+  android35-full-regression:
+    permissions:
+      contents: read
+    needs: source-and-synthetic
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Verify pinned offline dictionary source and SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Build Android test app without a release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable hardware-accelerated emulator when available
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Verify complete Android test count and failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          files=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert files,"Missing Android emulator test report"
+          count=failed=errors=skipped=0
+          for f in files:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith("testsuite") else [
+                  e for e in root.iter() if e.tag.endswith("testsuite")]
+              for suite in suites:
+                  count+=int(suite.attrib.get('tests','0'))
+                  failed+=int(suite.attrib.get('failures','0'))
+                  errors+=int(suite.attrib.get('errors','0'))
+                  skipped+=int(suite.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {count} tests, {failed} failures, {errors} errors, {skipped} skipped')
+          assert count>=187 and failed==0 and errors==0 and skipped==0
+          PY
+          echo "PASS emulator ONLY — not Samsung phone-qualified; no APK published."
