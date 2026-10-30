@@ -2873,7 +2873,8 @@ public final class RebornImeService extends InputMethodService {
             ic.beginBatchEdit();
             try {
                 if(ic.deleteSurroundingText(plan.lettersBefore,plan.lettersAfter))
-                    done=ic.commitText(plan.replacement,1);
+                    done=ic.commitText(
+                            plan.replacement+plan.trailingSeparator,1);
             } finally {
                 ic.endBatchEdit();
             }
@@ -3115,6 +3116,20 @@ public final class RebornImeService extends InputMethodService {
     private void showSuggestions() {
         if(candidates==null)return;
         final String snapshot=composing;
+        // A delayed editor selection callback can leave editingInMiddle
+        // stuck true after a long message. At the REAL document end, after
+        // a Space, there is no word under the caret and no suffix: recover
+        // next-word predictions without switching keyboards. Only the
+        // previously stuck state incurs these bounded extra editor reads.
+        if(snapshot.isEmpty() && editingInMiddle && !hasSelection()) {
+            try {
+                if(SuggestionContinuity353.resumeNextWordsAtDocumentEnd(
+                        true,true,false,cursorHasTextAfter(),wordAtCursor()))
+                    editingInMiddle=false;
+            } catch(RuntimeException detached) {
+                // Do not reset editing state on an unavailable editor.
+            }
+        }
         if(sensitive || !editorAllowsSuggestions) {
             predictionDispatcher.cancel();
             renderSuggestions(snapshot,java.util.Collections.emptyList());
@@ -3426,6 +3441,16 @@ public final class RebornImeService extends InputMethodService {
         // Display-only condensation retains the highest-ranked prediction.
         // Do not change the underlying predictor scores or accepted text.
         options=SuggestionDisplayPolicy.compact(input,options);
+        // In a committed word under the cursor (not active composition),
+        // put the CURRENT word in the physical center of the stable three
+        // slot strip. Blank side slots remain invisible and unclickable;
+        // async results update them in place, without Candidate 345 flicker.
+        final boolean cursorWordRow353=composing.isEmpty() &&
+                !input.isEmpty() && !sensitive && !hasSelection() &&
+                editorAllowsSuggestions && input.length()<=24 &&
+                PredictionStripFrame344.stableWord(input,false,true,false,false);
+        if(cursorWordRow353)
+            options=SuggestionContinuity353.centerCurrentWord(input,options);
         // Build 304: a few idle next-word chips should sit in the CENTER of
         // the available strip, not cling to its left edge. Restore START
         // while composing/editing and for private-field status messages.
@@ -3497,7 +3522,7 @@ public final class RebornImeService extends InputMethodService {
         // screen-wide chip. Short-word predictions keep their familiar
         // centered layout. In every case the original input remains tappable.
         // Nothing is accepted or changes the editor without an explicit tap.
-        if(!input.isEmpty() && !sensitive)
+        if(!input.isEmpty() && !sensitive && !cursorWordRow353)
             options=SuggestionDisplayPolicy.arrange(
                     input,options,splitActive && !splitNextWords.isEmpty());
         // Smart Rise 3.0: the primary candidate owns a fixed-width strip cell.
