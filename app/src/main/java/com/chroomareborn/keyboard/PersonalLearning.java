@@ -69,7 +69,16 @@ final class PersonalLearning {
                 continue;
             acceptedCounts.merge(canonical,count,Math::max);
         }
-        return LearningV2Policy.preferred(typed,acceptedCounts);
+        String established=LearningV2Policy.preferred(typed,acceptedCounts);
+        if(established!=null)return established;
+        // A single explicitly selected correction gains confidence when its
+        // accepted word is later really TYPED AND COMMITTED in safe contexts.
+        // Never infer a typo mapping from words used without an accepted tap.
+        if(acceptedCounts.size()!=1)return null;
+        String selected=acceptedCounts.keySet().iterator().next();
+        int used=PersonalContextLearning319.usedCount(context,selected);
+        return AdaptiveUsagePolicy321.reinforcedCorrection(
+                typed,acceptedCounts,used);
     }
 
     /** Safe aggregate diagnostics: no typed words, phrases, or editor content. */

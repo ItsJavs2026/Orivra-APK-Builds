@@ -2087,8 +2087,26 @@ public final class RebornImeService extends InputMethodService {
         cancelCursorReleaseSuggestions();
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
+        // Detect a real word just typed through this IME, not a pasted or
+        // existing editor string. Capture before finishComposingText(), and
+        // keep only a short approved word pair after a successful Space.
+        CommittedWordUsagePolicy321.Observation used=null;
+        long session=inputSessionGeneration;
+        if(editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
+                !sensitive && !composing.isEmpty()) {
+            try {
+                used=CommittedWordUsagePolicy321.capture(
+                        ic.getTextBeforeCursor(96,0),composing,true,
+                        editorAllowsPersonalLearning,sensitive,editingInMiddle,
+                        hasSelection(),cursorHasTextAfter(),symbols);
+            } catch(RuntimeException detached) { used=null; }
+        }
         currentFinish();
         if(!ic.commitText(" ", 1))return;
+        if(used!=null && ic==getCurrentInputConnection() &&
+                session==inputSessionGeneration && !sensitive &&
+                editorAllowsPersonalLearning)
+            PersonalContextLearning319.recordUsed(this,used.prior,used.word);
         // A normal space typed after repositioning must not switch back to
         // end-of-document composition when content remains after the cursor.
         editingInMiddle=cursorHasTextAfter() || hasSelection();
