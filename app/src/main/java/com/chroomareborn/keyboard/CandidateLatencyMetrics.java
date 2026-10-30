@@ -17,7 +17,8 @@ final class CandidateLatencyMetrics {
     private static final long[] compute=new long[CAPACITY];
     private static final long[] uiReady=new long[CAPACITY];
     private static final long[] nextFrame=new long[CAPACITY];
-    private static int readySamples, frameSamples;
+    private static final long[] keyHandler340=new long[CAPACITY];
+    private static int readySamples, frameSamples, keySamples340;
     private static boolean enabled;
 
     static boolean isCandidate(String packageName) {
@@ -39,8 +40,10 @@ final class CandidateLatencyMetrics {
         Arrays.fill(compute,0L);
         Arrays.fill(uiReady,0L);
         Arrays.fill(nextFrame,0L);
+        Arrays.fill(keyHandler340,0L);
         readySamples=0;
         frameSamples=0;
+        keySamples340=0;
     }
     static synchronized long start(String packageName) {
         return enabled(packageName)?System.nanoTime():0L;
@@ -56,6 +59,15 @@ final class CandidateLatencyMetrics {
         uiReady[slot]=viewUpdated-start;
         readySamples++;
         return true;
+    }
+    /** Time spent synchronously handling a typed key, including all UI work.
+     * In-memory duration only: no text, key identity or input length.
+     */
+    static synchronized void recordKeyHandler340(long start,long end) {
+        if(!enabled || start==0L || end-start<0L ||
+                end-start>MAX_DURATION_NANOS)return;
+        keyHandler340[keySamples340%CAPACITY]=end-start;
+        keySamples340++;
     }
     static synchronized void recordFrame(long start,long frameAt) {
         if(!enabled || start==0L || frameAt-start<0L ||
@@ -83,6 +95,7 @@ final class CandidateLatencyMetrics {
                 +"Prediction completed: "+stats(compute,readySamples)+"\n"
                 +"Suggestion views updated: "+stats(uiReady,readySamples)+"\n"
                 +"Next animation callback: "+stats(nextFrame,frameSamples)+"\n"
+                +"Typed-key UI work: "+stats(keyHandler340,keySamples340)+"\n"
                 +"Includes the 40 ms prediction debounce. "
                 +"The animation callback is before frame rendering, "
                 +"not proof that pixels reached the screen.\n"
