@@ -55,6 +55,17 @@ final class SuggestionContinuity353 {
                 others.size()>1?others.get(1):"");
     }
 
+    static boolean splitNextWordsOnlyDuringLiveComposition(
+            boolean liveComposition,boolean privateEditor,
+            boolean suggestionsAllowed,boolean nonemptyInput,
+            boolean editingMiddle,boolean textAfterCursor) {
+        // A committed cursor word is a CORRECTION surface, never a place
+        // to promote next-word chips. Those chips otherwise accidentally
+        // replace the previous word rather than being appended after it.
+        return liveComposition && !privateEditor && suggestionsAllowed &&
+                nonemptyInput && !editingMiddle && !textAfterCursor;
+    }
+
     static boolean resumeNextWordsAtDocumentEnd(boolean staleEditing,
             boolean composingEmpty,boolean hasSelection,
             boolean textAfterCaret,String wordAtCaret) {
