@@ -2163,8 +2163,16 @@ public final class RebornImeService extends InputMethodService {
                         hasSelection(),cursorHasTextAfter(),symbols);
             } catch(RuntimeException detached) { used=null; }
         }
+        String completed=editorAllowsPersonalLearning &&
+                PersonalLearning.enabled(this) && !sensitive &&
+                !editingInMiddle && !symbols && !hasSelection() &&
+                !cursorHasTextAfter()?composing:null;
         currentFinish();
         if(!ic.commitText(" ", 1))return;
+        if(completed!=null && ic==getCurrentInputConnection() &&
+                session==inputSessionGeneration && !sensitive &&
+                editorAllowsPersonalLearning)
+            FrequentWordLearning328.recordCompleted(this,completed);
         if(used!=null && ic==getCurrentInputConnection() &&
                 session==inputSessionGeneration && !sensitive &&
                 editorAllowsPersonalLearning)
@@ -2438,7 +2446,9 @@ public final class RebornImeService extends InputMethodService {
             editingInMiddle=cursorHasTextAfter();
             confirmSuggestionTap(source);
             if(editorAllowsPersonalLearning) {
-                PersonalLearning.recordAcceptance(this,expected,replacement);
+                if(FrequentWordCompletionPolicy328.isCompletion(expected,replacement))
+                    FrequentWordLearning328.recordAccepted(this,replacement);
+                else PersonalLearning.recordAcceptance(this,expected,replacement);
                 PersonalContextLearning319.record(this,priorWord,replacement);
             }
             updateSentenceShift();
@@ -2475,6 +2485,8 @@ public final class RebornImeService extends InputMethodService {
                     ic==getCurrentInputConnection() &&
                     editorAllowsPersonalLearning && !sensitive)
                 PersonalContextLearning319.record(this,acceptedPrior,next);
+            if(editorAllowsPersonalLearning)
+                FrequentWordLearning328.recordAccepted(this,next);
             confirmSuggestionTap(source);
             updateSentenceShift();
             showSuggestions();
@@ -2514,8 +2526,10 @@ public final class RebornImeService extends InputMethodService {
                     ?AcceptedContextPolicy319.precedingForNextWord(
                             ic.getTextBeforeCursor(96,0)):null;
             if (!ic.commitText(suggestion + " ", 1)) return;
-            if(editorAllowsPersonalLearning)
+            if(editorAllowsPersonalLearning) {
                 PersonalContextLearning319.record(this,prior,suggestion);
+                FrequentWordLearning328.recordAccepted(this,suggestion);
+            }
             confirmSuggestionTap(source);
             if(shift && !capsLock) shift=false;
             // A next-word tap commits a trailing boundary at the cursor.
@@ -2569,7 +2583,9 @@ public final class RebornImeService extends InputMethodService {
             if(shift && !capsLock)shift=false;
             confirmSuggestionTap(source);
             if(editorAllowsPersonalLearning) {
-                PersonalLearning.recordAcceptance(this,expected,suggestion);
+                if(FrequentWordCompletionPolicy328.isCompletion(expected,suggestion))
+                    FrequentWordLearning328.recordAccepted(this,suggestion);
+                else PersonalLearning.recordAcceptance(this,expected,suggestion);
                 // Explicit selection can teach adjacent public-word pairs.
                 // Only closed-list left context plus accepted words persist.
                 PersonalContextLearning319.record(this,priorWord,suggestion);
@@ -2640,8 +2656,11 @@ public final class RebornImeService extends InputMethodService {
                     final CursorEditSnapshotGuard.Ticket ticket=
                             captureEditingTicket(cursorWord);
                     if(ticket!=null) {
-                        renderSuggestions(cursorWord,
-                                CommittedEnglishCursorPolicy.immediate(cursorWord));
+                        renderSuggestions(cursorWord,FrequentWordCompletionPolicy328.merge(
+                                cursorWord,CommittedEnglishCursorPolicy.immediate(cursorWord),
+                                editorAllowsPersonalLearning
+                                    ?FrequentWordLearning328.matching(this,cursorWord,3)
+                                    :java.util.Collections.emptyList(),8));
                         visibleEditingTicket=ticket;
                         final long startedAt=CandidateLatencyMetrics.start(getPackageName());
                         predictionDispatcher.scheduleEditing(cursorWord,(id,input,options)->{
@@ -2652,8 +2671,11 @@ public final class RebornImeService extends InputMethodService {
                                         !editorAllowsSuggestions || !composing.isEmpty() ||
                                         !input.equals(wordAtCursor()) ||
                                         !isEditingTicketCurrent(ticket))return;
-                                renderSuggestions(input,
-                                        CommittedEnglishCursorPolicy.merge(input,options));
+                                renderSuggestions(input,FrequentWordCompletionPolicy328.merge(
+                                         input,CommittedEnglishCursorPolicy.merge(input,options),
+                                         editorAllowsPersonalLearning
+                                             ?FrequentWordLearning328.matching(this,input,3)
+                                             :java.util.Collections.emptyList(),8));
                                 visibleEditingTicket=ticket;
                                 if(CandidateLatencyMetrics.recordReady(
                                         startedAt,computedAt,System.nanoTime()))
@@ -2741,11 +2763,20 @@ public final class RebornImeService extends InputMethodService {
                     learned,legacy,3));
             return;
         }
+        // User-adaptive single-word completions appear before the slower
+        // sentence worker finishes; only visible after repeated usage.
+        java.util.List<String> frequent=editorAllowsPersonalLearning
+                ?FrequentWordLearning328.matching(this,snapshot,3)
+                :java.util.Collections.emptyList();
+        if(!frequent.isEmpty())
+            renderSuggestions(snapshot,FrequentWordCompletionPolicy328.merge(
+                    snapshot,java.util.Collections.singletonList(snapshot),
+                    frequent,8));
         // Narrow fast lane: show the typed word and exact, tap-only
         // apostrophe choices at once (including were/we're and hows/how's).
         // Full SentenceFlow still runs off-thread and replaces these options
         // only if its result belongs to the same composing snapshot.
-        if(EnglishApostrophePolicy.hasDistinctSuggestion(snapshot)) {
+        if(frequent.isEmpty() && EnglishApostrophePolicy.hasDistinctSuggestion(snapshot)) {
             java.util.ArrayList<String> immediate=new java.util.ArrayList<>();
             immediate.add(snapshot);
             immediate.addAll(EnglishApostrophePolicy.suggestions(snapshot));
@@ -2770,6 +2801,10 @@ public final class RebornImeService extends InputMethodService {
                 java.util.List<String> withPersonal=editorAllowsPersonalLearning
                         ?PersonalDictionaryPolicy.merge(input,withContractions,
                                 PersonalDictionary.matching(this,input)):withContractions;
+                withPersonal=FrequentWordCompletionPolicy328.merge(input,
+                        withPersonal,editorAllowsPersonalLearning
+                            ?FrequentWordLearning328.matching(this,input,3)
+                            :java.util.Collections.emptyList(),8);
                 // Existing opt-in Learning v1 remains independent: only a
                 // twice-accepted explicit single-word correction may outrank.
                 String preferred=editorAllowsPersonalLearning ?
