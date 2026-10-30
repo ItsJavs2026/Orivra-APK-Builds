@@ -16,9 +16,10 @@ final class SentenceSuggestionCommit {
                 candidate == null || candidate.isEmpty()) return Result.REJECTED;
         CharSequence live = editor.before(expected.length());
         if (live == null || !expected.contentEquals(live)) return Result.STALE;
-        // Unknown suffix means no invented separator. Respect existing text.
+        // Every explicit completion has a word boundary, unless a boundary
+        // or closing punctuation already follows. Never double-space.
         CharSequence following = editor.after(1);
-        String insertion = candidate + (following != null && following.length() == 0 ? " " : "");
+        String insertion = candidate + SuggestionContinuity353.spaceAfter(following);
         editor.beginBatch();
         try {
             // commitText replaces the active composing span. Never retry a
