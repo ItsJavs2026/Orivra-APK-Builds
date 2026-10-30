@@ -2192,12 +2192,11 @@ public final class RebornImeService extends InputMethodService {
                 !sensitive && !editingInMiddle && !hasSelection() &&
                 !cursorHasTextAfter() && !numericEditor && !symbols) {
             String visible=composing.isEmpty()?wordAtCursor():composing;
-            String normalized=EnglishApostrophePolicy.canonical(visible);
             CharSequence before=ic.getTextBeforeCursor(96,0);
+            String normalized=TappedWordBoundary340.verified(visible,before);
             if(normalized!=null &&
-                    StableWordUsagePolicy329.sameVisibleWord(normalized,
-                            visible,before,ic==getCurrentInputConnection(),
-                            typeSession340==inputSessionGeneration) &&
+                    ic==getCurrentInputConnection() &&
+                    typeSession340==inputSessionGeneration &&
                     before!=null && before.toString().endsWith(value)) {
                 lastTappedWord340=normalized;
                 lastTappedSession340=inputSessionGeneration;
@@ -2386,9 +2385,10 @@ public final class RebornImeService extends InputMethodService {
                 !cursorHasTextAfter() && !numericEditor && !symbols) {
             String visible=composing.isEmpty()?wordAtCursor():composing;
             try {
-                if(StableWordUsagePolicy329.sameVisibleWord(lastTappedWord340,
-                        visible,ic.getTextBeforeCursor(96,0),
-                        ic==getCurrentInputConnection(),true))
+                String verified=TappedWordBoundary340.verified(
+                        visible,ic.getTextBeforeCursor(96,0));
+                if(lastTappedWord340.equals(verified) &&
+                        ic==getCurrentInputConnection())
                     tappedWord340=lastTappedWord340;
             } catch(RuntimeException detached) { tappedWord340=null; }
         }
