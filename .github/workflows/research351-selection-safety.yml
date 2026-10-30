@@ -1,0 +1,164 @@
+name: Orivra Research 351 - highlighted selection composing safety (no phone APK)
+on:
+  push:
+    branches:
+      - research/build351-cursor-selection-transaction-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research351
+  cancel-in-progress: true
+jobs:
+  java-and-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: candidate/build350-prediction-latency-20261030
+          path: frozen350
+          persist-credentials: false
+      - name: Freeze Candidate 350 source except selection recovery transaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C frozen350 rev-parse HEAD)" = "ccac1afecb9743f2f2fbed177ec2ae2243bed247"
+          python3 - <<'PY'
+          from pathlib import Path
+          old=Path('frozen350/app')
+          root=Path('app')
+          allowed={'src/main/java/com/chroomareborn/keyboard/RebornImeService.java'}
+          for f in old.rglob('*'):
+              if not f.is_file():continue
+              rel=f.relative_to(old)
+              current=root/rel
+              assert current.exists(),f'Missing Candidate 350 baseline: {rel}'
+              if rel.as_posix() in allowed:continue
+              assert current.read_bytes()==f.read_bytes(),f'Unapproved Candidate 350 drift: {rel}'
+          stem=root/'src/main/java/com/chroomareborn/keyboard'
+          service=(stem/'RebornImeService.java').read_text()
+          oldservice=(old/'src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert service!=oldservice
+          assert 'SelectionCommitRecovery351.recover(' in service
+          assert 'SelectionCommitRecovery351.finishBeforeTypedReplacement(' in service
+          assert 'if(SelectionCommitRecovery351' in service
+          assert 'PredictionStripContinuity345.holdVisualOnly(option)' in service
+          assert 'PredictionStripContinuity345.currentChip(option)' in service
+          assert 'PredictionStripContinuity345.clearQuietRow(candidates,this)' in service
+          assert 'renderImmediateSuggestions345(snapshot,' in service
+          assert 'typedWords347.committedSpace(verified347,session,true,true)' in service
+          helper=(stem/'SelectionCommitRecovery351.java')
+          assert helper.is_file() and 'selectedText()' in helper.read_text()
+          assert (root/'src/androidTest/java/com/chroomareborn/keyboard/SelectionCommitRecovery351AndroidTest.java').is_file()
+          manifest=(root/'src/main/AndroidManifest.xml').read_text()
+          assert 'android.permission.INTERNET' not in manifest
+          assert 'android:allowBackup="false"' in manifest
+          build=(root/'build.gradle.kts').read_text()
+          assert 'build350trial' in build and 'versionCode = 350' in build
+          print('PASS: only cursor selection transaction changed from best phone-tested Candidate 350')
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Validate selected-text recovery and baseline visual/latency integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=app/src/main/java/com/chroomareborn/keyboard
+          grep -Fq 'SelectionCommitRecovery351.recover(' "$root/RebornImeService.java"
+          grep -Fq 'finishBeforeTypedReplacement(highlighted351)' "$root/RebornImeService.java"
+          grep -Fq 'getSelectedText(0)' "$root/RebornImeService.java"
+          grep -Fq 'debounceMillisFor(snapshot,editing)' "$root/PredictionDispatcher.java"
+          test -s "$root/SelectionCommitRecovery351.java"
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SelectionCommitRecovery351AndroidTest.java
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          echo 'PASS: one-shot highlighted replacement; no changes to Candidate 350 prediction timing'
+  android35-instrumentation:
+    needs: java-and-privacy
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Materialize pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile research 351 Java and Android tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration when present
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Check test report exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d app/build/outputs/androidTest-results/connected
+          ! grep -R -E '<failure|<error' app/build/outputs/androidTest-results/connected --include='*.xml'
+      - name: Upload anonymized test reports only (no APK or user data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Research351-TestReports
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Verify all Android regression tests; do not publish an APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          count=failed=errors=skipped=0
+          for f in reports:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  x for x in root.iter() if x.tag.endswith('testsuite')]
+              for x in suites:
+                  count+=int(x.attrib.get('tests',0))
+                  failed+=int(x.attrib.get('failures',0))
+                  errors+=int(x.attrib.get('errors',0))
+                  skipped+=int(x.attrib.get('skipped',0))
+          print(f'Research 351 Android 35 emulator: {count} tests, {failed} failures, {errors} errors, {skipped} skips')
+          assert count>=153 and failed==0 and errors==0 and skipped==0,'Unqualified tests'
+          PY
+          echo 'PASS: Research 351 qualified. No APK published; Candidate 350 remains untouched.'
