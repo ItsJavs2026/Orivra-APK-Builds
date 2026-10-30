@@ -9,7 +9,8 @@ public final class JoinedEnglishContraction314Test {
         total++;if(!condition)throw new AssertionError(message);
     }
     private static void accepts(String raw,String decoded,String expected) {
-        yes(expected.equals(JoinedEnglishContractionPolicy.punctuateExactJoined(raw,decoded)),
+        yes(java.util.Objects.equals(expected,
+                JoinedEnglishContractionPolicy.punctuateExactJoined(raw,decoded)),
                 "Exact missing-mark reconstruction: "+raw);
     }
     public static void main(String[] args) {
