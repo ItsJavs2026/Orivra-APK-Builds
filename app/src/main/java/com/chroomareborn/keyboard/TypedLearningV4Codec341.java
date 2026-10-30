@@ -10,7 +10,7 @@ import java.util.TreeMap;
  * Research codec for one future all-in-one user-exported V4 backup.
  *
  * V1/V2/V3 imports decode as legacy with no saved typed-context records.
- * V4 is not understood by old Candidate 340, so the V3 exporter remains
+ * V4 is not understood by old candidates, so the V3 exporter remains
  * untouched until version migration and phone tests are explicitly qualified.
  * No Android storage, background backups, or data collection in this class.
  */
@@ -46,13 +46,10 @@ final class TypedLearningV4Codec341 {
 
     private static void requireAnchoredPairs(Map<String,Integer> words,
             Map<String,Integer> pairs) {
-        for(String pair:pairs.keySet()) {
-            int split=pair.indexOf(' ');
-            if(split<1 || !words.containsKey(pair.substring(0,split)) ||
-                    !words.containsKey(pair.substring(split+1)))
-                throw new IllegalArgumentException(
-                        "Word pair missing confirmed component vocabulary");
-        }
+        // V4 includes *pending* 1-2-use evidence as well as confirmed entries.
+        // Otherwise exporting after a first or second use would discard exactly
+        // the words the user expects this single all-in-one backup to preserve.
+        TypedSequenceArchive341.verifyRawEvidence(words,pairs);
     }
 
     static String encode(String legacyBackup,Map<String,Integer> words,
@@ -70,13 +67,11 @@ final class TypedLearningV4Codec341 {
         if(footer<=0)throw new IllegalArgumentException("Malformed V3 base");
         TreeMap<String,Integer> orderedWords=new TreeMap<>();
         for(Map.Entry<String,Integer> e:words.entrySet()){
-            TypedSequenceArchive341.verifyWord(e.getKey(),e.getValue());
             if(orderedWords.putIfAbsent(e.getKey(),e.getValue())!=null)
                 throw new IllegalArgumentException("Duplicate word");
         }
         TreeMap<String,Integer> orderedPairs=new TreeMap<>();
         for(Map.Entry<String,Integer> e:pairs.entrySet()){
-            TypedSequenceArchive341.verifyPair(e.getKey(),e.getValue());
             if(orderedPairs.putIfAbsent(e.getKey(),e.getValue())!=null)
                 throw new IllegalArgumentException("Duplicate pair");
         }
@@ -104,8 +99,7 @@ final class TypedLearningV4Codec341 {
             throw new IllegalArgumentException("Invalid evidence count");
         try {
             int x=Integer.parseInt(raw);
-            if(x<TypedSequenceArchive341.MIN_EVIDENCE ||
-                    x>TypedSequenceArchive341.MAX_COUNT)
+            if(x<1 || x>TypedSequenceArchive341.MAX_COUNT)
                 throw new IllegalArgumentException("Evidence count out of bounds");
             return x;
         }catch(NumberFormatException invalid){
@@ -150,7 +144,6 @@ final class TypedLearningV4Codec341 {
             if(fields.length>=1 && fields[0].equals("VOC")) {
                 if(fields.length!=3)throw new IllegalArgumentException("Malformed vocabulary");
                 int n=count(fields[2]);
-                TypedSequenceArchive341.verifyWord(fields[1],n);
                 if(words.putIfAbsent(fields[1],n)!=null ||
                         words.size()>TypedSequenceArchive341.MAX_WORDS)
                     throw new IllegalArgumentException("Duplicate or excess vocabulary");
@@ -158,7 +151,6 @@ final class TypedLearningV4Codec341 {
                 if(fields.length!=4)throw new IllegalArgumentException("Malformed pair");
                 int n=count(fields[3]);
                 String key=fields[1]+" "+fields[2];
-                TypedSequenceArchive341.verifyPair(key,n);
                 if(pairs.putIfAbsent(key,n)!=null ||
                         pairs.size()>TypedSequenceArchive341.MAX_PAIRS)
                     throw new IllegalArgumentException("Duplicate or excess pairs");
