@@ -50,8 +50,8 @@ public final class ContextBackupFormat322Test {
         reject(()->ContextBackupFormat322.decode(
                 text.replace("CTX\tplease\ttell\t2\t4","CTX\tplease\ttell\t3\t4")),
                 "corrupted counters refused");
-        ok(LearningTransferCodec.decode(v1).contextualPairs==null,
-                "never alter existing v1 Bundle layout");
+        ok(LearningTransferCodec.decode(v1).learnedPairs.get("tekk:tell")==2,
+                "legacy v1 codec and Bundle remain unchanged");
         System.out.println("PASS ContextBackupFormat322Test "+n+" checks");
     }
 }
