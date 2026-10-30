@@ -28,6 +28,12 @@ final class StableWordUsagePolicy329 {
         int prior=before.length()-composing.length()-1;
         // A valid standalone word boundary or empty editor; reject
         // a suffix inside another longer token.
-        return prior<0 || !Character.isLetter(before.charAt(prior));
+        if(prior<0)return true;
+        char separator=before.charAt(prior);
+        // A word following a digit or an apostrophe is likely a token
+        // fragment (e.g. account123continue or jo'continue), not a
+        // standalone completed word.
+        return !Character.isLetterOrDigit(separator) &&
+                separator!='\'' && separator!='\u2019';
     }
 }

@@ -19,6 +19,18 @@ public final class StableWordUsage329Test {
                 "my","my","dummy",true,true),
                 "never harvest a suffix of an unrelated word");
         ok(!StableWordUsagePolicy329.sameVisibleWord(
+                "continue","continue","123continue",true,true),
+                "a numeric prefix cannot become learned standalone text");
+        ok(!StableWordUsagePolicy329.sameVisibleWord(
+                "continue","continue","jo'continue",true,true),
+                "an apostrophe prefix is not a clean completed-word boundary");
+        ok(StableWordUsagePolicy329.sameVisibleWord(
+                "continue","continue","go continue",true,true),
+                "ordinary whitespace boundary remains supported");
+        ok(StableWordUsagePolicy329.sameVisibleWord(
+                "continue","continue","say,continue",true,true),
+                "punctuation boundary remains supported");
+        ok(!StableWordUsagePolicy329.sameVisibleWord(
                 "continue","continued","continued",true,true),
                 "stale complete-word event must not count longer continuation");
         ok(!StableWordUsagePolicy329.sameVisibleWord(

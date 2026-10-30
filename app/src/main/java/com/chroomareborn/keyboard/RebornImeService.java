@@ -173,7 +173,9 @@ public final class RebornImeService extends InputMethodService {
         pendingStableWord329=candidate;
         // Idle observation is weaker than an explicit tap. Combined with
         // minimum repeat thresholds, a pause mid-word won't auto-replace it.
-        suggestionHandler.postDelayed(candidate,700L);
+        long stableDelayMs=StableWordTiming334.milliseconds(expected);
+        if(stableDelayMs>0)
+            suggestionHandler.postDelayed(candidate,stableDelayMs);
     }
     private String composing = "";
     private boolean sensitive, shift, symbols, capsLock;
@@ -1326,6 +1328,11 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInput();
     }
     @Override public void onFinishInputView(boolean finishingInput) {
+        // A hidden keyboard must not interpret a remaining draft as a
+        // completed word. An app's own Send button is not proof of delivery.
+        cancelStableWord329();
+        stableWordCounted329="";
+        stableWordSession329=-1L;
         invalidateEditingTicket();
         predictionDispatcher.cancel();
         invalidateBackspaceGestureSession();
