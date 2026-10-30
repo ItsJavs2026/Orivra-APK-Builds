@@ -26,6 +26,7 @@ public final class MainActivity extends Activity {
             Executors.newSingleThreadExecutor();
     private static final int REQUEST_EXPORT_LEARNING=3071;
     private static final int REQUEST_IMPORT_LEARNING=3072;
+    private static final int REQUEST_EXPORT_CONTEXT=3073;
     private TextView learningStatsView;
     private TextView dictionaryInfoView;
     private int dp(float n) { return Math.round(getResources().getDisplayMetrics().density * n); }
@@ -372,7 +373,9 @@ public final class MainActivity extends Activity {
         transferNotice.setText("\nPortable learning backup (experimental)\n"
                 +"Export only manually saved words and intentional accepted corrections. "
                 +"The file is plaintext: it may include names or personalized words. "
-                +"Choose a location you trust. No full notes or typing history.");
+                +"Choose a location you trust. No full notes or typing history. "+
+                "The familiar V1 export works with older builds; V2 can also "+
+                "include compact learned word-use relationships.");
         transferNotice.setTextColor(0xFF455263);
         transferNotice.setTextSize(14);
         root.addView(transferNotice);
@@ -394,6 +397,25 @@ public final class MainActivity extends Activity {
                                     REQUEST_EXPORT_LEARNING))
                     .show());
         root.addView(exportLearning);
+
+        Button exportContext=new Button(this);
+        exportContext.setAllCaps(false);
+        exportContext.setText("Export my context learning (V2 backup)");
+        exportContext.setOnClickListener(v->
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("Export contextual word learning?")
+                    .setMessage("This optional plaintext V2 backup includes "+
+                            "two-word habits and counts, saved words, and "+
+                            "accepted corrections. It may reveal how you type. "+
+                            "Older Orivra versions cannot import V2; keep a "+
+                            "V1 backup too for rollback. Save only to a trusted place.")
+                    .setNegativeButton("Cancel",null)
+                    .setPositiveButton("Choose location",(dialog,which)->
+                            startActivityForResult(
+                                    LearningTransferDocumentIO.createIntent(),
+                                    REQUEST_EXPORT_CONTEXT))
+                    .show());
+        root.addView(exportContext);
 
         Button importLearning=new Button(this);
         importLearning.setAllCaps(false);
@@ -598,11 +620,15 @@ public final class MainActivity extends Activity {
         if(resultCode!=RESULT_OK || result==null || result.getData()==null)
             return;
         final Uri selected=result.getData();
-        if(requestCode==REQUEST_EXPORT_LEARNING){
+        if(requestCode==REQUEST_EXPORT_LEARNING ||
+                requestCode==REQUEST_EXPORT_CONTEXT){
+            final boolean portable=requestCode==REQUEST_EXPORT_CONTEXT;
             learningTransferIo.execute(()->{
                 boolean saved=false;
                 try{
-                    String content=LearningTransferStore.exportText(this);
+                    String content=portable?
+                            LearningTransferStore.exportV2(this):
+                            LearningTransferStore.exportText(this);
                     LearningTransferDocumentIO.write(this,selected,content);
                     saved=true;
                 }catch(Exception invalidOrWriteFailed){
@@ -619,10 +645,10 @@ public final class MainActivity extends Activity {
             });
         }else if(requestCode==REQUEST_IMPORT_LEARNING){
             learningTransferIo.execute(()->{
-                final LearningTransferCodec.Bundle parsed;
+                final ContextBackupFormat322.Data parsed;
                 try{
                     String file=LearningTransferDocumentIO.read(this,selected);
-                    parsed=LearningTransferCodec.decode(file);
+                    parsed=ContextBackupFormat322.decode(file);
                 }catch(Exception malformed){
                     runOnUiThread(()->{
                         if(isFinishing()||isDestroyed())return;
@@ -635,7 +661,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(()->{
                     if(isFinishing()||isDestroyed())return;
                     final LearningTransferStore.Preview preview;
-                    try{preview=LearningTransferStore.preview(this,parsed);}
+                    try{preview=LearningTransferStore.previewV2(this,parsed);}
                     catch(IllegalArgumentException atCapacity){
                         android.widget.Toast.makeText(this,
                                 "Not enough space in personal learning for this backup.",
@@ -645,11 +671,14 @@ public final class MainActivity extends Activity {
                     new android.app.AlertDialog.Builder(this)
                         .setTitle("Review local learning import")
                         .setMessage("Validated backup: "+
-                                parsed.words.size()+" saved words and "+
-                                parsed.learnedPairs.size()+" accepted correction pairs.\n"+
+                                parsed.legacy.words.size()+" saved words, "+
+                                parsed.legacy.learnedPairs.size()+" correction pairs and "+
+                                parsed.contexts.size()+" context patterns.\n"+
                                 "Will add "+preview.newWords+" words, "+preview.newPairs+
                                 " corrections and strengthen "+preview.strongerPairs+
-                                " previous counts. Importing again does not duplicate "+
+                                " previous correction counts. Context patterns merge "+
+                                "only when backed by approved words. Importing again "+
+                                "does not duplicate "+
                                 "or inflate entries. Learning stays in its current ON/OFF "+
                                 "state. Proceed only with a backup you recognize.")
                         .setNegativeButton("Cancel",null)
@@ -657,7 +686,7 @@ public final class MainActivity extends Activity {
                                 learningTransferIo.execute(()->{
                                     boolean completed=false;
                                     try{
-                                        LearningTransferStore.importConfirmed(this,parsed);
+                                        LearningTransferStore.importV2Confirmed(this,parsed);
                                         completed=true;
                                     }catch(Exception rejected){
                                         // No raw learned words or selected URI logged.
