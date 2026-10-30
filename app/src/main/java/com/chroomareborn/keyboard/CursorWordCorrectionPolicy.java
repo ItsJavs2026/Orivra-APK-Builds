@@ -35,8 +35,9 @@ final class CursorWordCorrectionPolicy {
                 !singleWord(replacement))return null;
 
         int left=before.length(),right=0;
-        while(left>0 && Character.isLetter(before.charAt(left-1)))left--;
-        while(right<after.length() && Character.isLetter(after.charAt(right)))right++;
+        while(left>0 && EnglishApostrophePolicy.isTokenChar(before.charAt(left-1)))left--;
+        while(right<after.length() &&
+                EnglishApostrophePolicy.isTokenChar(after.charAt(right)))right++;
         int beforeCount=before.length()-left;
         if(beforeCount+right==0)return null;
         // A 64-character snapshot can cut off a longer word. Refuse a
