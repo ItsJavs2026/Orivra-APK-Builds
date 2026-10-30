@@ -53,8 +53,16 @@ final class ComposingMutation340 {
             if(before==null || after==null)
                 return accepted?Result.COMPOSING:Result.REJECTED;
             String wanted=expected(before,addition);
-            if(wanted.equals(after))
-                return accepted?Result.COMPOSING:Result.COMMITTED;
+            if(wanted.equals(after)) {
+                if(accepted)return Result.COMPOSING;
+                // Even a false-returning editor may have left an active
+                // composing span. Finish it without changing visible text so
+                // the next key cannot replace the whole previous word.
+                if(!editor.finishComposing() || !editor.sameSession() ||
+                        !wanted.equals(copy(editor.before())))
+                    return Result.STALE;
+                return Result.COMMITTED;
+            }
             // A false result is not permission to type a second time if
             // the host changed *anything*. Avoid doubling or corrupting text.
             if(!before.equals(after))return Result.STALE;
