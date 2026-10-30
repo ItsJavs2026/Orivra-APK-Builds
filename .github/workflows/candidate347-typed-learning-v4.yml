@@ -1,0 +1,316 @@
+name: Orivra Candidate 347 - verified typed-word learning and unified V4 backup
+on:
+  push:
+    branches:
+      - candidate/build347-typed-learning-v4-test-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate347
+  cancel-in-progress: true
+jobs:
+  java-and-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: research/build340-composing-safety-lag-20261030
+          path: qualified340
+          persist-credentials: false
+      - name: Compare exact pinned Research 340 source and protect previous candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C qualified340 rev-parse HEAD)" = "141b6275df50bd8853e9a47503387862b3a4e37e"
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('app')
+          old=Path('qualified340/app')
+          allowed={
+              'build.gradle.kts',
+              'src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+              'src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
+              'src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java',
+              'src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
+              'src/main/java/com/chroomareborn/keyboard/LearningTransferDocumentIO.java'
+          }
+          for f in old.rglob('*'):
+              if not f.is_file():continue
+              rel=f.relative_to(old)
+              if rel.as_posix() in allowed:continue
+              current=root/rel
+              assert current.exists() and current.read_bytes()==f.read_bytes(),f'Source drift: {rel}'
+          build=(root/'build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build347trial"' in build
+          assert 'versionCode = 347' in build
+          assert '"Orivra Candidate 347"' in build
+          assert 'build339trial' not in build
+          for p in [
+              'src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
+              'src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java'
+          ]:assert 'build347trial' in (root/p).read_text()
+          main=(root/'src/main/java/com/chroomareborn/keyboard/MainActivity.java').read_text()
+          assert 'Candidate 347 Test' in main
+          assert 'LearningTransferStore.exportV3(this)' in main
+          assert 'LearningTransferStore.importV3Confirmed(this,parsed)' in main
+          assert 'android.permission.INTERNET' not in (root/'src/main/AndroidManifest.xml').read_text()
+          service=(root/'src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'PredictionStripStability342.showPrivateStatus(' in service
+          assert 'immediate342.add(snapshot)' in service
+          assert 'NextWordControlLabels.emptyBarText(' not in service
+          assert 'PredictionStripStability342.autoExpandDuringTyping()' not in service
+          assert 'predictionsExpanded=true;' in service
+          assert 'if(splitActive && (!splitNextWords.isEmpty() || !splitPhrases.isEmpty())) {' in service
+          assert '.suppressExpectedCursorEcho(' in service
+          assert (root/'src/main/java/com/chroomareborn/keyboard/PredictionStripStability342.java').exists()
+          assert (root/'src/androidTest/java/com/chroomareborn/keyboard/PredictionStripStability342AndroidTest.java').exists()
+          assert (root/'src/main/java/com/chroomareborn/keyboard/PredictionStripFrame344.java').exists()
+          assert (root/'src/androidTest/java/com/chroomareborn/keyboard/PredictionStripFrame344AndroidTest.java').exists()
+          assert 'PredictionStripFrame344.ensureThreeSlots(candidates,this)' in service
+          assert 'PredictionStripFrame344.slotValue(options,i)' in service
+          assert 'STRIP_REGULAR_344' in service and 'STRIP_EMPHASIZED_344' in service
+          assert (root/'src/main/java/com/chroomareborn/keyboard/PredictionStripContinuity345.java').exists()
+          assert (root/'src/androidTest/java/com/chroomareborn/keyboard/PredictionStripContinuity345AndroidTest.java').exists()
+          assert 'renderImmediateSuggestions345(snapshot,' in service
+          assert 'renderImmediateSuggestions345(cursorWord,initial)' in service
+          assert 'renderImmediateSuggestions345(word,immediately)' in service
+          assert 'PredictionStripContinuity345.holdVisualOnly(option)' in service
+          assert 'PredictionStripContinuity345.clearQuietRow(candidates,this)' in service
+          assert 'PredictionStripContinuity345.currentChip(option)' in service
+          assert 'VerifiedSpacePolicy347.verifiedToken(' in service
+          assert 'typedWords347.committedSpace(verified347,session,true,true)' in service
+          assert 'typedWords347.beginEditor(typedWordsSession347,true)' in service
+          assert 'typedWords347.endEditor(typedWordsSession347)' in service
+          assert 'TypedWordsConsent341.enabled(this)' in service
+          assert 'TypedLearningV4Transfer347.exportV4(this)' in main
+          assert 'TypedLearningV4Transfer347.importConfirmed(' in main
+          assert 'Turn OFF and erase typed-word memory' in main
+          for file in ['TypedWordLearningWorker346.java','TypedWordBoundaryStore346.java',
+                       'TypedWordEvidenceStore341.java','TypedWordsConsent341.java',
+                       'TypedLearningV4Codec341.java','TypedLearningV4Transfer347.java',
+                       'VerifiedSpacePolicy347.java']:
+              assert (root/'src/main/java/com/chroomareborn/keyboard'/file).exists(),file
+          for file in ['TypedWordEvidenceStore341AndroidTest.java',
+                       'TypedWordLearningWorker346AndroidTest.java',
+                       'TypedLearningV4Transfer347AndroidTest.java',
+                       'VerifiedSpacePolicy347AndroidTest.java']:
+              assert (root/'src/androidTest/java/com/chroomareborn/keyboard'/file).exists(),file
+          manifest=(root/'src/main/AndroidManifest.xml').read_text()
+          assert 'android:allowBackup="false"' in manifest
+          assert 'android.permission.INTERNET' not in manifest
+          prefs=(root/'src/main/java/com/chroomareborn/keyboard/TypedWordsConsent341.java').read_text()
+          assert 'getBoolean(KEY,false)' in prefs
+          codec=(root/'src/main/java/com/chroomareborn/keyboard/TypedLearningV4Codec341.java').read_text()
+          assert 'TypedSequenceArchive341.verifyRawEvidence(words,pairs)' in codec
+          print('PASS: visual continuity retained + opt-in verified worker and full V4 source wiring')
+          assert 'predictionsExpanded=true;' in service
+          print('PASS: active prediction cells reused, original automatic Rise still enabled')
+          print('PASS: qualified 340 source + isolated strip hotfix; V3 and manifest unchanged')
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Check regression files, offline permissions and source wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=app/src/main/java/com/chroomareborn/keyboard
+          test -s "$root/ComposingMutation340.java"
+          test -s "$root/PrefixCandidateCache340.java"
+          test -s "$root/PersonalNextWordModel.java"
+          test -s "$root/TappedWordBoundary340.java"
+          test -s "$root/SessionPhraseDisplay340.java"
+          test -s "$root/NextWordTapTicket340.java"
+          test -s "$root/PredictionStripStability342.java"
+          test -s "$root/PredictionStripFrame344.java"
+          test -s "$root/PredictionStripContinuity345.java"
+          test -s "$root/TypedWordLearningWorker346.java"
+          test -s "$root/TypedWordBoundaryStore346.java"
+          test -s "$root/TypedWordEvidenceStore341.java"
+          test -s "$root/TypedWordsConsent341.java"
+          test -s "$root/TypedLearningV4Codec341.java"
+          test -s "$root/TypedLearningV4Transfer347.java"
+          test -s "$root/VerifiedSpacePolicy347.java"
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TypedLearningV4Transfer347AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/VerifiedSpacePolicy347AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TypedWordLearningWorker346AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PredictionStripContinuity345AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PredictionStripFrame344AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PredictionStripStability342AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/ComposingMutation340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PrefixCandidateCache340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TappedSequence340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/TappedWordBoundary340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/SessionPhraseDisplay340AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/NextWordTapTicket340AndroidTest.java
+          grep -Fq 'ComposingMutation340.append(' "$root/RebornImeService.java"
+          grep -Fq 'personalizedPrefix340(input)' "$root/RebornImeService.java"
+          grep -Fq 'tappedSequence340.observeCommittedWord(' "$root/RebornImeService.java"
+          grep -Fq 'LearningTransferStore.exportV3(this)' "$root/MainActivity.java"
+          grep -Fq 'LearningTransferStore.importV3Confirmed(this,parsed)' "$root/MainActivity.java"
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          ! grep -Fq 'inputSessionGeneration==inputSessionGeneration' "$root/RebornImeService.java"
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -sourcepath app/src/main/java -d "$RUNNER_TEMP/classes" \
+            "$root/ComposingMutation340.java" \
+            "$root/PrefixCandidateCache340.java" \
+            "$root/PersonalNextWordModel.java" \
+            "$root/TappedWordBoundary340.java" \
+            "$root/SessionPhraseDisplay340.java" \
+            "$root/NextWordTapTicket340.java" \
+            "$root/PredictionStripStability342.java"
+          echo 'PASS: stable prediction engine untouched; V4 is user-selected only and no Internet permission'
+
+  android35-instrumentation:
+    permissions:
+      contents: write
+    needs: java-and-privacy
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Materialize pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile Candidate 347 hotfix and Android test APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration when present
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Check test report exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d app/build/outputs/androidTest-results/connected
+          ! grep -R -E '<failure|<error' app/build/outputs/androidTest-results/connected --include='*.xml'
+      - name: Upload anonymized test reports only (no APK or user data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate347-TestReports
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Confirm no instrumentation failures and verify separate APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          count=failed=errors=skipped=0
+          for f in reports:
+              t=ET.parse(f).getroot()
+              suites=[t] if t.tag.endswith('testsuite') else [x for x in t.iter() if x.tag.endswith('testsuite')]
+              for x in suites:
+                  count+=int(x.attrib.get('tests',0))
+                  failed+=int(x.attrib.get('failures',0))
+                  errors+=int(x.attrib.get('errors',0))
+                  skipped+=int(x.attrib.get('skipped',0))
+          print(f'Android35 emulator: {count} tests; {failed} failures; {errors} errors; {skipped} skipped')
+          assert count>=136 and failed==0 and errors==0 and skipped==0,'Unqualified instrumentation results'
+          PY
+          mkdir -p dist
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n1 |
+            grep -Fq "package: name='com.chroomareborn.keyboard.build347trial' versionCode='347'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > dist/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" > dist/permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/permissions.txt
+          cp "$apk" dist/Orivra-Candidate-347.apk
+          (cd dist && sha256sum Orivra-Candidate-347.apk > Orivra-Candidate-347.apk.sha256)
+          cat > dist/Release_Notes.txt <<'TXT'
+          Orivra Candidate 347 - optional persistent typed words and V4 backup
+
+          Separate debug-signed com.chroomareborn.keyboard.build347trial APK.
+          Does not replace Candidate 345 or its phone-tested prediction strip.
+          - Retains Candidate 345 normal prediction-bar visual stability,
+            automatic Rise, split predictions, composing/backspace and privacy.
+          - New separate default-OFF "Remember words I type" permission;
+            existing Learning must also be enabled and editor must allow it.
+          - Records only successfully committed and verified Space words.
+            No paste, unverified edits, numeric, password or sensitive fields.
+          - Bounded on-device word/pair evidence across independent sessions;
+            counts >=3 may become explicit tap-only candidates, including
+            short words. Storage I/O is off the keyboard's key thread.
+          - One recommended portable V4 backup includes V1/V2/V3 plus pending
+            verified typed word/pair counts 1 and 2, not only confirmed words.
+          - V4 import previews and validates, merges counts by MAX; never
+            toggles ON consent. Previous V1/V2/V3 backup controls retained.
+          - Explicit OFF+erase separate typed memory; no INTERNET permission,
+            no automatic backup, no typed-text analytics or network.
+          - Keep the previous V3 backup for rollback; Candidate 345 cannot
+            read V4 backups. Other candidate app data is not auto-imported.
+
+          Android 35 emulator qualifying tests do NOT establish Samsung Android
+          17 responsiveness. Test in a non-sensitive disposable note and
+          verify typing/Backspace/Rise before relying on this new candidate.
+          TXT
+      - name: Upload APK, SHA256 and signature report
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate-347-Android35-Passed
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Create prerelease only after successful emulator qualification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view candidate-347-20261030 >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to overwrite'
+            exit 1
+          fi
+          gh release create candidate-347-20261030 \
+            dist/Orivra-Candidate-347.apk \
+            dist/Orivra-Candidate-347.apk.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 347 - Opt-in Typed Learning and One-File V4 Backup" \
+            --notes-file dist/Release_Notes.txt \
+            --prerelease
