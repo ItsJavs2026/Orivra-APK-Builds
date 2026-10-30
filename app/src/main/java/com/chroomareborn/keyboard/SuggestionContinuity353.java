@@ -24,10 +24,10 @@ final class SuggestionContinuity353 {
         if(following==null)return "";
         if(following.length()==0)return " ";
         int cp=Character.codePointAt(following,0);
-        if(Character.isWhitespace(cp))return "";
+        if(Character.isWhitespace(cp) || Character.isSpaceChar(cp))return "";
         // A selected word before commas/periods/etc should not acquire
-        // an ungrammatical separator before its closing punctuation.
-        if(",.;:!?)]}’”»".indexOf(cp)>=0)return "";
+        // an ungrammatical separator before closing punctuation or quotes.
+        if(",.;:!?)]}’”»'\"›".indexOf(cp)>=0)return "";
         return " ";
     }
 
