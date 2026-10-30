@@ -1,0 +1,118 @@
+name: Orivra 306 - learning conflict and casing regression QA
+on:
+  push:
+    branches:
+      - research/build306-learning-v2-ranking-20261029
+    paths:
+      - .github/workflows/research306-learning-v2-conflict-qa.yml
+      - app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java
+      - app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java
+      - app/src/testsupport/java/com/chroomareborn/keyboard/LearningV21ConflictTest.java
+      - app/src/androidTest/java/com/chroomareborn/keyboard/LearningV21RankingAndroidTest.java
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-306-learning-conflicts
+  cancel-in-progress: true
+jobs:
+  java-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ab6a8d7e675533271981dca6fe0d146419ffe338
+          path: qualified-candidate-305
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Protect fully qualified 305 IME, Keep privacy, apostrophe, assets and manifest
+        run: |
+          set -euo pipefail
+          for f in RebornImeService.java EnglishApostrophePolicy.java PersonalDictionaryPolicy.java PersonalDictionary.java EditorSuggestionPrivacyPolicy.java PredictionLite.java SuggestionStripLayoutPolicy.java OfflineDictionaryActivationPolicy.java; do
+            cmp "qualified-candidate-305/app/src/main/java/com/chroomareborn/keyboard/$f" "app/src/main/java/com/chroomareborn/keyboard/$f"
+          done
+          cmp qualified-candidate-305/app/build.gradle.kts app/build.gradle.kts
+          cmp qualified-candidate-305/app/src/main/AndroidManifest.xml app/src/main/AndroidManifest.xml
+          cmp qualified-candidate-305/app/src/main/java/com/chroomareborn/keyboard/MainActivity.java app/src/main/java/com/chroomareborn/keyboard/MainActivity.java
+          cmp qualified-candidate-305/app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          grep -Fq 'EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'editorAllowsPersonalLearning' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'orivra_personal_learning_v1' app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java
+          grep -Fq 'accepted:' app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java
+          grep -Fq 'KEY' app/src/main/java/com/chroomareborn/keyboard/OfflineDictionaryActivationPolicy.java
+      - name: Compile original and expanded 306 policy regressions
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PersonalDictionaryPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningV21ConflictTest.java
+          java -Xmx128m -ea -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.EnglishApostropheAndLearningV2Test
+          java -Xmx128m -ea -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.LearningV21ConflictTest
+      - name: Confirm experimental source only, no user APK
+        run: echo "V1 correction schema preserved; no apk or release published."
+  android-emulator:
+    needs: java-regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Rebuild licensed exact-word source needed by existing Android tests
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          test -s app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+          gzip -t < app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Validate unchanged candidate package and new synthetic Android tests
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.chroomareborn.keyboard.build305trial' app/build.gradle.kts
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/LearningV21RankingAndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/PersonalLearningV2AndroidTest.java
+          test -s app/src/androidTest/java/com/chroomareborn/keyboard/KeepPredictionSecurityAndroidTest.java
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+      - name: Enable KVM
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Research qualification only, do not publish
+        run: echo "Original Candidate 305 remains untouched; Android emulator verified. No APK is released."
