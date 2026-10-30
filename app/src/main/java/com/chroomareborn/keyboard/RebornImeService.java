@@ -1356,6 +1356,7 @@ public final class RebornImeService extends InputMethodService {
             invalidateEditingTicket();
         lastSelectionStart=newSelStart;
         lastSelectionEnd=newSelEnd;
+        if(singleBackspaceMutation338)return;
         // Suppress per-character prediction work while the finger is moving.
         if(cursorSwipeNavigating || cursorReleaseSuggestionsPending)return;
         if(composing.isEmpty()) {
@@ -2175,6 +2176,10 @@ public final class RebornImeService extends InputMethodService {
         updateSentenceShift();
         showSuggestions();
     }
+    // Suppress re-entrant Android selection callbacks during an actual
+    // Backspace edit. Otherwise a transient -1 composing range may clear
+    // the final composing letter and briefly show an empty suggestion hint.
+    private boolean singleBackspaceMutation338;
     private void backspace() {
         cancelStableWord329();
         stableWordCounted329="";
@@ -2183,29 +2188,67 @@ public final class RebornImeService extends InputMethodService {
         cancelCursorReleaseSuggestions();
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
-        prepareCursorEdit(ic);
-        if (!composing.isEmpty()) {
-            composing = composing.substring(0, composing.length() - 1);
-            if (composing.isEmpty()) ic.finishComposingText();
-            else ic.setComposingText(composing, 1);
-        } else {
-            try {
-                if(!ic.deleteSurroundingTextInCodePoints(1,0)
-                        && !ic.deleteSurroundingText(1,0)) {
-                    // Some custom search editors implement only the standard
-                    // delete key event. Send it ONLY if both direct deletion
-                    // APIs rejected the operation, so a single tap cannot
-                    // delete multiple characters on a successful API call.
-                    if(ic.sendKeyEvent(new KeyEvent(
-                            KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL)))
-                        ic.sendKeyEvent(new KeyEvent(
-                                KeyEvent.ACTION_UP,KeyEvent.KEYCODE_DEL));
+        singleBackspaceMutation338=true;
+        try {
+            prepareCursorEdit(ic);
+            if (!composing.isEmpty()) {
+                if(composing.codePointCount(0,composing.length())==1) {
+                    final long session=inputSessionGeneration;
+                    final String letter=composing;
+                    FinalComposingDelete338.Result result=
+                            FinalComposingDelete338.apply(
+                                new FinalComposingDelete338.Editor() {
+                                    @Override public boolean sameSession() {
+                                        return ic==getCurrentInputConnection() &&
+                                                session==inputSessionGeneration;
+                                    }
+                                    @Override public CharSequence before() {
+                                        return ic.getTextBeforeCursor(96,0);
+                                    }
+                                    @Override public boolean replaceComposingWithEmpty() {
+                                        return ic.setComposingText("",1);
+                                    }
+                                    @Override public boolean finishComposing() {
+                                        return ic.finishComposingText();
+                                    }
+                                    @Override public boolean deleteOneCodePoint() {
+                                        return ic.deleteSurroundingTextInCodePoints(1,0)
+                                                ||ic.deleteSurroundingText(1,0);
+                                    }
+                                },letter);
+                    // Never retain a stale composing span after the host
+                    // rejected or unexpectedly changed the final-letter edit.
+                    composing="";
+                    if(result==FinalComposingDelete338.Result.STALE)return;
+                } else {
+                    int previous=composing.offsetByCodePoints(
+                            composing.length(),-1);
+                    String shortened=composing.substring(0,previous);
+                    if(ic.setComposingText(shortened,1))
+                        composing=shortened;
+                    else {
+                        ic.finishComposingText();
+                        composing=""; // next tap may use committed-text deletion
+                    }
                 }
-            } catch(RuntimeException editorDetached) {
-                // The editor switched while Backspace was held. Do not
-                // retry or dispatch a keystroke to the newly focused editor.
-                return;
+            } else {
+                try {
+                    if(!ic.deleteSurroundingTextInCodePoints(1,0)
+                            && !ic.deleteSurroundingText(1,0)) {
+                        // Some custom search editors implement only the standard
+                        // delete key event. Send it ONLY if both direct deletion
+                        // APIs rejected the operation.
+                        if(ic.sendKeyEvent(new KeyEvent(
+                                KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL)))
+                            ic.sendKeyEvent(new KeyEvent(
+                                    KeyEvent.ACTION_UP,KeyEvent.KEYCODE_DEL));
+                    }
+                } catch(RuntimeException editorDetached) {
+                    return;
+                }
             }
+        } finally {
+            singleBackspaceMutation338=false;
         }
         boolean oldShift=shift;
         updateSentenceShift();
