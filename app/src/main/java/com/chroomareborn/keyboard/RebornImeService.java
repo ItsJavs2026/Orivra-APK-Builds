@@ -208,6 +208,9 @@ public final class RebornImeService extends InputMethodService {
     private boolean extraSymbols=false;
 
     private boolean numericEditor=false;
+    // Manual ABC override for host-declared NUMBER/PHONE/DATETIME fields.
+    // This is never persisted and resets when focus changes.
+    private boolean numericAlphabeticOverride=false;
     // Selection callbacks can arrive after an IME write. Only an actual
     // editor selection outside our composing span should end composition.
     private boolean editingInMiddle = false;
@@ -1232,8 +1235,9 @@ public final class RebornImeService extends InputMethodService {
         editorAllowsPersonalLearning=privacy.allowPersonalLearning;
         editorAllowsSuggestions=privacy.allowSuggestions;
         reconcileOptionalDictionary();
-        numericEditor=info!=null && ((info.inputType & InputType.TYPE_MASK_CLASS)==InputType.TYPE_CLASS_NUMBER
-                || (info.inputType & InputType.TYPE_MASK_CLASS)==InputType.TYPE_CLASS_PHONE);
+        numericEditor=NumericKeypadPolicy323.isNumericField(
+                info==null?0:info.inputType);
+        numericAlphabeticOverride=false;
         symbols=false;
         extraSymbols=false;
         lastTypingTime=0L;
@@ -1646,6 +1650,16 @@ public final class RebornImeService extends InputMethodService {
         final boolean landscape=getResources().getConfiguration().orientation
                 == Configuration.ORIENTATION_LANDSCAPE;
         keys.removeAllViews();
+        // A numeric editor used to suppress Shift and ?123 but still draw
+        // the *ABC rows*. Currency/amount inputs became unusable: QWERTY
+        // with only Go and no route to digits. Render actual digit keys.
+        // Keep NO_SUGGESTIONS / sensitive flags independent of layout.
+        final boolean numericPad=numericEditor&&!numericAlphabeticOverride;
+        if(numericPad) {
+            renderNumericKeypad323(heightMode,landscape);
+            showSuggestions();
+            return;
+        }
         final int layoutMode=!symbols?KeyboardLayoutSpec.ABC:
                 extraSymbols?KeyboardLayoutSpec.EXTRA:KeyboardLayoutSpec.SYMBOLS;
         final String[] rows=KeyboardLayoutSpec.rows(layoutMode);
@@ -1654,7 +1668,7 @@ public final class RebornImeService extends InputMethodService {
             LinearLayout row = new LinearLayout(this);
             row.setMotionEventSplittingEnabled(true);
             row.setGravity(Gravity.CENTER);
-            if(index==2 && !numericEditor) {
+            if(index==2) {
                 if(!symbols) {
                     Button shiftKey=addKey(row,capsLock?"⇪":"⇧",1.4f,()->{});
                     attachShiftKey(shiftKey);
@@ -1669,7 +1683,7 @@ public final class RebornImeService extends InputMethodService {
             for(int col=0;col<rows[index].length();col++) {
                 final String value=String.valueOf(rows[index].charAt(col));
                 final String visible=shift&&!symbols?value.toUpperCase():value;
-                if(!symbols && !numericEditor) {
+                if(!symbols) {
                     String hint=KeyboardLayoutSpec.longPressHint(index,col);
                     addHintLetterKey(row,visible,value,hint);
                 } else addKey(row,visible,1f,()->type(value));
@@ -1683,14 +1697,20 @@ public final class RebornImeService extends InputMethodService {
         currentRowHeightDp=KeyboardSizing.keyHeightDp(heightMode,3,landscape);
         LinearLayout bottom = new LinearLayout(this);
         bottom.setMotionEventSplittingEnabled(true);
-        if(!numericEditor) addKey(bottom,KeyboardLayoutSpec.bottomModeLabel(layoutMode),
+        addKey(bottom,KeyboardLayoutSpec.bottomModeLabel(layoutMode),
                 1.3f,()->{
-                    symbols=!symbols;
+                    // The host claimed a numeric editor but the user pressed
+                    // ABC to temporarily type letters. ?123 must always
+                    // restore its numeric keypad, not an unrelated symbol page.
+                    if(numericEditor) {
+                        numericAlphabeticOverride=false;
+                        symbols=false;
+                    } else symbols=!symbols;
                     extraSymbols=false;
                     refreshView();
                 });
-        if(!numericEditor)addKey(bottom,",",0.95f,()->type(","));
-        if(!numericEditor) {
+        addKey(bottom,",",0.95f,()->type(","));
+        {
             if(symbols) {
                 final Button[] numberKey=new Button[1];
                 numberKey[0]=addKey(bottom,"1234",0.95f,()->showNumberMenu(numberKey[0]));
@@ -1704,12 +1724,63 @@ public final class RebornImeService extends InputMethodService {
             spaceKey.setContentDescription("Space; slide left or right to move cursor");
             attachSpacebarCursorControl(spaceKey);
         }
-        if(!numericEditor)addKey(bottom,".",0.95f,()->type("."));
+        addKey(bottom,".",0.95f,()->type("."));
         Button enterKey=addKey(bottom,"↵",1.3f,this::handleEnterTap);
         attachSafeEnterKey(enterKey);
         keys.addView(bottom);
         showSuggestions();
     }
+    /**
+     * Numeric/financial input: actual digits, decimal and deletion, with a
+     * visible ABC escape hatch. No predictions or private learning occur.
+     * Uses the same full-cell touch and haptic behavior as ordinary keys.
+     */
+    private void renderNumericKeypad323(int sizeMode,boolean landscape) {
+        final EditorInfo editor=getCurrentInputEditorInfo();
+        final int inputType=editor==null?0:editor.inputType;
+        final String[] lines=NumericKeypadPolicy323.NUMBER_ROWS;
+        for(int index=0;index<3;index++) {
+            currentRowHeightDp=KeyboardSizing.keyHeightDp(sizeMode,index,landscape);
+            LinearLayout row=new LinearLayout(this);
+            row.setMotionEventSplittingEnabled(true);
+            for(int col=0;col<3;col++) {
+                String digit=String.valueOf(lines[index].charAt(col));
+                addKey(row,digit,1f,()->type(digit));
+            }
+            keys.addView(row);
+        }
+        currentRowHeightDp=KeyboardSizing.keyHeightDp(sizeMode,3,landscape);
+        LinearLayout last=new LinearLayout(this);
+        last.setMotionEventSplittingEnabled(true);
+        String separator=NumericKeypadPolicy323.secondarySymbol(inputType);
+        if(separator.isEmpty()) {
+            // Keep zero physically centered; blank slot has no touch action.
+            View unused=new View(this);
+            last.addView(unused,new LinearLayout.LayoutParams(
+                    0,dp(currentRowHeightDp),1f));
+        } else addKey(last,separator,1f,()->type(separator));
+        addKey(last,"0",1f,()->type("0"));
+        Button delete=addKey(last,"⌫",1f,this::backspace);
+        attachRepeatingBackspace(delete);
+        keys.addView(last);
+
+        currentRowHeightDp=KeyboardSizing.keyHeightDp(sizeMode,3,landscape);
+        LinearLayout actions=new LinearLayout(this);
+        actions.setMotionEventSplittingEnabled(true);
+        addKey(actions,"ABC",1.4f,()->{
+            numericAlphabeticOverride=true;
+            symbols=false;
+            extraSymbols=false;
+            refreshView();
+        }).setContentDescription("Switch to letters temporarily");
+        if(NumericKeypadPolicy323.isSigned(inputType))
+            addKey(actions,"−",0.9f,()->type("-"))
+                    .setContentDescription("Minus");
+        Button enter=addKey(actions,"↵",2.1f,this::handleEnterTap);
+        attachSafeEnterKey(enter);
+        keys.addView(actions);
+    }
+
     /**
      * Alphabet hints mirror the screenshot. A quick release types the letter;
      * a deliberate long press types its secondary symbol instead, never both.
