@@ -27,6 +27,10 @@ final class EnglishApostrophePolicy {
             "you're","you've","y'all"
     ));
     private static final Map<String,String> UNAMBIGUOUS_MISSING_MARK;
+    // These exact normal English words are valid as typed. Their
+    // apostrophized meanings are OPTIONAL tap-only choices, never silent
+    // conversions. The list stays tiny to avoid speculative corrections.
+    private static final Map<String,String> AMBIGUOUS_TAP_ONLY;
     static {
         Map<String,String> words=new LinkedHashMap<>();
         for(String original:FORMS){
@@ -51,6 +55,10 @@ final class EnglishApostrophePolicy {
             words.put(parts[0],parts[1]);
         }
         UNAMBIGUOUS_MISSING_MARK=Collections.unmodifiableMap(words);
+        Map<String,String> ambiguous=new LinkedHashMap<>();
+        ambiguous.put("were","we're");
+        ambiguous.put("hows","how's");
+        AMBIGUOUS_TAP_ONLY=Collections.unmodifiableMap(ambiguous);
     }
 
     /** ASCII letters with one or more internal apostrophes, no separators.
@@ -111,9 +119,32 @@ final class EnglishApostrophePolicy {
             }
         } else {
             String fixed=UNAMBIGUOUS_MISSING_MARK.get(normalized);
-            if(fixed!=null)choices.add(fixed);
+            if(fixed==null)fixed=AMBIGUOUS_TAP_ONLY.get(normalized);
+            if(fixed!=null)choices.add(matchInputCase(raw,fixed));
         }
         return choices;
+    }
+
+    /** Preserve existing word/case and add only distinct tap alternatives. */
+    static boolean hasDistinctSuggestion(String typed) {
+        String key=canonical(typed);
+        if(key==null || containsApostrophe(typed))return false;
+        for(String candidate:suggestions(typed))
+            if(!key.equals(canonical(candidate)))return true;
+        return false;
+    }
+
+    private static String matchInputCase(String input,String suggestion) {
+        if(input==null||input.isEmpty()||suggestion==null)return suggestion;
+        // The first-person "I" is always capitalized in English.
+        if("I'm".equals(suggestion)||"I'll".equals(suggestion)||
+                "I'd".equals(suggestion)||"I've".equals(suggestion))
+            return suggestion;
+        if(input.equals(input.toUpperCase(Locale.ROOT)))
+            return suggestion.toUpperCase(Locale.ROOT);
+        if(Character.isUpperCase(input.charAt(0)))
+            return Character.toUpperCase(suggestion.charAt(0))+suggestion.substring(1);
+        return suggestion;
     }
 
     static List<String> merge(String input,List<String> base){
