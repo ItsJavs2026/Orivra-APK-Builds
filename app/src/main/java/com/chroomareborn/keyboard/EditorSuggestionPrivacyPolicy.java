@@ -42,6 +42,16 @@ final class EditorSuggestionPrivacyPolicy {
     static Decision decide(String editorPackage,boolean isTextClass,
             boolean isPasswordOrIdentifier,boolean noSuggestions,
             boolean noPersonalizedLearning,boolean searchOrGoAction) {
+        return decide(editorPackage,isTextClass,isPasswordOrIdentifier,
+                noSuggestions,noPersonalizedLearning,searchOrGoAction,false);
+    }
+
+    /** Name, postal address and phonetic-name editors can display suggestions
+     * and use editing gestures, but should not feed persistent learning. */
+    static Decision decide(String editorPackage,boolean isTextClass,
+            boolean isPasswordOrIdentifier,boolean noSuggestions,
+            boolean noPersonalizedLearning,boolean searchOrGoAction,
+            boolean personalDataVariation) {
         // A password-style variation, URI/email or non-text input always
         // remains private—even inside Google Keep itself.
         if(!isTextClass || isPasswordOrIdentifier)
@@ -52,7 +62,8 @@ final class EditorSuggestionPrivacyPolicy {
         // disabled text editing gestures, and hid the suggestion strip.
         // No app-name allowlist is needed; only trustworthy InputType
         // credential/identifier signals above can mark the editor private.
-        final boolean allowLearning=!noSuggestions && !noPersonalizedLearning;
+        final boolean allowLearning=!noSuggestions && !noPersonalizedLearning &&
+                !personalDataVariation;
         // Only a declared Search/Go intent or the already-qualified Keep
         // note exception can override the host's NO_SUGGESTIONS UI hint.
         // Other normal text fields honor the hint, but their editing
