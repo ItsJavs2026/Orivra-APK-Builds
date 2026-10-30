@@ -9,7 +9,8 @@ import java.util.Set;
 /**
  * Manual vocabulary v2: pure Java policy, no Android or user text persistence.
  * The user explicitly saves words in settings; the engine never scrapes text.
- * Works only for English ASCII single words in this carefully bounded release.
+ * Supports ASCII English words with internal straight/curly apostrophes.
+ * Rejects whitespace, emails, URLs, numeric strings and freeform sentences.
  */
 final class PersonalDictionaryPolicy {
     static final int MAX_WORDS=250;
@@ -18,9 +19,7 @@ final class PersonalDictionaryPolicy {
 
     static String canonical(String input) {
         if(input==null)return null;
-        String word=input.trim();
-        if(!word.matches("[A-Za-z]{2,24}"))return null;
-        return word.toLowerCase(Locale.ROOT);
+        return EnglishApostrophePolicy.canonical(input);
     }
 
     static String acceptedDisplay(String input) {
@@ -37,7 +36,7 @@ final class PersonalDictionaryPolicy {
 
     static List<String> merge(String typed,List<String> base,List<String> saved) {
         if(base==null)return List.of();
-        String input=canonical(typed);
+        String input=EnglishApostrophePolicy.prefix(typed);
         if(input==null||saved==null||saved.isEmpty())return base;
         // Known correctly spelled input stays top unless the user explicitly
         // saved that same word; adding vocabulary must not rewrite good text.
