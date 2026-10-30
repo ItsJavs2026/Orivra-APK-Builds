@@ -54,12 +54,50 @@ public final class KeepPredictionSecurityAndroidTest {
             assertFalse(choice.allowPersonalLearning);
         }
     }
-    @Test public void nonKeepNoSuggestionsAndNullInfoRemainProtected() {
-        assertTrue(RebornImeService.editorPrivacyDecision(
-                info("com.example.bank",InputType.TYPE_CLASS_TEXT |
-                        InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,0)).sensitive);
+    @Test public void googleSearchNoSuggestionsIsTextNotAPassword() {
+        for(String app:new String[]{"com.google.android.googlequicksearchbox",
+                "com.android.chrome","com.example.web.search"}) {
+            EditorSuggestionPrivacyPolicy.Decision search=
+                    RebornImeService.editorPrivacyDecision(info(app,
+                            InputType.TYPE_CLASS_TEXT |
+                                    InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
+                            EditorInfo.IME_ACTION_SEARCH));
+            assertFalse("Google web search may display ephemeral suggestions",
+                    search.sensitive);
+            assertFalse("NO_SUGGESTIONS must prohibit personal learning",
+                    search.allowPersonalLearning);
+            assertFalse(search.keepCompatibility);
+        }
+    }
+    @Test public void webEditTextCanSearchAndStillHonorNoPersonalizedLearning() {
+        EditorSuggestionPrivacyPolicy.Decision d=
+                RebornImeService.editorPrivacyDecision(info(
+                        "com.google.android.googlequicksearchbox",
+                        InputType.TYPE_CLASS_TEXT |
+                                InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT |
+                                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
+                        EditorInfo.IME_ACTION_SEARCH |
+                                EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING));
+        assertFalse(d.sensitive);
+        assertFalse(d.allowPersonalLearning);
+    }
+    @Test public void nonTextAndCredentialTypesAlwaysRemainProtected() {
         assertTrue(RebornImeService.editorPrivacyDecision(
                 info("com.google.android.keep",InputType.TYPE_CLASS_NUMBER,0)).sensitive);
         assertTrue(RebornImeService.editorPrivacyDecision(null).sensitive);
+        for(String app:new String[]{"com.google.android.googlequicksearchbox",
+                "com.example.bank"})for(int variation:new int[]{
+                InputType.TYPE_TEXT_VARIATION_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+                InputType.TYPE_TEXT_VARIATION_URI}) {
+            var choice=RebornImeService.editorPrivacyDecision(info(app,
+                    InputType.TYPE_CLASS_TEXT|variation|
+                            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
+                    EditorInfo.IME_ACTION_SEARCH));
+            assertTrue(choice.sensitive);
+            assertFalse(choice.allowPersonalLearning);
+        }
     }
 }
