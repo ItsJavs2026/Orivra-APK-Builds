@@ -15,6 +15,10 @@ import java.util.Set;
 final class PredictionLite {
     private PredictionLite() {}
     private static final Map<String, Integer> WORDS = new HashMap<>();
+    // Explicit accepted words only: no raw editor strings are stored here.
+    static boolean publicWordForContext(String normalized) {
+        return normalized!=null && WORDS.containsKey(normalized);
+    }
     // Experimental exact-only ESDB tier. Never populated in Candidate 300.
     // Only qualified offline research injects this pack; no user typing,
     // network or telemetry is collected.

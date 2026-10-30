@@ -32,6 +32,7 @@ final class PersonalLearning {
 
     static void clear(Context context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply();
+        PersonalContextLearning319.clear(context);
     }
 
     static void recordAcceptance(Context context, String typed, String accepted) {

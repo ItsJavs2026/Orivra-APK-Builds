@@ -2331,6 +2331,15 @@ public final class RebornImeService extends InputMethodService {
             return false;
         }
         if(plan==null)return false;
+        // Derive only a safe, common previous word *before* the live edit.
+        // Never persist an editor snapshot, full message or surrounding text.
+        String priorWord=null;
+        if(editorAllowsPersonalLearning && !cursorHasTextAfter()) {
+            try {
+                priorWord=AcceptedContextPolicy319.precedingForReplacement(
+                        ic.getTextBeforeCursor(96,0),expected);
+            } catch(RuntimeException detachedEditor) {priorWord=null;}
+        }
         invalidateEditingTicket();
         boolean done=false;
         try {
@@ -2348,8 +2357,10 @@ public final class RebornImeService extends InputMethodService {
         if(done) {
             editingInMiddle=cursorHasTextAfter();
             confirmSuggestionTap(source);
-            if(editorAllowsPersonalLearning)
+            if(editorAllowsPersonalLearning) {
                 PersonalLearning.recordAcceptance(this,expected,replacement);
+                PersonalContextLearning319.record(this,priorWord,replacement);
+            }
             updateSentenceShift();
             showSuggestions();
             refreshView();
@@ -2403,7 +2414,13 @@ public final class RebornImeService extends InputMethodService {
         // Empty-bar choices are NEXT-WORD insertions, not corrections to a
         // composing span. Never call setComposingText with an empty expected span.
         if (expected.isEmpty()) {
+            String prior=editorAllowsPersonalLearning &&
+                    !editingInMiddle && !hasSelection() && !cursorHasTextAfter()
+                    ?AcceptedContextPolicy319.precedingForNextWord(
+                            ic.getTextBeforeCursor(96,0)):null;
             if (!ic.commitText(suggestion + " ", 1)) return;
+            if(editorAllowsPersonalLearning)
+                PersonalContextLearning319.record(this,prior,suggestion);
             confirmSuggestionTap(source);
             if(shift && !capsLock) shift=false;
             // A next-word tap commits a trailing boundary at the cursor.
@@ -2425,6 +2442,10 @@ public final class RebornImeService extends InputMethodService {
             return;
         }
         if (hasSelection()) return;
+        final String priorWord=editorAllowsPersonalLearning &&
+                !editingInMiddle && !cursorHasTextAfter()
+                ?AcceptedContextPolicy319.precedingForReplacement(
+                        ic.getTextBeforeCursor(96,0),expected):null;
         // Commit the entire chosen sentence in one InputConnection operation.
         // A separate setComposingText + space commit risked partial insertion.
         SentenceSuggestionCommit.Result outcome=SentenceSuggestionCommit.insert(
@@ -2452,8 +2473,13 @@ public final class RebornImeService extends InputMethodService {
             composing="";
             if(shift && !capsLock)shift=false;
             confirmSuggestionTap(source);
-            if(editorAllowsPersonalLearning)
+            if(editorAllowsPersonalLearning) {
                 PersonalLearning.recordAcceptance(this,expected,suggestion);
+                // Explicit selection can teach adjacent public-word pairs.
+                // Only closed-list left context plus accepted words persist.
+                PersonalContextLearning319.record(this,priorWord,suggestion);
+                PersonalContextLearning319.recordChosenPhrase(this,suggestion);
+            }
             predictionsExpanded=false;
             updateSentenceShift();
             showSuggestions();
@@ -2597,6 +2623,15 @@ public final class RebornImeService extends InputMethodService {
             }
             String context=precedingContext();
             List<String> legacy=PredictionLite.contextualNextWords(context);
+            // Personal context is independent of optional pretrained seed
+            // suggestions; only twice-reinforced, opt-in accepted taps rank.
+            if(editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
+                    !editingInMiddle && !hasSelection() && !cursorHasTextAfter()) {
+                List<String> learned=PersonalContextLearning319.suggest(
+                        this,precedingWord(),3);
+                if(!learned.isEmpty())
+                    legacy=NextWordCandidatePolicy.merge(learned,legacy,3);
+            }
             if(NextWordCandidatePolicy.eligible(offlineNextWordEnabled(),sensitive,
                     editingInMiddle,hasSelection(),cursorHasTextAfter(),precedingWord())) {
                 NextWordSeedModel model=offlineNextWordSeed();
