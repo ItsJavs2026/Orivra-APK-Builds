@@ -941,6 +941,14 @@ final class PredictionLite {
         ExactOnlyLanguagePack pack=researchExactOnlyPack;
         if(pack!=null && pack.contains(raw))
             return Collections.singletonList(caseDisplay(input,display(raw)));
+        // A short missing-space phrase with a unique doubled neighbor-key
+        // typo (e.g. Iwikk -> I will) is not recovered by long-sentence
+        // rescue (which requires >=6 chars). Only existing, confirmed
+        // dictionary+bigram evidence can make this optional tap candidate.
+        // This runs on the existing background predictor, not at key-down.
+        List<String> strongJoin362=ShortJoinedContext362.suggestions(
+                input,WORDS,NEXT);
+        if(!strongJoin362.isEmpty())return strongJoin362;
         ArrayList<ScoredText> result=new ArrayList<>();
         Set<String> known=new HashSet<>();
         addConversationalPhrases(input,raw,result,known);
