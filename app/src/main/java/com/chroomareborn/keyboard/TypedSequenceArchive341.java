@@ -188,6 +188,55 @@ final class TypedSequenceArchive341 {
             throw new IllegalArgumentException("Invalid learned pair");
     }
 
+    /** Includes pending observations (counts 1-2) only for explicit-consent
+     * PRIVATE on-device storage. V4 export still filters evidence >=3.
+     */
+    synchronized Map<String,Integer> rawWordEvidence() {
+        return Collections.unmodifiableMap(new TreeMap<>(words));
+    }
+    synchronized Map<String,Integer> rawPairEvidence() {
+        return Collections.unmodifiableMap(new TreeMap<>(pairs));
+    }
+
+    static void verifyRawEvidence(Map<String,Integer> wordCounts,
+            Map<String,Integer> pairCounts) {
+        if(wordCounts==null || pairCounts==null ||
+                wordCounts.size()>MAX_WORDS || pairCounts.size()>MAX_PAIRS)
+            throw new IllegalArgumentException("Evidence storage over capacity");
+        for(Map.Entry<String,Integer> entry:wordCounts.entrySet()) {
+            String word=entry.getKey();
+            Integer value=entry.getValue();
+            if(word==null || value==null || value<1 || value>MAX_COUNT ||
+                    !word.equals(canonical(word)))
+                throw new IllegalArgumentException("Invalid typed-word evidence");
+        }
+        for(Map.Entry<String,Integer> entry:pairCounts.entrySet()) {
+            String pair=entry.getKey();
+            Integer count=entry.getValue();
+            if(pair==null || count==null || count<1 || count>MAX_COUNT)
+                throw new IllegalArgumentException("Invalid typed-pair count");
+            int split=pair.indexOf(' ');
+            if(split<1 || split!=pair.lastIndexOf(' ') ||
+                    !pair.equals(pairKey(pair.substring(0,split),
+                            pair.substring(split+1))))
+                throw new IllegalArgumentException("Invalid typed pair");
+            if(wordCounts.getOrDefault(pair.substring(0,split),0)<count ||
+                    wordCounts.getOrDefault(pair.substring(split+1),0)<count)
+                throw new IllegalArgumentException("Pair lacks verified word evidence");
+        }
+    }
+
+    /** Strict, all-or-nothing restoration, never merges with an editor context.
+     * Use only from the research Android private store after consent.
+     */
+    synchronized void restoreRawEvidence(Map<String,Integer> wordCounts,
+            Map<String,Integer> pairCounts) {
+        verifyRawEvidence(wordCounts,pairCounts);
+        words.clear();words.putAll(wordCounts);
+        pairs.clear();pairs.putAll(pairCounts);
+        previousInEditor=null;
+    }
+
     synchronized int observedVocabularyCount() { return words.size(); }
     synchronized int observedPairCount() { return pairs.size(); }
 }
