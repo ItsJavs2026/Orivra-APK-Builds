@@ -27,9 +27,9 @@ final class CursorEditSnapshotGuard {
         if(before==null||after==null||before.length()>WINDOW||after.length()>WINDOW)
             return null;
         int left=before.length();
-        while(left>0&&Character.isLetter(before.charAt(left-1)))left--;
+        while(left>0&&EnglishApostrophePolicy.isTokenChar(before.charAt(left-1)))left--;
         int right=0;
-        while(right<after.length()&&Character.isLetter(after.charAt(right)))right++;
+        while(right<after.length()&&EnglishApostrophePolicy.isTokenChar(after.charAt(right)))right++;
         if(left==before.length()&&right==0)return null;
         if((left==0&&before.length()==WINDOW) ||
             (right==after.length()&&after.length()==WINDOW))return null;
