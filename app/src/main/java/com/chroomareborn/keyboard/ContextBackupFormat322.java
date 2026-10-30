@@ -23,8 +23,14 @@ final class ContextBackupFormat322 {
     static final class Data {
         final LearningTransferCodec.Bundle legacy;
         final Map<String,Counts> contexts;
+        final Map<String,Integer> frequentWords;
         Data(LearningTransferCodec.Bundle l,Map<String,Counts> c){
+            this(l,c,Map.of());
+        }
+        Data(LearningTransferCodec.Bundle l,Map<String,Counts> c,
+                Map<String,Integer> frequency){
             legacy=l;contexts=Collections.unmodifiableMap(new TreeMap<>(c));
+            frequentWords=Collections.unmodifiableMap(new TreeMap<>(frequency));
         }
     }
     private static String checksum(String text) {
@@ -50,6 +56,16 @@ final class ContextBackupFormat322 {
     }
     static String encode(java.util.List<String> words,Map<String,Integer> corrections,
             Map<String,Counts> contexts) {
+        return encode(words,corrections,contexts,Map.of());
+    }
+    /** Optional FREQ records are supported by newer V2 readers only.
+     * The three-argument overload emits byte-identical older V2 backups.
+     */
+    static String encode(java.util.List<String> words,Map<String,Integer> corrections,
+            Map<String,Counts> contexts,Map<String,Integer> frequentWords) {
+        if(frequentWords==null ||
+                frequentWords.size()>FrequentWordCompletionPolicy328.MAX_WORDS)
+            throw new IllegalArgumentException("Too many frequency entries");
         if(contexts==null||contexts.size()>MAX_CONTEXT)
             throw new IllegalArgumentException("Too many context records");
         String v1=LearningTransferCodec.encode(words,corrections);
@@ -71,6 +87,19 @@ final class ContextBackupFormat322 {
                 .append(e.getValue().accepted).append('\t')
                 .append(e.getValue().used).append('\n');
         }
+        TreeMap<String,Integer> frequency=new TreeMap<>();
+        for(Map.Entry<String,Integer> e:frequentWords.entrySet()) {
+            String token=e.getKey();
+            Integer count=e.getValue();
+            if(token==null||count==null||count<1||count>1000 ||
+                    !token.equals(EnglishApostrophePolicy.canonical(token)))
+                throw new IllegalArgumentException("Invalid frequency word");
+            if(frequency.putIfAbsent(token,count)!=null)
+                throw new IllegalArgumentException("Duplicate frequency");
+        }
+        for(Map.Entry<String,Integer> e:frequency.entrySet())
+            body.append("FREQ\t").append(e.getKey()).append('\t')
+                    .append(e.getValue()).append('\n');
         String result=body+"SHA256\t"+checksum(body.toString())+"\n";
         if(result.getBytes(StandardCharsets.UTF_8).length>
                 LearningTransferCodec.MAX_UTF8_BYTES)
@@ -96,6 +125,7 @@ final class ContextBackupFormat322 {
             throw new IllegalArgumentException("Corrupted or forged context");
         String[] lines=body.split("\n",-1);
         TreeMap<String,Counts> contexts=new TreeMap<>();
+        TreeMap<String,Integer> frequency=new TreeMap<>();
         StringBuilder v1=new StringBuilder(LearningTransferCodec.HEADER).append('\n');
         for(int i=1;i<lines.length;i++){
             String line=lines[i];
@@ -112,12 +142,24 @@ final class ContextBackupFormat322 {
                 if(contexts.putIfAbsent(normalized,new Counts(a,u))!=null ||
                         contexts.size()>MAX_CONTEXT)
                     throw new IllegalArgumentException("Duplicate context");
+            }else if(parts.length==3 && parts[0].equals("FREQ")) {
+                int count;
+                try {count=Integer.parseInt(parts[2]);}
+                catch(NumberFormatException invalid){
+                    throw new IllegalArgumentException("Invalid frequency count");
+                }
+                String word=parts[1];
+                if(count<1||count>1000 ||
+                        !word.equals(EnglishApostrophePolicy.canonical(word)) ||
+                        frequency.putIfAbsent(word,count)!=null ||
+                        frequency.size()>FrequentWordCompletionPolicy328.MAX_WORDS)
+                    throw new IllegalArgumentException("Invalid frequency record");
             }else {
                 v1.append(line).append('\n');
             }
         }
         String known=v1+"SHA256\t"+checksum(v1.toString())+"\n";
         LearningTransferCodec.Bundle legacy=LearningTransferCodec.decode(known);
-        return new Data(legacy,contexts);
+        return new Data(legacy,contexts,frequency);
     }
 }
