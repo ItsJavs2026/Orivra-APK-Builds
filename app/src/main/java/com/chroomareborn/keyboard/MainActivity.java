@@ -369,6 +369,103 @@ public final class MainActivity extends Activity {
                 }).show());
         root.addView(resetLearning);
 
+        // Research 341 only. Consent is available for future durable typed
+        // word learning, but this branch does NOT yet connect the live IME
+        // to the new store. No automatic collection occurs.
+        TextView typedLearningInfo341=new TextView(this);
+        typedLearningInfo341.setText("\nResearch 341 — remember typed words across sessions "
+                +"(not active in this test branch yet). "
+                +"A separate, default-OFF permission will be required. "
+                +"Even ordinary words can be private names. "
+                +"Only explicitly allowed typed words, not full notes, may "
+                +"eventually be stored. Older V3 backup controls stay unchanged.");
+        typedLearningInfo341.setTextColor(0xFF455263);
+        typedLearningInfo341.setTextSize(14);
+        root.addView(typedLearningInfo341);
+
+        Button rememberWords341=new Button(this);
+        rememberWords341.setAllCaps(false);
+        rememberWords341.setText("Research only — typed-word storage permission: "+
+                (TypedWordsConsent341.enabled(this)?"ON":"OFF"));
+        rememberWords341.setOnClickListener(v->{
+            if(TypedWordsConsent341.enabled(this)){
+                if(TypedWordsConsent341.setEnabled(this,false))
+                    rememberWords341.setText(
+                            "Research only — typed-word storage permission: OFF");
+                return;
+            }
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("Allow future on-device typed-word memory?")
+                .setMessage("Research setting only; no automatic recording "
+                        +"is active in this build. If enabled in a later "
+                        +"test candidate, typed words including names "
+                        +"may remain privately on this device after "
+                        +"several uses. The existing Learning setting "
+                        +"must also be ON. You can turn this off and "
+                        +"clear the separate data at any time. Continue?")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Allow research setting",(dialog,which)->{
+                    if(TypedWordsConsent341.setEnabled(this,true))
+                        rememberWords341.setText(
+                                "Research only — typed-word storage permission: ON");
+                }).show();
+        });
+        root.addView(rememberWords341);
+
+        TextView typedEvidenceCount341=new TextView(this);
+        typedEvidenceCount341.setText("Typed-word research evidence: select "
+                +"Refresh counts. No typed words are shown here.");
+        typedEvidenceCount341.setTextColor(0xFF455263);
+        root.addView(typedEvidenceCount341);
+
+        Button refreshTyped341=new Button(this);
+        refreshTyped341.setAllCaps(false);
+        refreshTyped341.setText("Refresh typed-word research counts");
+        refreshTyped341.setOnClickListener(v->learningTransferIo.execute(()->{
+            final String summary;
+            try {
+                TypedWordEvidenceStore341.Snapshot s=
+                        TypedWordEvidenceStore341.read(this);
+                summary="On-device research counts: "+s.vocabulary()+
+                        " distinct words ("+s.confirmedWords()+" confirmed), "+
+                        s.associations()+" pairs ("+s.confirmedPairs()+
+                        " confirmed). No raw text shown.";
+            } catch(RuntimeException invalidEvidence) {
+                summary="Local research data is invalid; clear it before reuse.";
+            }
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed())return;
+                typedEvidenceCount341.setText(summary);
+            });
+        }));
+        root.addView(refreshTyped341);
+
+        Button clearTyped341=new Button(this);
+        clearTyped341.setAllCaps(false);
+        clearTyped341.setText("Disable and erase typed-word research evidence");
+        clearTyped341.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
+                .setTitle("Erase typed-word research evidence?")
+                .setMessage("Disables the separate typed-word permission and "
+                        +"deletes only the new research word/pair counts. "
+                        +"Existing V1/V2/V3 backups and learned corrections "
+                        +"are not affected.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Disable and erase",(dialog,which)->
+                    learningTransferIo.execute(()->{
+                        boolean success=TypedWordsConsent341.setEnabled(
+                                this,false) &&
+                                TypedWordEvidenceStore341.clearAll(this);
+                        runOnUiThread(()->{
+                            if(isFinishing()||isDestroyed())return;
+                            rememberWords341.setText(
+                                    "Research only — typed-word storage permission: OFF");
+                            typedEvidenceCount341.setText(success?
+                                    "Typed-word research evidence erased.":
+                                    "Could not erase research evidence.");
+                        });
+                    })).show());
+        root.addView(clearTyped341);
+
         // Build 307 research: explicit user-selected backup, never automatic.
         TextView transferNotice=new TextView(this);
         transferNotice.setText("\nPortable learning backup (experimental)\n"
