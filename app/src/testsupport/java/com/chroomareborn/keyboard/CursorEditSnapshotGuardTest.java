@@ -61,6 +61,26 @@ public final class CursorEditSnapshotGuardTest {
             "old ticket cannot target duplicate word elsewhere");
         ok(!current(repeated,"the cor","ect again",7,23),
             "matching word but different bounded context fails");
+        // Build 309: the same caret guard must understand apostrophized
+        // words as ONE token. No partial deletion of "can't" or "we’re".
+        var contracted=capture("can't","I can't"," today",9,7);
+        ok(contracted!=null,"straight apostrophe is part of the live word");
+        ok(current(contracted,"I can't"," today",9,7),
+                "unchanged contracted cursor text accepted");
+        ok(!current(contracted,"I cant"," today",9,7),
+                "removing the apostrophe invalidates a stale editing ticket");
+        var curly=capture("we’re","hello, we’","re at work",10,11);
+        ok(curly!=null,"curly apostrophe across caret is one token");
+        ok(current(curly,"hello, we’","re at work",10,11),
+                "curly token snapshot persists across caret");
+        ok(capture("we","hello we'","re",11,9)==null,
+                "cannot truncate original word at apostrophe boundary");
+        ok(capture("hows","Hello there. hows","",12,17)!=null,
+                "punctuation before a valid token does not erase the token");
+        ok(capture("hows","Hello there. hows","?",12,17)!=null,
+                "punctuation after caret does not alter the bounded word");
+        ok(capture("hows","Hello there. hows!","",12,18)==null,
+                "caret after punctuation is not inside the previous token");
         Random rng=new Random(283);
         for(int k=0;k<15000;k++){
             String word=k%2==0?"corect":"keyboadr";
