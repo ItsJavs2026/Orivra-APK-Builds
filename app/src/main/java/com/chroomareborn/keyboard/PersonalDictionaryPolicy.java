@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * Manual vocabulary v2: pure Java policy, no Android or user text persistence.
  * The user explicitly saves words in settings; the engine never scrapes text.
- * Supports ASCII English words with internal straight/curly apostrophes.
+ * Supports bounded English and Spanish words with accents and apostrophes.
  * Rejects whitespace, emails, URLs, numeric strings and freeform sentences.
  */
 final class PersonalDictionaryPolicy {
@@ -19,7 +19,7 @@ final class PersonalDictionaryPolicy {
 
     static String canonical(String input) {
         if(input==null)return null;
-        return EnglishApostrophePolicy.canonical(input);
+        return PersonalWordCanonical.canonical(input);
     }
 
     static String acceptedDisplay(String input) {
@@ -36,7 +36,7 @@ final class PersonalDictionaryPolicy {
 
     static List<String> merge(String typed,List<String> base,List<String> saved) {
         if(base==null)return List.of();
-        String input=EnglishApostrophePolicy.prefix(typed);
+        String input=PersonalWordCanonical.prefix(typed);
         if(input==null||saved==null||saved.isEmpty())return base;
         // Known correctly spelled input stays top unless the user explicitly
         // saved that same word; adding vocabulary must not rewrite good text.

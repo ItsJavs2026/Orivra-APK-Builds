@@ -40,8 +40,8 @@ final class LearningTransferStore {
         if(raw==null)return null;
         int p=raw.indexOf(':');
         if(p<=0||p!=raw.lastIndexOf(':'))return null;
-        String left=EnglishApostrophePolicy.canonical(raw.substring(0,p));
-        String right=EnglishApostrophePolicy.canonical(raw.substring(p+1));
+        String left=PersonalWordCanonical.canonical(raw.substring(0,p));
+        String right=PersonalWordCanonical.canonical(raw.substring(p+1));
         if(left==null||right==null||left.equals(right))return null;
         return left+":"+right;
     }

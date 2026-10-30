@@ -1,0 +1,71 @@
+name: Orivra Research 312 - bilingual personal learning
+on:
+  push:
+    branches:
+      - research/build312-spanish-personal-learning-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research312-personal-learning
+  cancel-in-progress: true
+jobs:
+  source-and-java:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify privacy invariants and compile all existing Java regression policies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java
+          grep -Fq 'personalDataVariation' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          grep -Fq 'TYPE_TEXT_VARIATION_POSTAL_ADDRESS' app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java
+          ! grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PersonalWordCanonical.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningV2Policy.java \
+            app/src/main/java/com/chroomareborn/keyboard/PersonalDictionaryPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorEditSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipeSnapshotGuard.java \
+            app/src/main/java/com/chroomareborn/keyboard/CursorReleaseSuggestionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/EnterKeyPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/LearningTransferCodec.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnglishApostropheAndLearningV2Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningV21ConflictTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningTransferCodecTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CursorEditSnapshotGuardTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ContractionTapOnly309Test.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EditorSuggestionPrivacyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/EnterKeyPolicyTest.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PersonalSpanishLearning312Test.java
+          for suite in PersonalSpanishLearning312Test EnglishApostropheAndLearningV2Test LearningV21ConflictTest LearningTransferCodecTest CursorEditSnapshotGuardTest ContractionTapOnly309Test EditorSuggestionPrivacyPolicyTest EnterKeyPolicyTest; do
+            java -ea -Xmx128m -cp "$RUNNER_TEMP/classes" "com.chroomareborn.keyboard.$suite"
+          done
+  android-compilation:
+    needs: source-and-java
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile Android IME and framework test source; no APK publication
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:compileDebugJavaWithJavac :app:compileDebugAndroidTestJavaWithJavac

@@ -17,8 +17,8 @@ final class LearningV2Policy {
     static Pair extract(String original,String chosen) {
         if(original==null||chosen==null)return null;
         String left=original.trim(),right=chosen.trim();
-        String in=EnglishApostrophePolicy.canonical(left);
-        String out=EnglishApostrophePolicy.canonical(right);
+        String in=PersonalWordCanonical.canonical(left);
+        String out=PersonalWordCanonical.canonical(right);
         if(in!=null && out!=null && !in.equals(out))
             return new Pair(in,out);
         // Can't align a no-spaces string with a spaced phrase. Not safe
@@ -45,7 +45,7 @@ final class LearningV2Policy {
     private static String contextToken(String value) {
         String lowered=value.toLowerCase(java.util.Locale.ROOT);
         if("i".equals(lowered)||"a".equals(lowered))return lowered;
-        return EnglishApostrophePolicy.canonical(value);
+        return PersonalWordCanonical.canonical(value);
     }
 
     /** At least two explicit acceptances must agree before re-ranking. */
@@ -58,11 +58,11 @@ final class LearningV2Policy {
      * Never upgrades a single acceptance or a malformed/same-word pair.
      */
     static String preferred(String typed,java.util.Map<String,Integer> acceptedCounts) {
-        String key=EnglishApostrophePolicy.canonical(typed);
+        String key=PersonalWordCanonical.canonical(typed);
         if(key==null||acceptedCounts==null||acceptedCounts.isEmpty())return null;
         java.util.Map<String,Integer> normalized=new java.util.HashMap<>();
         for(java.util.Map.Entry<String,Integer> item:acceptedCounts.entrySet()){
-            String output=EnglishApostrophePolicy.canonical(item.getKey());
+            String output=PersonalWordCanonical.canonical(item.getKey());
             Integer count=item.getValue();
             if(output==null||output.equals(key)||count==null||
                     count<1||count>1000)continue;

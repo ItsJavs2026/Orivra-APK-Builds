@@ -50,7 +50,7 @@ final class PersonalLearning {
 
     static String preferredCorrection(Context context, String typed) {
         if (!enabled(context) || typed == null) return null;
-        String input=EnglishApostrophePolicy.canonical(typed);
+        String input=PersonalWordCanonical.canonical(typed);
         if(input==null)return null;
         String prefix = PREFIX + input + ":";
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -62,7 +62,7 @@ final class PersonalLearning {
             if (!entry.getKey().startsWith(prefix) || !(entry.getValue() instanceof Integer))
                 continue;
             String choice=entry.getKey().substring(prefix.length());
-            String canonical=EnglishApostrophePolicy.canonical(choice);
+            String canonical=PersonalWordCanonical.canonical(choice);
             int count=(Integer)entry.getValue();
             if(canonical==null||canonical.equals(input)||count<1||count>1000)
                 continue;

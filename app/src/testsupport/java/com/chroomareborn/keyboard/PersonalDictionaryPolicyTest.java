@@ -9,10 +9,15 @@ public final class PersonalDictionaryPolicyTest {
     private static void ok(boolean yes,String msg){n++;if(!yes)throw new AssertionError(msg);}
     public static void main(String[] args){
         for(String rejected:new String[]{"","x","two words","1234","hello_world","can't'",
-            "éclair","hello!","word1","x".repeat(25)}) {
+            "hello!","word1","x".repeat(33)}) {
             ok(PersonalDictionaryPolicy.canonical(rejected)==null,"invalid manual word");
         }
         ok("orivra".equals(PersonalDictionaryPolicy.canonical(" Orivra ")),"case-fold");
+        ok("éclair".equals(PersonalDictionaryPolicy.canonical("Éclair")),"Spanish accent words supported");
+        ok("camión".equals(PersonalDictionaryPolicy.canonical("camio\u0301n")),"NFC accented words supported");
+        ok(PersonalDictionaryPolicy.merge("cam",List.of("cam"),
+                List.of("camión")).equals(List.of("cam","camión")),
+                "Spanish manual word remains tap-only");
         ok("can't".equals(PersonalDictionaryPolicy.canonical("CAN’T")),"curly apostrophe canonical");
         ok("ain't".equals(PersonalDictionaryPolicy.canonical("Ain't")),"contractions allowed");
         ok("o'connor".equals(PersonalDictionaryPolicy.canonical("O’Connor")),"proper names with apostrophe");

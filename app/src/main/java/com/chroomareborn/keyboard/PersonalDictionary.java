@@ -62,7 +62,7 @@ final class PersonalDictionary {
         return words;
     }
     static List<String> matching(Context ctx,String prefix) {
-        String normalized=EnglishApostrophePolicy.prefix(prefix);
+        String normalized=PersonalWordCanonical.prefix(prefix);
         if(normalized==null)return List.of();
         List<String> matches=new ArrayList<>();
         for(String word:savedWords(ctx)) {
@@ -73,9 +73,9 @@ final class PersonalDictionary {
         // Explicit exact word should outrank prefix completions.
         matches.sort((a,b)->{
             boolean ae=PersonalDictionaryPolicy.canonical(a).equals(
-                    EnglishApostrophePolicy.canonical(prefix));
+                    PersonalWordCanonical.canonical(prefix));
             boolean be=PersonalDictionaryPolicy.canonical(b).equals(
-                    EnglishApostrophePolicy.canonical(prefix));
+                    PersonalWordCanonical.canonical(prefix));
             if(ae!=be)return ae?-1:1;
             return Integer.compare(a.length(),b.length());
         });

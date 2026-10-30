@@ -62,8 +62,8 @@ final class LearningTransferCodec {
         return input;
     }
     private static String normalizedPair(String typed,String accepted,int count) {
-        String from=EnglishApostrophePolicy.canonical(typed);
-        String to=EnglishApostrophePolicy.canonical(accepted);
+        String from=PersonalWordCanonical.canonical(typed);
+        String to=PersonalWordCanonical.canonical(accepted);
         if(from==null||to==null||from.equals(to)||count<1||count>1000)
             throw new IllegalArgumentException("Invalid learned word pair");
         return from+":"+to;
