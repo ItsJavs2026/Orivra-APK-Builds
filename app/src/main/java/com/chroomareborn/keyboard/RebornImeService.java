@@ -133,6 +133,9 @@ public final class RebornImeService extends InputMethodService {
     // NO_SUGGESTIONS is not a password marker in Google Keep note editors.
     // Honor NO_PERSONALIZED_LEARNING separately even when suggestions appear.
     private boolean editorAllowsPersonalLearning=false;
+    // Separate from credential privacy: NO_SUGGESTIONS can suppress the UI
+    // without disabling Backspace, spacebar cursor or Search/Go actions.
+    private boolean editorAllowsSuggestions=true;
     // Build 303 research: optional, default-OFF large exact-word dictionary.
     // This pack is never loaded on touch or inside the 40ms prediction worker.
     // Unlike personal dictionary, this contains only publicly sourced words.
@@ -373,7 +376,7 @@ public final class RebornImeService extends InputMethodService {
 
     private void scheduleCursorReleaseSuggestions() {
         cancelCursorReleaseSuggestions();
-        if(sensitive) {
+        if(sensitive || !editorAllowsSuggestions) {
             predictionDispatcher.cancel();
             renderSuggestions("",java.util.Collections.emptyList());
             return;
@@ -391,7 +394,7 @@ public final class RebornImeService extends InputMethodService {
      */
     private void refreshSuggestionsAfterCursorRelease() {
         if(candidates==null || spacebarTouchActive)return;
-        if(sensitive) {
+        if(sensitive || !editorAllowsSuggestions) {
             predictionDispatcher.cancel();
             renderSuggestions("",java.util.Collections.emptyList());
             return;
@@ -1226,6 +1229,7 @@ public final class RebornImeService extends InputMethodService {
         EditorSuggestionPrivacyPolicy.Decision privacy=editorPrivacyDecision(info);
         sensitive=privacy.sensitive;
         editorAllowsPersonalLearning=privacy.allowPersonalLearning;
+        editorAllowsSuggestions=privacy.allowSuggestions;
         reconcileOptionalDictionary();
         numericEditor=info!=null && ((info.inputType & InputType.TYPE_MASK_CLASS)==InputType.TYPE_CLASS_NUMBER
                 || (info.inputType & InputType.TYPE_MASK_CLASS)==InputType.TYPE_CLASS_PHONE);
@@ -1350,9 +1354,12 @@ public final class RebornImeService extends InputMethodService {
         boolean noSuggestions=(input & InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)!=0;
         boolean noPersonalizedLearning=(info.imeOptions &
                 EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING)!=0;
+        int action=info.imeOptions & EditorInfo.IME_MASK_ACTION;
+        boolean searchOrGo=action==EditorInfo.IME_ACTION_SEARCH ||
+                action==EditorInfo.IME_ACTION_GO;
         return EditorSuggestionPrivacyPolicy.decide(info.packageName,
                 cls==InputType.TYPE_CLASS_TEXT,identifierOrPassword,
-                noSuggestions,noPersonalizedLearning);
+                noSuggestions,noPersonalizedLearning,searchOrGo);
     }
     private void currentFinish() {
         InputConnection ic = getCurrentInputConnection();
@@ -1952,7 +1959,8 @@ public final class RebornImeService extends InputMethodService {
                 ic.commitText(value,1);
                 composing="";
             }
-        } else if (editingInMiddle || sensitive || symbols || !value.matches("[A-Za-z]")) {
+        } else if (editingInMiddle || sensitive || !editorAllowsSuggestions ||
+                symbols || !value.matches("[A-Za-z]")) {
             if (!composing.isEmpty()) currentFinish();
             ic.commitText(value, 1);
         } else {
@@ -2475,7 +2483,7 @@ public final class RebornImeService extends InputMethodService {
     private void showSuggestions() {
         if(candidates==null)return;
         final String snapshot=composing;
-        if(sensitive) {
+        if(sensitive || !editorAllowsSuggestions) {
             predictionDispatcher.cancel();
             renderSuggestions(snapshot,java.util.Collections.emptyList());
             return;
@@ -2696,6 +2704,7 @@ public final class RebornImeService extends InputMethodService {
             candidates.setTag("message");
             TextView message=new TextView(this);
             message.setText(sensitive?"Private field • predictions off":
+                    !editorAllowsSuggestions?"Suggestions off for this field":
                     NextWordControlLabels.emptyBarText(offlineNextWordEnabled()));
             message.setTextColor(secondaryTextColor);
             message.setTextSize(12);
