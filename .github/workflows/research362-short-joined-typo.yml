@@ -1,0 +1,154 @@
+name: Orivra Research 362 - short joined phrases and spacing (NO APK)
+on:
+  push:
+    branches:
+      - research/build362-short-joined-neighbor-correction-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research362
+  cancel-in-progress: true
+
+jobs:
+  source-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify isolated changes and no private data or touch-path regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="d1dcd974e13c45c41906445727ef262b006ff883"
+          changed=set(subprocess.check_output(["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          expected={
+              "app/src/main/java/com/chroomareborn/keyboard/ShortJoinedContext362.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/ShortJoinedContext362Research.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/ShortJoinedContext362AndroidTest.java",
+              ".github/workflows/research362-short-joined-typo.yml"
+          }
+          assert changed==expected,f"Unexpected or missing changes: {changed ^ expected}"
+          for rel in [
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java",
+              "app/src/main/java/com/chroomareborn/keyboard/NeighborDoubleKeyCorrectionPolicy.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PunctuationSpacing.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java",
+              "app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java"]:
+              previous=subprocess.check_output(["git","show",base+":"+rel],text=True)
+              assert previous==Path(rel).read_text(),f"Stable source drift: {rel}"
+          helper=Path("app/src/main/java/com/chroomareborn/keyboard/ShortJoinedContext362.java").read_text()
+          engine=Path("app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java").read_text()
+          assert "NeighborDoubleKeyCorrectionPolicy.unique(" in helper
+          assert "establishedNext.get(head)" in helper
+          assert "offlineWords.containsKey(compact)" in helper
+          assert "ShortJoinedContext362.suggestions(" in engine
+          assert "if(WORDS.containsKey(raw)) {" in engine
+          assert "android." not in helper
+          assert "commitText(" not in helper and "setComposingText(" not in helper
+          assert "getSharedPreferences" not in helper
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert "android.permission.INTERNET" not in manifest
+          build=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build361trial"' in build
+          assert "versionCode = 361" in build
+          print("PASS: untouched Candidate 361 app and hot keyboard input path; offline decoder research")
+          PY
+      - name: Run synthetic short joined-word and QWERTY-neighbor regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/NeighborDoubleKeyCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/ShortJoinedContext362.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ShortJoinedContext362Research.java
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.ShortJoinedContext362Research
+
+  android35-emulator:
+    needs: source-and-synthetic
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Build pinned offline English wordlist and verify exact SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile research Android app and tests (never publish APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration when available
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Require at least 197 passing, no skipped Android emulator tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,"No Android test reports"
+          total=fail=err=skip=0
+          for p in reports:
+              root=ET.parse(p).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [x for x in root.iter() if x.tag.endswith('testsuite')]
+              for x in suites:
+                  total+=int(x.attrib.get('tests',0))
+                  fail+=int(x.attrib.get('failures',0))
+                  err+=int(x.attrib.get('errors',0))
+                  skip+=int(x.attrib.get('skipped',0))
+          print(f'Android API35: {total} tests, {fail} failures, {err} errors, {skip} skipped')
+          assert total>=197 and fail==0 and err==0 and skip==0
+          assert Path('app/src/androidTest/java/com/chroomareborn/keyboard/ShortJoinedContext362AndroidTest.java').read_text().count('@Test')==5
+          PY
+          echo "PASS emulator, no APK release or real Samsung validation."
