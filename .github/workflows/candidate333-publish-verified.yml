@@ -29,8 +29,8 @@ jobs:
           source_sha=$(gh api "repos/$repo/actions/runs/41062583313" --jq '.head_sha')
           test "$confirmed" = "success"
           test "$source_sha" = "7859f4fd8e2e7eee69d5c0aed72aa99d96c1891d"
-          test -f .github/workflows/candidate333-combined-apk.yml
-          echo "PASS: verified Build 327 Android 35 test run was successful"
+          test -f .github/workflows/candidate333-frequent-words-apk.yml
+          echo "PASS: verified Build 333 Android 35 test run was successful"
       - name: Retrieve byte-identical, qualified Candidate 333 artifact
         env:
           GH_TOKEN: ${{ github.token }}
