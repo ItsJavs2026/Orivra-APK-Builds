@@ -1352,6 +1352,12 @@ public final class RebornImeService extends InputMethodService {
                 variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
                 variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
                 variation == InputType.TYPE_TEXT_VARIATION_URI;
+        // Real name and address editors are normal text (gestures still work),
+        // but their content must not update the local learned-word store.
+        boolean personalDataVariation=
+                variation == InputType.TYPE_TEXT_VARIATION_PERSON_NAME ||
+                variation == InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS ||
+                variation == InputType.TYPE_TEXT_VARIATION_PHONETIC;
         boolean noSuggestions=(input & InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)!=0;
         boolean noPersonalizedLearning=(info.imeOptions &
                 EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING)!=0;
@@ -1360,7 +1366,8 @@ public final class RebornImeService extends InputMethodService {
                 action==EditorInfo.IME_ACTION_GO;
         return EditorSuggestionPrivacyPolicy.decide(info.packageName,
                 cls==InputType.TYPE_CLASS_TEXT,identifierOrPassword,
-                noSuggestions,noPersonalizedLearning,searchOrGo);
+                noSuggestions,noPersonalizedLearning,searchOrGo,
+                personalDataVariation);
     }
     private void currentFinish() {
         InputConnection ic = getCurrentInputConnection();
