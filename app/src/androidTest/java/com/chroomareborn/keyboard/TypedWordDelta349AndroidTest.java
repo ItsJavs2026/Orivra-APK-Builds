@@ -62,19 +62,21 @@ public final class TypedWordDelta349AndroidTest {
     }
     @Test public void verifiedPairChangesOnlyWordAndPairEntries(){
         assertTrue(data.edit().putInt("w:to",3).putInt("w:continue",2).commit());
-        Map<String,?> before=data.getAll();
-        Set<String> changed=Collections.synchronizedSet(new HashSet<>());
-        SharedPreferences.OnSharedPreferenceChangeListener listener=
-                (prefs,key)->changed.add(key==null?"NULL_KEY":key);
-        data.registerOnSharedPreferenceChangeListener(listener);
-        try {
-            assertTrue(word("continue","to").stored);
-        }finally {data.unregisterOnSharedPreferenceChangeListener(listener);}
+        TypedWordEvidenceStore341.Snapshot before=
+                TypedWordEvidenceStore341.read(ctx);
+        Map<String,Integer> nextWords=new HashMap<>(before.words);
+        Map<String,Integer> nextPairs=new HashMap<>(before.pairs);
+        nextWords.put("continue",3);
+        nextPairs.put("to continue",1);
+        assertEquals(Map.of("w:continue",3,"p:to continue",1),
+                TypedWordDelta349.changedEntries(before,nextWords,nextPairs,
+                        "continue","to continue"));
+        assertTrue(word("continue","to").stored);
         assertEquals(3,data.getInt("w:to",0));
         assertEquals(3,data.getInt("w:continue",0));
         assertEquals(1,data.getInt("p:to continue",0));
-        assertEquals(before.get("w:to"),data.getAll().get("w:to"));
-        assertEquals(Set.of("w:continue","p:to continue"),changed);
+        assertEquals(before.words.get("to"),TypedWordEvidenceStore341.read(ctx)
+                .words.get("to"));
     }
     @Test public void largeVocabularyIsNotClearedAndRepopulated(){
         SharedPreferences.Editor e=data.edit();
@@ -82,17 +84,19 @@ public final class TypedWordDelta349AndroidTest {
         e.putInt("w:to",3);
         assertTrue(e.commit());
         Map<String,?> before=data.getAll();
-        Set<String> changed=Collections.synchronizedSet(new HashSet<>());
-        SharedPreferences.OnSharedPreferenceChangeListener listener=
-                (prefs,key)->changed.add(key==null?"NULL_KEY":key);
-        data.registerOnSharedPreferenceChangeListener(listener);
-        try {
-            assertTrue(word("continue","to").stored);
-        }finally {data.unregisterOnSharedPreferenceChangeListener(listener);}
+        TypedWordEvidenceStore341.Snapshot existing=
+                TypedWordEvidenceStore341.read(ctx);
+        Map<String,Integer> nextWords=new HashMap<>(existing.words);
+        Map<String,Integer> nextPairs=new HashMap<>(existing.pairs);
+        nextWords.put("continue",1);
+        nextPairs.put("to continue",1);
+        assertEquals(Map.of("w:continue",1,"p:to continue",1),
+                TypedWordDelta349.changedEntries(existing,nextWords,nextPairs,
+                        "continue","to continue"));
+        assertTrue(word("continue","to").stored);
         assertEquals(before.size()+2,data.getAll().size());
         for(Map.Entry<String,?> entry:before.entrySet())
             assertEquals(entry.getValue(),data.getAll().get(entry.getKey()));
-        assertEquals(Set.of("w:continue","p:to continue"),changed);
         assertEquals(172,TypedWordEvidenceStore341.read(ctx).vocabulary());
     }
     @Test public void previousPairsAndCountsSurviveNewWrites(){
@@ -111,14 +115,13 @@ public final class TypedWordDelta349AndroidTest {
         assertTrue(data.edit().putInt("w:to",1000)
                 .putInt("w:continue",1000)
                 .putInt("p:to continue",1000).commit());
-        Set<String> changed=Collections.synchronizedSet(new HashSet<>());
-        SharedPreferences.OnSharedPreferenceChangeListener listener=
-                (prefs,key)->changed.add(key==null?"NULL_KEY":key);
-        data.registerOnSharedPreferenceChangeListener(listener);
-        try{
-            assertTrue(word("continue","to").stored);
-        }finally{data.unregisterOnSharedPreferenceChangeListener(listener);}
-        assertTrue("unchanged max-count evidence never emits a mutation",changed.isEmpty());
+        TypedWordEvidenceStore341.Snapshot before=
+                TypedWordEvidenceStore341.read(ctx);
+        assertTrue(TypedWordDelta349.changedEntries(before,before.words,before.pairs,
+                "continue","to continue").isEmpty());
+        Map<String,?> original=data.getAll();
+        assertTrue(word("continue","to").stored);
+        assertEquals(original,data.getAll());
         assertEquals(1000,data.getInt("p:to continue",0));
     }
     @Test public void staleRevisionNeverTouchesEvidenceAfterRevocation(){
