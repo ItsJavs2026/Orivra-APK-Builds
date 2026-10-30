@@ -2533,6 +2533,17 @@ public final class RebornImeService extends InputMethodService {
         // Display-only condensation retains the highest-ranked prediction.
         // Do not change the underlying predictor scores or accepted text.
         options=SuggestionDisplayPolicy.compact(input,options);
+        // Build 304: a few idle next-word chips should sit in the CENTER of
+        // the available strip, not cling to its left edge. Restore START
+        // while composing/editing and for private-field status messages.
+        // The HorizontalScrollView already has fillViewport=true; its child
+        // can therefore center a short row without moving the right caret.
+        final boolean centerIdle=SuggestionStripLayoutPolicy.centerIdleSuggestions(
+                input,options.size(),sensitive);
+        final int stripGravity=Gravity.CENTER_VERTICAL |
+                (centerIdle?Gravity.CENTER_HORIZONTAL:Gravity.START);
+        if(candidates.getGravity()!=stripGravity)
+            candidates.setGravity(stripGravity);
         latestOptions=new java.util.ArrayList<>(options);
         suggestionHandler.removeCallbacks(delayedRiseDismiss);
         // Auto-expand only when there are several real choices; avoid a jump
