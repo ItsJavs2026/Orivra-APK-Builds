@@ -33,6 +33,21 @@ public final class SuggestionStripLayoutPolicyTest {
         }
         check(SuggestionStripLayoutPolicy.chipChildIndex(-1,false)==-1,
                 "negative chip index sentinel");
+        for(int count=0;count<=8;count++) {
+            check(SuggestionStripLayoutPolicy.centerIdleSuggestions("",count,false)
+                            ==(count>0),
+                    "idle next-word chips centered only when there are choices");
+            check(!SuggestionStripLayoutPolicy.centerIdleSuggestions("hello",count,false),
+                    "typed word, correction and sentence strips retain START gravity");
+            check(!SuggestionStripLayoutPolicy.centerIdleSuggestions("",count,true),
+                    "private fields keep existing protected message layout");
+            check(!SuggestionStripLayoutPolicy.centerIdleSuggestions("editing",count,true),
+                    "protected editor stays unchanged with composing text");
+        }
+        check(SuggestionStripLayoutPolicy.centerIdleSuggestions(null,3,false),
+                "null empty-composing sentinel centers visible idle choices");
+        check(!SuggestionStripLayoutPolicy.centerIdleSuggestions(null,0,false),
+                "empty placeholder must never be centered");
         System.out.println("BUILD287_SUGGESTION_LAYOUT checks="+checks+" passed");
     }
 }
