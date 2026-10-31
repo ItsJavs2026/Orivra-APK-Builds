@@ -315,6 +315,9 @@ final class PredictionLite {
         "how was your day","what do you think","I love this",
         "I'm ready","let's get it","hell yeah","heck yeah","it's working","okay this works"
     };
+    // Immutable PUBLIC phrase normalization, never sourced from editor text.
+    private static final PublicPhraseIndex397 PUBLIC_PHRASES_397=
+            new PublicPhraseIndex397(COMMON_PHRASES);
     // Separate next-word corpus: never used as whole-phrase typo corrections.
     // These varied examples provide suffix evidence for unfamiliar sentences.
     private static final String[] CONTEXT_EXAMPLES={
@@ -416,8 +419,9 @@ final class PredictionLite {
     private static void addConversationalPhrases(String input,String raw,
             List<ScoredText> result,Set<String> known) {
         if(raw.length()<5 || raw.length()>28)return;
-        for(String phrase:COMMON_PHRASES) {
-            String normalized=phrase.toLowerCase(Locale.US).replaceAll("[^a-z]","");
+        for(int p=0;p<COMMON_PHRASES.length;p++) {
+            String phrase=COMMON_PHRASES[p];
+            String normalized=PUBLIC_PHRASES_397.compactAt(p);
             int maxEdits=raw.length()>=10?3:raw.length()>=8?2:1;
             if(Math.abs(normalized.length()-raw.length())>maxEdits)continue;
             int edits=editDistanceLimited(raw,normalized,maxEdits);
@@ -1049,8 +1053,9 @@ final class PredictionLite {
         // This also handles punctuation-free contractions without a special
         // rule for any one screenshot.
         if(raw.length()>=5) {
-            for(String phrase:COMMON_PHRASES) {
-                String normalized=phrase.toLowerCase(Locale.US).replaceAll("[^a-z]","");
+            for(int p=0;p<COMMON_PHRASES.length;p++) {
+                String phrase=COMMON_PHRASES[p];
+                String normalized=PUBLIC_PHRASES_397.compactAt(p);
                 if(normalized.equals(raw)) {
                     String corrected=caseDisplay(input,phrase);
                     result.removeIf(candidate -> candidate.text.equals(corrected));
@@ -1084,8 +1089,9 @@ final class PredictionLite {
         // the later sentence-rescue pass.
         String trustedPhrase=null;
         int trustedEdits=3;
-        for(String phrase:COMMON_PHRASES) {
-            String compact=phrase.toLowerCase(Locale.US).replaceAll("[^a-z]","");
+        for(int p=0;p<COMMON_PHRASES.length;p++) {
+            String phrase=COMMON_PHRASES[p];
+            String compact=PUBLIC_PHRASES_397.compactAt(p);
             if(Math.abs(compact.length()-raw.length())>1)continue;
             int edits=editDistanceLimited(raw,compact,1);
             if(edits<=1 && edits<trustedEdits) {
@@ -1098,8 +1104,9 @@ final class PredictionLite {
         // Prefer exact/one-error phrases first, then two-error matches only
         // for sufficiently long strings. Never override known dictionary words.
         if(trustedPhrase==null && raw.length()>=8 && !WORDS.containsKey(raw)) {
-            for(String phrase:COMMON_PHRASES) {
-                String compact=phrase.toLowerCase(Locale.US).replaceAll("[^a-z]","");
+            for(int p=0;p<COMMON_PHRASES.length;p++) {
+                String phrase=COMMON_PHRASES[p];
+                String compact=PUBLIC_PHRASES_397.compactAt(p);
                 if(Math.abs(compact.length()-raw.length())>2)continue;
                 if(editDistanceLimited(raw,compact,2)==2) {
                     String proposed=caseDisplay(input,phrase);
@@ -1261,10 +1268,7 @@ final class PredictionLite {
         String word=typed.toLowerCase(Locale.US);
         if(!WORDS.containsKey(word))return Collections.emptyList();
         ArrayList<String> out=new ArrayList<>();
-        for(String phrase:COMMON_PHRASES) {
-            String[] parts=phrase.split(" ");
-            if(parts.length<2 || parts.length>5)continue;
-            if(!parts[0].replaceAll("[^A-Za-z]","").equalsIgnoreCase(word))continue;
+        for(String phrase:PUBLIC_PHRASES_397.startingWith(word)) {
             String candidate=caseDisplay(typed,phrase);
             if(!out.contains(candidate))out.add(candidate);
             if(out.size()==3)break;
