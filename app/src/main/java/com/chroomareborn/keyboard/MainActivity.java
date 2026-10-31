@@ -85,13 +85,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 411 Performance Audit");
+        title.setText("Orivra — Build 412 Stable Suggestion Bar");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nBuild 411 — Find remaining prediction display delays (full settings preserved)\n"+
+        notes.setText("\nBuild 412 — Frame-coalesced suggestion bar and background split predictions\n"+
                 "Uses the complete Orivra settings and learning baseline, not the old Alpha 1.0 prototype. Calm prediction paint reduces repeated UI refreshes while you type and suppresses automatic suggestion panel expansion for uncertain text. It is experimental and needs Samsung testing.\n"+
                 "Targets the real S26 Ultra freezes reported in WhatsApp "+
                 "notification replies while music plays. Rapid letters and "+
@@ -234,6 +234,37 @@ public final class MainActivity extends Activity {
         });
         root.addView(riseButton411);
 
+        TextView frameHelp412=new TextView(this);
+        frameHelp412.setText("\nStable suggestion bar experiment. "+
+                "ON (default) merges multiple incoming candidate updates "+
+                "into one latest display-frame update. Split-word predictions "+
+                "are computed on the background worker, not while the "+
+                "keyboard is painting chips. OFF uses the old immediate "+
+                "bar painting behavior for comparison; the background "+
+                "split improvement remains enabled in either mode. "+
+                "Rise can be disabled independently above. "+
+                "Reopen the keyboard after switching.");
+        frameHelp412.setTextColor(0xFF303846);
+        frameHelp412.setTextSize(15);
+        root.addView(frameHelp412);
+        final String framePref412="orivra_frame_updates_412";
+        final android.content.SharedPreferences framePrefs412=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        Button frameButton412=new Button(this);
+        frameButton412.setAllCaps(false);
+        frameButton412.setText("Stable frame-based suggestion updates: "+
+                (framePrefs412.getBoolean(framePref412,true)?"ON":"OFF"));
+        frameButton412.setOnClickListener(v->{
+            boolean next=!framePrefs412.getBoolean(framePref412,true);
+            framePrefs412.edit().putBoolean(framePref412,next).apply();
+            frameButton412.setText("Stable frame-based suggestion updates: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen a text field to apply the new bar update setting",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(frameButton412);
+
         TextView auditHelp411=new TextView(this);
         auditHelp411.setText("\nBUILD 411 • Local performance audit (OFF by default). "+
                 "Measures letter, Space, Backspace, suggestion processing, "+
@@ -300,6 +331,8 @@ public final class MainActivity extends Activity {
                             "orivra_calm_predictions_408",true)+
                     " | Rise: "+currentFeedback411.getBoolean(
                             "orivra_rise_enabled_411",true)+
+                    " | Frame updates: "+currentFeedback411.getBoolean(
+                            "orivra_frame_updates_412",true)+
                     " | Theme: "+AppPalette.modeName(theme411);
             return OrivraPerfAudit411.report(settings411);
         };
@@ -375,7 +408,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra 411 Audit keyboard");
+        picker.setText("2. Choose Orivra 412 Stable Strip keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
