@@ -979,9 +979,9 @@ public final class MainActivity extends Activity {
                 if(unifiedV4){
                     // Strict read-back of the user-selected URI after the V4
                     // write; never call this from the IME/input thread.
-                    LearningBackupSafety392.ExportResult result=
+                    LearningBackupSafety392.ExportResult exportOutcome392=
                             LearningBackupSafety392.exportAndVerify(this,selected);
-                    message=result.display();
+                    message=exportOutcome392.display();
                 }else{
                     boolean saved=false;
                     try{
