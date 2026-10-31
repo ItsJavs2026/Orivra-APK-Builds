@@ -142,12 +142,12 @@ public final class LoadedLearningLatency394AndroidTest {
         final Stats loadedContext=new Stats("242 context",SAMPLES);
         InstrumentationRegistry.getInstrumentation().runOnMainSync(
                 ()->profile("th",loadedCorrections,loadedFreq,loadedContext));
-        System.out.println("R394 " + baseCorrections.describe());
-        System.out.println("R394 " + loadedCorrections.describe());
-        System.out.println("R394 " + baseFreq.describe());
-        System.out.println("R394 " + loadedFreq.describe());
-        System.out.println("R394 " + baseContext.describe());
-        System.out.println("R394 " + loadedContext.describe());
+        android.util.Log.i("OrivraPerf394","R394 " + baseCorrections.describe());
+        android.util.Log.i("OrivraPerf394","R394 " + loadedCorrections.describe());
+        android.util.Log.i("OrivraPerf394","R394 " + baseFreq.describe());
+        android.util.Log.i("OrivraPerf394","R394 " + loadedFreq.describe());
+        android.util.Log.i("OrivraPerf394","R394 " + baseContext.describe());
+        android.util.Log.i("OrivraPerf394","R394 " + loadedContext.describe());
         assertEquals("No preferences changed by read-only lookup",
                 304,PersonalLearning.countEntries(
                     context.getSharedPreferences(

@@ -98,7 +98,13 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+          script: |
+            set -e
+            adb logcat -c
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+            echo "---- R394 aggregate loaded-learning timing; fictional data only ----"
+            adb logcat -d -v brief -s OrivraPerf394:I | grep 'R394 .*p50='
+            echo "---- End of aggregate profile ----"
       - name: Require full regression + 8 deep tests + 4 loaded-learning profile tests
         shell: bash
         run: |
