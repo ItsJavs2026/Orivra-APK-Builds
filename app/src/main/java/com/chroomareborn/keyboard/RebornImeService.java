@@ -2473,6 +2473,7 @@ public final class RebornImeService extends InputMethodService {
         final InputConnection[] pressEditor={null};
         final LetterRowPredictionSwipe386[] rowSwipe386={null};
         final String[] rowExpected386={null};
+        final boolean[] idleNextWord388={false};
         final java.util.List<String>[] rowOptions386=new java.util.List[]{null};
         final long[] rowDownSerial386={-1L};
         final int[] rowSelectionStart386={-1},rowSelectionEnd386={-1};
@@ -2501,6 +2502,7 @@ public final class RebornImeService extends InputMethodService {
                     rowDownSerial386[0]=alphabetDownSerial386;
                     rowSwipe386[0]=null;
                     rowExpected386[0]=null;
+                    idleNextWord388[0]=false;
                     rowOptions386[0]=null;
                     if(LetterRowPredictionSwipe386.enabledForRow(
                             letterRowSwipeMode386,rowIndex386) &&
@@ -2509,15 +2511,22 @@ public final class RebornImeService extends InputMethodService {
                             editorAllowsSuggestions && !hasSelection() &&
                             !editingInMiddle && !cursorHasTextAfter() &&
                             !spacebarTouchActive && !backspaceTouchActive &&
-                            pressEditor[0]!=null && !latestSnapshot.isEmpty() &&
+                            pressEditor[0]!=null &&
                             latestSnapshot.equals(composing)) {
                         java.util.List<String> live=visiblePredictionOptions372(false);
-                        if(LetterRowPredictionSwipe386.hasSelectable(live)) {
+                        boolean nextWordReady388=latestSnapshot.isEmpty() &&
+                                nextWordTicketCurrent340(pressEditor[0]);
+                        LetterRowIdleMode388.Mode mode388=
+                                LetterRowIdleMode388.start(
+                                        latestSnapshot,composing,nextWordReady388,live);
+                        if(mode388!=LetterRowIdleMode388.Mode.UNAVAILABLE) {
                             try {
                                 rowSwipe386[0]=new LetterRowPredictionSwipe386(
                                         primaryPointer[0],event.getX(0),event.getY(0),
                                         getResources().getDisplayMetrics().density);
                                 rowExpected386[0]=latestSnapshot;
+                                idleNextWord388[0]=
+                                        mode388==LetterRowIdleMode388.Mode.NEXT_WORD;
                                 rowOptions386[0]=live;
                                 rowSelectionStart386[0]=lastSelectionStart;
                                 rowSelectionEnd386[0]=lastSelectionEnd;
@@ -2620,6 +2629,7 @@ public final class RebornImeService extends InputMethodService {
                         final long session386=pressSession[0];
                         final long startedSerial386=rowDownSerial386[0];
                         final String expected386=rowExpected386[0];
+                        final boolean chosenIdle388=idleNextWord388[0];
                         final int start386=rowSelectionStart386[0];
                         final int end386=rowSelectionEnd386[0];
                         rowSwipe386[0]=null;
@@ -2640,8 +2650,14 @@ public final class RebornImeService extends InputMethodService {
                                     hasSelection(),symbols,
                                     !hintPressOrder353.hasOpenPresses() &&
                                     !spacebarTouchActive && !backspaceTouchActive);
+                            boolean idleTicketNow388=chosenIdle388 &&
+                                    nextWordTicketCurrent340(editor386);
                             if(!valid386 || editingInMiddle ||
-                                    cursorHasTextAfter())return;
+                                    cursorHasTextAfter() ||
+                                    !LetterRowIdleMode388.finish(
+                                            chosenIdle388,expected386,composing,
+                                            live386,idleTicketNow388))
+                                return;
                             java.util.List<String> now386=visiblePredictionOptions372(false);
                             String choice386=LetterRowPredictionSwipe386.chosen(
                                     committedDirection386,now386);
