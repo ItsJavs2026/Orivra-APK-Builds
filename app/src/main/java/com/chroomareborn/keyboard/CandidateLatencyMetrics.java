@@ -18,7 +18,8 @@ final class CandidateLatencyMetrics {
     private static final long[] uiReady=new long[CAPACITY];
     private static final long[] nextFrame=new long[CAPACITY];
     private static final long[] keyHandler340=new long[CAPACITY];
-    private static int readySamples, frameSamples, keySamples340;
+    private static final long[] deferredUi401=new long[CAPACITY];
+    private static int readySamples, frameSamples, keySamples340,deferredSamples401;
     private static boolean enabled;
 
     static boolean isCandidate(String packageName) {
@@ -41,9 +42,11 @@ final class CandidateLatencyMetrics {
         Arrays.fill(uiReady,0L);
         Arrays.fill(nextFrame,0L);
         Arrays.fill(keyHandler340,0L);
+        Arrays.fill(deferredUi401,0L);
         readySamples=0;
         frameSamples=0;
         keySamples340=0;
+        deferredSamples401=0;
     }
     static synchronized long start(String packageName) {
         return enabled(packageName)?System.nanoTime():0L;
@@ -68,6 +71,13 @@ final class CandidateLatencyMetrics {
                 end-start>MAX_DURATION_NANOS)return;
         keyHandler340[keySamples340%CAPACITY]=end-start;
         keySamples340++;
+    }
+    /** One coalesced suggestion refresh, numeric duration only, not editor text. */
+    static synchronized void recordDeferredUi401(long start,long end) {
+        if(!enabled || start==0L || end-start<0L ||
+                end-start>MAX_DURATION_NANOS)return;
+        deferredUi401[deferredSamples401%CAPACITY]=end-start;
+        deferredSamples401++;
     }
     static synchronized void recordFrame(long start,long frameAt) {
         if(!enabled || start==0L || frameAt-start<0L ||
@@ -96,6 +106,8 @@ final class CandidateLatencyMetrics {
                 +"Suggestion views updated: "+stats(uiReady,readySamples)+"\n"
                 +"Next animation callback: "+stats(nextFrame,frameSamples)+"\n"
                 +"Typed-key UI work: "+stats(keyHandler340,keySamples340)+"\n"
+                +"Deferred suggestion UI work: "+
+                    stats(deferredUi401,deferredSamples401)+"\n"
                 +"Includes the 40 ms prediction debounce. "
                 +"The animation callback is before frame rendering, "
                 +"not proof that pixels reached the screen.\n"
