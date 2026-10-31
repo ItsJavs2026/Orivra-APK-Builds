@@ -63,3 +63,14 @@ The same noticeable typing delay also occurs **in the ChatGPT Android app's ordi
 - GitHub commit `80cb02c073fdfa945b512ded6e86040fdbfce009`: WORKER ONLY also samples committed-character editors when `composing` is empty by reading a current word at the cursor during the deferred refresh pass (not during a key touch), scheduling `scheduleEditing` and dropping its result. Before this patch, such an editor could falsely look fast because the background worker did no prediction work.
 - The selection callback and direct editor operations can still do Android InputConnection IPC in all modes, so OFF is not a zero-overhead bare IME. OFF vs WORKER ONLY vs FULL remains diagnostic rather than proof of cause.
 - Changes are committed to the branch; the Android 409 APK still **has not been built or tested**. Do not use a stale exported project snapshot after new commits: cloning now will capture this patch, but existing phone clones must `git pull --ff-only` then re-export before building.
+
+## Simplified, guarded Android Code Studio build (2026-10-31)
+New checked-in script: `scripts/build_orivra409_android_code_studio.sh`. It exports current Git HEAD into a new `AndroidIDEProjects/Orivra409Isolation` folder, copies the working 8.9 wrapper from the existing `Orivra408Calm` project, uses the native ARM64 AAPT2 override, builds debug APK, and verifies packageId and versionCode. It **refuses to overwrite** a nonempty 409 project folder and does not modify 408/407, existing app data, or GitHub Actions.
+Phone commands:
+```bash
+cd ~
+git clone --depth 1 --single-branch --branch candidate/build409-prediction-isolation-20261031 git@github.com:ItsJavs2026/Orivra-APK-Builds.git Orivra-Isolation
+bash ~/Orivra-Isolation/scripts/build_orivra409_android_code_studio.sh
+```
+If the user has ALREADY cloned an earlier state of this 409 branch, run `cd ~/Orivra-Isolation && git pull --ff-only` first so that the helper/script and latest service corrections are present. If the destination Orivra409Isolation already contains files, the script deliberately stops rather than destroying any work; inspect existing project before deciding how to refresh it.
+APK expected at `/storage/emulated/0/AndroidIDEProjects/Orivra409Isolation/app/build/outputs/apk/debug/app-debug.apk`. Still source-only as of this note: no real Samsung APK compile yet.
