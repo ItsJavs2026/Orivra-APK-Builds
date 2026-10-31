@@ -88,7 +88,8 @@ public final class MainActivity extends Activity {
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nCandidate 401 — Notification Reply + Memory Reliability\n"+
+        notes.setText("\nBuild 407 full-settings recovery (based on Candidate 401)\n"+
+                "Restored from the full Orivra codebase, NOT the old Alpha 1.0 prototype. The current baseline preserves modern settings. Full 407 performance changes still require review and Samsung testing.\n"+
                 "Targets the real S26 Ultra freezes reported in WhatsApp "+
                 "notification replies while music plays. Rapid letters and "+
                 "Space taps now share one bounded prediction-refresh window "+
