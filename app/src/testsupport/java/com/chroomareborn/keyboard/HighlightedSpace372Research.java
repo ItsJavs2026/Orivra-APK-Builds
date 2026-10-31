@@ -33,8 +33,26 @@ public final class HighlightedSpace372Research {
                 "Stale word cannot be corrected");
         check(eligible("cat","cat","dog",true,true),false,
                 "Unrelated words never auto replace");
-        check(eligible("te","te","telephone",true,true),false,
-                "Long speculative expansion blocked");
+        check(eligible("te","te","telephone",true,true),true,
+                "Short highlighted completion is explicitly accepted with Space");
+        check(eligible("k","k","keyboard",true,true),true,
+                "Single-character highlighted prefix completes whole known word");
+        check(eligible("ke","ke","keyboard",true,true),true,
+                "Two-character highlighted prefix completion");
+        check(eligible("key","key","keyboard",true,true),true,
+                "Three-character highlighted prefix completion");
+        check(eligible("a","a","and",true,true),true,
+                "One-character word completes highlighted ordinary word");
+        check(eligible("key","key","keyboard",false,true),false,
+                "Short word never auto-completes from preliminary frame");
+        check(eligible("key","key","keyboard",true,false),false,
+                "No visible highlight means ordinary Space");
+        check(eligible("key","key","keyboard and",true,true),false,
+                "Short prefix does not auto-insert speculative multiword phrase");
+        check(eligible("we","we","well",true,true),true,
+                "Two-character expansion from a displayed final option");
+        check(eligible("k","k","xylophone",true,true),false,
+                "Unrelated single-letter completion rejected");
         check(eligible("john","john","john",true,true),false,
                 "Known name remains original");
         check(eligible("let's","let's","lets",true,true),false,
