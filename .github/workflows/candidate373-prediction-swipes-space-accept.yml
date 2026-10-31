@@ -1,0 +1,337 @@
+name: Orivra Candidate 373 - prediction slide gestures and highlighted Space correction (separate APK)
+on:
+  push:
+    branches:
+      - candidate/build373-prediction-swipes-space-accept-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate373
+  cancel-in-progress: true
+
+jobs:
+  source-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify isolated identity on pinned Research 372
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="064185b26b7867813d5b0e4076526d86cf533a68"
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          allowed={
+              "app/build.gradle.kts",
+              "app/src/main/java/com/chroomareborn/keyboard/MainActivity.java",
+              "app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java",
+              ".github/workflows/candidate373-prediction-swipes-space-accept.yml",
+          }
+          assert changed==allowed, f"Unreviewed files: {changed ^ allowed}"
+          old=lambda name: subprocess.check_output(["git","show",base+":"+name],text=True)
+          for rel in [
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/main/java/com/chroomareborn/keyboard/LongDraftPrediction358.java",
+              "app/src/main/java/com/chroomareborn/keyboard/CommittedWordBoundary360.java",
+              "app/src/main/java/com/chroomareborn/keyboard/ShortJoinedContext362.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppPalette.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppSurfaceAccent368.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppIconHueCache366.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppIconColorSignature366.java",
+              "app/src/main/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369.java",
+              "app/src/main/java/com/chroomareborn/keyboard/SymbolHoldTiming367.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java",
+              "app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java",
+              "app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java",
+          ]:
+              assert old(rel)==Path(rel).read_text(),f"Unexpected production change: {rel}"
+          build=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build373trial"' in build
+          assert 'versionCode = 373' in build
+          assert '"Orivra Candidate 373"' in build
+          main=Path("app/src/main/java/com/chroomareborn/keyboard/MainActivity.java").read_text()
+          assert "Orivra — Candidate 373 Test" in main
+          assert "TypedLearningV4Transfer347.exportV4(this)" in main
+          assert "TypedLearningV4Transfer347.importConfirmed(" in main
+          metrics=Path("app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java").read_text()
+          assert "com.chroomareborn.keyboard.build373trial" in metrics
+          pack=Path("app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java").read_text()
+          assert "com.chroomareborn.keyboard.build373trial" in pack
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert 'android:allowBackup="false"' in manifest
+          assert 'android.permission.INTERNET' not in manifest
+          assert 'android:usesCleartextTraffic="false"' in manifest
+          service=Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          assert "safeComposing358" in service and "safeIdle358" in service
+          assert "CommittedWordBoundary360.resumeWholeWordCorrection(" in service
+          assert "PredictionTapCaret364.prefixFirstLetter(" in service
+          assert "PredictionTapCaret364.arm(" in service
+          assert 'ic.commitText(insertLeftBoundary364?" "+value:value, 1)' in service
+          prediction=Path("app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java").read_text()
+          assert "ShortJoinedContext362.suggestions(" in prediction
+          assert "NeighborDoubleKeyCorrectionPolicy.unique(" in Path("app/src/main/java/com/chroomareborn/keyboard/ShortJoinedContext362.java").read_text()
+          assert "final CharSequence beforeKey360=ic.getTextBeforeCursor(1,0);" in service
+          assert "SuggestionContinuity353.resumeNextWordsAtDocumentEnd(" in service
+          assert "TypedWordsConsent341.enabled(this)" in service
+          assert "if(instantKeyFeedback369)return;" in service
+          assert "SymbolHoldTiming367.delayMs(" in service
+          assert "requestAppIconHue366(editor);" in service
+          assert "hintPressOrder353.hasOpenPresses()" in service
+          assert "AppSurfaceAccent368.colors(hue,dark)" in Path(
+              "app/src/main/java/com/chroomareborn/keyboard/AppPalette.java").read_text()
+          assert "Shaded Surface trial" in main
+          assert "Swipe prediction selection:" in main
+          assert "Space accepts highlighted correction:" in main
+          assert "PredictionSwipe372.safeRelease(" in service
+          assert "HighlightedSpace372.eligible(" in service
+          assert "tryHighlightedSpace372()" in service
+          assert 'option.setOnTouchListener((v,event)->' in service
+          assert "Instant key visual feedback:" in main
+          assert "Special character hold:" in main
+          assert "android.permission.QUERY_ALL_PACKAGES" not in manifest
+          assert "android.permission.BIND_ACCESSIBILITY_SERVICE" not in manifest
+          print("PASS: isolated Trial 373 preserves Candidate 371 typing, private fields, V4 and independent prediction gesture controls")
+          PY
+      - name: Synthetic swipe, highlighted Space, typing, color and responsiveness regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/LongDraftPrediction358.java \
+            app/src/main/java/com/chroomareborn/keyboard/CommittedWordBoundary360.java \
+            app/src/main/java/com/chroomareborn/keyboard/NeighborDoubleKeyCorrectionPolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/ShortJoinedContext362.java \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java \
+            app/src/main/java/com/chroomareborn/keyboard/AppSurfaceAccent368.java \
+            app/src/main/java/com/chroomareborn/keyboard/AppIconColorSignature366.java \
+            app/src/main/java/com/chroomareborn/keyboard/SymbolHoldTiming367.java \
+            app/src/main/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369.java \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java \
+            app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LongDraftPrediction358Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CommittedWordBoundary360Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ShortJoinedContext362Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PredictionTapCaret364Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/AppSurfaceAccent368Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/AppIconColorSignature366Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SymbolHoldTiming367Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PredictionSwipe372Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/HighlightedSpace372Research.java
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.LongDraftPrediction358Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.CommittedWordBoundary360Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.ShortJoinedContext362Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.PredictionTapCaret364Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.AppSurfaceAccent368Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.AppIconColorSignature366Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.SymbolHoldTiming367Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.KeyPressVisualPolicy369Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.PredictionSwipe372Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.HighlightedSpace372Research
+
+  android35-qualify-and-release:
+    needs: source-and-synthetic
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Materialize pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Build Candidate 373 debug-signed APK and Android tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration when available
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Verify emulator tests, APK identity and no Internet permission
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          files=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert files,"Missing emulator reports"
+          tests=failed=errors=skipped=0
+          for f in files:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith("testsuite") else [
+                  x for x in root.iter() if x.tag.endswith("testsuite")]
+              for suite in suites:
+                  tests+=int(suite.attrib.get("tests","0"))
+                  failed+=int(suite.attrib.get("failures","0"))
+                  errors+=int(suite.attrib.get("errors","0"))
+                  skipped+=int(suite.attrib.get("skipped","0"))
+          print(f'Android 35 emulator: {tests} tests, {failed} failures, {errors} errors, {skipped} skipped')
+          assert tests>=217 and failed==0 and errors==0 and skipped==0
+          PY
+          mkdir -p dist
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n1 |
+            grep -Fq "package: name='com.chroomareborn.keyboard.build373trial' versionCode='373'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > dist/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" > dist/permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/permissions.txt
+          cp "$apk" dist/Orivra-Candidate-373.apk
+          (cd dist && sha256sum Orivra-Candidate-373.apk > Orivra-Candidate-373.apk.sha256)
+          cat > dist/Release_Notes.txt <<'TXT'
+          Orivra Candidate 373 — Optional prediction swipe selection and Space-to-highlighted correction PHONE TRIAL
+
+          Separately installable debug-signed package:
+          com.chroomareborn.keyboard.build373trial
+
+          - NEW: Slide on a visible prediction chip toward the left or right
+            adjacent suggestion; release to accept it. No character-key
+            glide typing, no spacebar gesture changes.
+          - NEW: Swipe UP on the prediction strip when RISE is visible to
+            choose its first alternative. The existing RISE chip taps
+            continue to work.
+          - NEW: Press Space to accept a LIVE, FINAL-RENDERED, HIGHLIGHTED
+            spelling correction AND one trailing word boundary in one editor
+            operation. Example: "tekk" -> "tell " if tell is highlighted.
+          - Any change of editor, session, cursor, original word, privacy
+            or selection cancels a swipe/Space correction. No auto rewrite
+            of unhighlighted text, URLs, passwords or numeric input.
+          - Independent in-app ON/OFF controls for Swipe Prediction
+            Selection and Space Accepts Highlighted Correction.
+          - Experimental gestures start only on the suggestion strip,
+            never on the letter keys, Backspace, or spacebar.
+          - A screenshot's visual highlight is NOT proof of model
+            confidence. The Space rule is limited to close word repairs
+            after the background model has settled; explicit taps remain.
+          - PREVIOUS: Shaded Surface uses a neutral white/gray or charcoal keyboard
+            background and keys while app-identifying hues tint only subtle
+            accents, special keys and suggestion backgrounds.
+          - Icon color extraction is confidence-screened and background-only,
+            with a bounded in-memory cache; hidden/monochrome icons fall back
+            to neutral colors. No screen recording or special permissions.
+          - NEW: instant visual key feedback skips scale animation but keeps
+            pressed-state ripple and system haptic. Toggle it OFF in the app
+            to compare the original 32/56-ms key-shrink motion.
+          - NEW: secondary symbols above letters activate at ~320 ms
+            instead of a long platform hold by default. Toggle this OFF
+            to restore Android's general long-press timing. Other hold
+            features and two-thumb touch-order behavior are unchanged.
+          - Both toggles apply on the next editor focus, never mid-keypress.
+          - This experiment isolates visual animation latency; it does NOT
+            change release-to-commit scheduling or claim Gboard equivalence.
+          - PREVIOUS: Select the prediction for a completed cursor word,
+            then type a new word before the next existing word. Example:
+            "I am hungry" -> tap "am" -> type "not" -> "I am not hungry".
+          - First alphabetic key receives one LEFT separator, while the
+            original right-side space is preserved. No temporary double
+            spaces, and the caret does not jump into the next word.
+          - One-shot bounded (48 chars each side) editor/session ticket
+            fails closed after cursor movement, selection, private fields,
+            punctuation, double spaces, tabs and newlines. No logging.
+          - No extra editor reads during ordinary typing: only the first
+            key after an explicit cursor-word prediction tap is verified.
+          - Built on Candidate 359/361/363, retaining Candidate 354's
+            previously phone-tested smooth touch baseline.
+          - Fixes Iwikk → I will using existing known word-pair evidence
+            and a unique QWERTY-neighbor doubled-key typo; no hardcoded user
+            phrase, no automatic correction, and one explicit-tap commit.
+          - Also offers an exact missing-space join (Iwill → I will).
+          - Keeps known correctly spelled words untouched. Joined-word
+            proposals run in the background predictor, never on key down.
+          - When a user moves the caret out of a composed word and returns to
+            the end of an existing committed word, the next letter is committed
+            once and the full word is eligible for correction predictions.
+          - Conservative whole-word recovery is gated against selection,
+            numeric, protected editors and mid-document text.
+          - A known completed composing word without useful alternatives may
+            show up to two optional tap-only phrase continuations.
+          - After Space at the document end, weak generic suggestions fill
+            otherwise empty chips only after existing learned/curated model ranks.
+          - Protected fields, selections and mid-document edits remain gated.
+          - Normal key touch handling unchanged; extra bounded editor verification only follows an explicit word-chip tap.
+          - Backspace, Keep/Search, no-flicker row, safe single-commit choices,
+            default-OFF opt-in typed-word learning and V4 backup are retained.
+          - No Internet permission, data analytics or automatic app backup.
+          - This is not yet phone-tested: Android 35 emulator qualification
+            cannot prove Samsung S26 Ultra Android 17 smoothness.
+          - Low-confidence fallback is not a pretrained Gboard language model.
+          - Test first in a disposable note; keep Candidate 354 installed.
+          - A separate APK does not migrate data automatically. Use a manual
+            V4 export/import if you want to carry over learning.
+          TXT
+      - name: Upload verified APK, SHA-256 and signatures
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate373-Android35-Qualified
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Create prerelease only after full Android qualification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view candidate-373-20261030 >/dev/null 2>&1; then
+            echo "Release already exists; refusing to overwrite"
+            exit 1
+          fi
+          gh release create candidate-373-20261030 \
+            dist/Orivra-Candidate-373.apk \
+            dist/Orivra-Candidate-373.apk.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 373 - Prediction Swipes and Space-to-Correction" \
+            --notes-file dist/Release_Notes.txt \
+            --prerelease
