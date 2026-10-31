@@ -3,7 +3,7 @@
 set -euo pipefail
 SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "$HOME/.cache"
-TEMP="$(mktemp -d "$HOME/.cache/orivra413test.XXXXXX")"
+TEMP="$(mktemp -d "$HOME/.cache/orivra414test.XXXXXX")"
 trap 'rm -rf "$TEMP"' EXIT
 javac --release 17 -d "$TEMP" \
     "$SOURCE/app/src/main/java/com/chroomareborn/keyboard/ComposingMutation340.java" \
