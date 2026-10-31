@@ -1,0 +1,61 @@
+name: Orivra Research 377 - broad-thumb letter drift (no APK)
+on:
+  push:
+    branches:
+      - research/build377-fat-thumb-touch-bounds-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research377
+  cancel-in-progress: true
+jobs:
+  synthetic-boundary-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enforce no production touch-path changes and no APK build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='2b920e50ed42ddeca76732013b73ec2abcf310ef'
+          diff=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          allowed={
+              'app/src/main/java/com/chroomareborn/keyboard/ThumbTapGuard377.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/ThumbTapGuard377Research.java',
+              'docs/RESEARCH377_FAT_THUMB_TOUCH_BOUNDS_20261030.md',
+              '.github/workflows/research377-fat-thumb-bounds.yml',
+          }
+          assert diff==allowed,(diff,allowed)
+          service=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'ThumbTapGuard377' not in service, 'Research must not change IME touch path'
+          manifest=Path('app/src/main/AndroidManifest.xml').read_text()
+          assert 'android.permission.INTERNET' not in manifest
+          assert 'android:allowBackup="false"' in manifest
+          build=Path('app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build376trial"' in build
+          assert 'versionCode = 376' in build
+          print('PASS isolated research: no APK, no production touch or signing changes')
+          PY
+      - name: Compile pure Java and run deterministic synthetic assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/research377"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/research377" \
+            app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java \
+            app/src/main/java/com/chroomareborn/keyboard/ThumbTapGuard377.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ThumbTapGuard377Research.java
+          java -cp "$RUNNER_TEMP/research377" \
+            com.chroomareborn.keyboard.ThumbTapGuard377Research
