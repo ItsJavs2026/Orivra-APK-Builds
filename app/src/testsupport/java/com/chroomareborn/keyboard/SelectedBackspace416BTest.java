@@ -48,7 +48,7 @@ public final class SelectedBackspace416BTest {
         expect(run(huge)==SelectedBackspace416B.Outcome.APPLIED,"very long selection");
         expect("START END".equals(huge.text.toString()),"whole long selection removed");
         expect(huge.commits==1,"no per-character loop");
-        Editor emoji=new Editor("left 🥰👍🏽 right",5,12);
+        Editor emoji=new Editor("left 🥰👍🏽 right",5,11);
         expect(run(emoji)==SelectedBackspace416B.Outcome.APPLIED,"emoji selection");
         expect("left  right".equals(emoji.text.toString()),"unicode preserved");
         Editor noSelection=new Editor("one two",4,4);
