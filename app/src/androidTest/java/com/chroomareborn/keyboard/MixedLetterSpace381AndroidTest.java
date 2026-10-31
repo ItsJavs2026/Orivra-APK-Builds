@@ -217,7 +217,12 @@ public final class MixedLetterSpace381AndroidTest {
         ui(()->{
             Harness h=new Harness();
             assertTrue(h.send(MotionEvent.ACTION_DOWN,new int[]{0},new float[]{190}));
-            assertTrue(h.addSpace());
+            // Keep the first pointer at its actual original x=190 when
+            // delivering the second finger's DOWN. A synthetic coordinate
+            // jump to x=40 here would falsely cancel the thumb guard.
+            assertTrue(h.send(MotionEvent.ACTION_POINTER_DOWN|
+                    (1<<MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+                    new int[]{0,1},new float[]{190,340}));
             assertTrue(h.send(MotionEvent.ACTION_MOVE,new int[]{0,1},new float[]{211,340}));
             assertTrue(h.releaseSpaceFirst());
             assertTrue(h.send(MotionEvent.ACTION_UP,new int[]{0},new float[]{211}));
