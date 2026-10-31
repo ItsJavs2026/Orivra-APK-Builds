@@ -86,8 +86,6 @@ public final class RebornImeService extends InputMethodService {
     private String riseRenderedSignature="";
     private boolean manuallyCollapsedPredictions=false;
     private List<String> latestOptions=java.util.Collections.emptyList();
-    private static final String SWIPE_SELECTION_PREF372="prediction_slide_select_372";
-    private static final String SPACE_CORRECTION_PREF372="space_accept_highlight_372";
     private boolean predictionSwipeEnabled372=true;
     private boolean spaceAcceptEnabled372=true;
     // Transient, current-editor-only highlighted correction and gesture.
@@ -1784,9 +1782,9 @@ public final class RebornImeService extends InputMethodService {
         fastSymbolHold367=visualOptions370.getBoolean(
                 SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,true);
         predictionSwipeEnabled372=visualOptions370.getBoolean(
-                SWIPE_SELECTION_PREF372,true);
+                PredictionSwipe372.PREF,true);
         spaceAcceptEnabled372=visualOptions370.getBoolean(
-                SPACE_CORRECTION_PREF372,true);
+                HighlightedSpace372.PREF,true);
         lastTypingTime=0L;
         averageTypingInterval=0;
         predictionsExpanded=false;
