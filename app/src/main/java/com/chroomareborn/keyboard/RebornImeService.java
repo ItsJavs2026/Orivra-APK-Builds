@@ -2309,6 +2309,27 @@ public final class RebornImeService extends InputMethodService {
         expandedSuggestions.setAlpha(1f);
         expandedSuggestions.setTranslationY(0f);
     }
+    /**
+     * Research 398: Shift-only changes must not detach the entire QWERTY
+     * keyboard, its in-progress touch handlers or backspace/spacebar controls.
+     * Full refresh remains the fallback for a non-alphabet or stale layout.
+     * The original Shift path also refreshed predictions, so keep that call.
+     */
+    private void refreshShiftCase398() {
+        if(base==null || keys==null || spacebarTouchActive ||
+                enterTouchActive ||
+                !BackspaceRepeatGuard.mayRebuildKeys(backspaceTouchActive,deleteHeld))
+            return;
+        if(hintPressOrder353.hasOpenPresses()) {
+            refreshAfterHint353=true;
+            return;
+        }
+        if(!AlphabetCaseRelabel398.relabel(keys,shift,capsLock)) {
+            refreshView();
+            return;
+        }
+        showSuggestions();
+    }
     private void refreshView() {
         if (base == null || keys == null || spacebarTouchActive ||
                 enterTouchActive ||
@@ -2801,7 +2822,7 @@ public final class RebornImeService extends InputMethodService {
         key.setOnClickListener(v -> {
             if(capsLock) { capsLock=false; shift=false; }
             else shift=!shift;
-            refreshView();
+            refreshShiftCase398();
         });
         key.setOnTouchListener((v,event)->{
             switch(event.getActionMasked()) {
@@ -2820,8 +2841,8 @@ public final class RebornImeService extends InputMethodService {
                         if(capsLock) { capsLock=false; shift=false; }
                         else shift=!shift;
                     }
-                    // Rebuild after touch release, not during ACTION_DOWN.
-                    refreshView();
+                    // Update only labels after release; preserve touched keys.
+                    refreshShiftCase398();
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     suggestionHandler.removeCallbacks(hold);
@@ -3035,7 +3056,7 @@ public final class RebornImeService extends InputMethodService {
         // ?123 and symbol-page switches refresh explicitly on user activation.
         if(!numericEditor && !capsLock && shiftAtStart!=shift &&
                 !symbolHoldInProgress)
-            suggestionHandler.post(this::refreshView);
+            suggestionHandler.post(this::refreshShiftCase398);
         CandidateLatencyMetrics.recordKeyHandler340(
                 keyStart340,System.nanoTime());
     }
@@ -3313,12 +3334,12 @@ public final class RebornImeService extends InputMethodService {
         editingInMiddle=cursorHasTextAfter() || hasSelection();
         // Previously every space destroyed and rebuilt the full key layout.
         // A normal word boundary does not change any key labels. Only a
-        // sentence-boundary Shift change requires a deferred rebuild.
+        // sentence-boundary Shift change needs in-place case relabeling.
         boolean previousShift=shift;
         updateSentenceShift();
         showSuggestions();
         if(previousShift!=shift && !capsLock && !symbols)
-            suggestionHandler.post(this::refreshView);
+            suggestionHandler.post(this::refreshShiftCase398);
     }
     private void insertNewlineSafely() {
         InputConnection ic = getCurrentInputConnection();
