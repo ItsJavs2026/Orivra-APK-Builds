@@ -95,7 +95,15 @@ final class PredictionDispatcher implements AutoCloseable {
         scheduled = worker.schedule(() -> {
             try {
                 if (!isCurrent(id)) return;
-                List<String> choices = predictor.predict(snapshot, editing);
+                // Time only the background algorithm, never record input.
+                final long perfStart411=OrivraPerfAudit411.begin();
+                List<String> choices;
+                try {
+                    choices=predictor.predict(snapshot, editing);
+                } finally {
+                    OrivraPerfAudit411.end(
+                            OrivraPerfAudit411.PREDICT_WORKER,perfStart411);
+                }
                 if (isCurrent(id)) listener.onResult(id, snapshot, choices);
             } finally {
                 // Release references to finished input/listener captures instead
