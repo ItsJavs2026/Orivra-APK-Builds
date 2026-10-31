@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build416bselectiontrial"
+        applicationId = "com.chroomareborn.keyboard.build416ccursortrial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 4161
-        versionName = "1.0.71-build416b-selected-delete"
-        manifestPlaceholders["appLabel"] = "Orivra 416B Selection Fix"
+        versionCode = 4162
+        versionName = "1.0.72-build416c-cursor-tap"
+        manifestPlaceholders["appLabel"] = "Orivra 416C Cursor Tap Fix"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra 416B Selection Fix"
+            manifestPlaceholders["appLabel"] = "Orivra 416C Cursor Tap Fix"
         }
     }
     compileOptions {
