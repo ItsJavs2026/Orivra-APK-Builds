@@ -91,26 +91,22 @@ public final class MainActivity extends Activity {
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nBuild 412 — Frame-coalesced suggestion bar and background split predictions\n"+
-                "Uses the complete Orivra settings and learning baseline, not the old Alpha 1.0 prototype. Calm prediction paint reduces repeated UI refreshes while you type and suppresses automatic suggestion panel expansion for uncertain text. It is experimental and needs Samsung testing.\n"+
-                "Targets the real S26 Ultra freezes reported in WhatsApp "+
-                "notification replies while music plays. Rapid letters and "+
-                "Space taps now share one bounded prediction-refresh window "+
-                "instead of repeatedly doing heavy suggestion UI work.\n"+
-                "\nMemory improvements: session-only learning and suggestion "+
-                "caches are released when the keyboard hides; optional "+
-                "dictionary data is released under background memory pressure; "+
-                "app-icon work keeps one active and one latest pending lookup; "+
-                "opt-in typed-word learning permits at most 128 pending "+
-                "Space-learning jobs. No V4 schema or personal-backup changes.\n"+
-                "\nThe optional performance lab now shows numeric Java/native "+
-                "heap use and deferred suggestion timing, without storing "+
-                "your typing or sending telemetry.\n"+
-                "\nSeparate experimental install. Keep Gboard as your daily "+
-                "keyboard and preserve Candidates 396, 399, 400 and all V4 "+
-                "backups. Emulator success does NOT prove Android 17 "+
-                "notification responsiveness on your phone. Test only "+
-                "disposable text until independently confirmed.\n");
+        notes.setText("\nBuild 412 — Stable prediction-bar experiment\n"+
+                "The full Orivra settings, SentenceFlow, personal learning and "+
+                "backup controls are preserved. Based on your Samsung tests: "+
+                "prediction OFF and WORKER ONLY were smooth, while FULL "+
+                "showed delay. Changing the theme did not fix it.\n"+
+                "\nThis build moves split-word calculations to the existing "+
+                "background prediction worker, combines duplicate candidate "+
+                "updates into the most recent display frame, and reuses "+
+                "unchanged suggestion-chip actions instead of rebuilding them. "+
+                "These changes need real device testing.\n"+
+                "\nYou can independently compare Rise ON/OFF, frame-based "+
+                "updates ON/OFF and opt-in aggregate performance timings. "+
+                "The report does not record what you type.\n"+
+                "\nSeparate experimental installation. Keep Gboard and your "+
+                "previous Orivra builds installed. Test non-sensitive text "+
+                "until this version is verified on your phone.\n");
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
