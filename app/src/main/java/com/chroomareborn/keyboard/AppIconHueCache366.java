@@ -27,7 +27,7 @@ import java.util.concurrent.Executors;
  */
 final class AppIconHueCache366 {
     private AppIconHueCache366() {}
-    private static final int MAX=40,ICON_PX=64;
+    private static final int MAX=40,MAX_IN_FLIGHT=8,ICON_PX=64;
     private static final long SUCCESS_TTL_MS=6*60*60*1000L;
     private static final long FAILURE_TTL_MS=5*60*1000L;
     private static final Object LOCK=new Object();
@@ -78,6 +78,19 @@ final class AppIconHueCache366 {
         }
     }
 
+    /** Drop optional cached icon-color metadata when Android trims the
+     * hidden keyboard process; no user content, bitmaps or preferences.
+     * Already-running tasks finish and remove their in-flight markers.
+     */
+    static void trimMemory() {
+        synchronized(LOCK) { CACHE.clear(); }
+    }
+    static int cacheSizeForTest() {
+        synchronized(LOCK) { return CACHE.size(); }
+    }
+    static int inFlightForTest() {
+        synchronized(LOCK) { return IN_FLIGHT.size(); }
+    }
     /** Test-only read: metadata bit, never an icon or package enumeration. */
     static boolean cacheContainsForTest(String pkg) {
         if(!valid(pkg))return false;
@@ -98,7 +111,8 @@ final class AppIconHueCache366 {
         synchronized(LOCK) {
             HueEntry entry=CACHE.get(pkg);
             if(entry!=null && SystemClock.elapsedRealtime()<entry.expiry)return;
-            if(IN_FLIGHT.containsKey(pkg))return;
+            if(IN_FLIGHT.containsKey(pkg) ||
+                    IN_FLIGHT.size()>=MAX_IN_FLIGHT)return;
             IN_FLIGHT.put(pkg,Boolean.TRUE);
         }
         try {
