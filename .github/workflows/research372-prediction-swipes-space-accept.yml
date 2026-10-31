@@ -59,7 +59,7 @@ jobs:
             assert old==Path(p).read_text(),f"Protected baseline drift: {p}"
           service=Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
           original=subprocess.check_output(["git","show",base+":app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java"],text=True)
-          assert service.count("hintPressOrder353")==original.count("hintPressOrder353")
+          assert service.count("hintPressOrder353")==original.count("hintPressOrder353")+2 # new gesture blocks multi-key overlap
           assert service.count("SpacebarCursorGesture")==original.count("SpacebarCursorGesture")
           assert service.count("SymbolHoldTiming367.delayMs(")==original.count("SymbolHoldTiming367.delayMs(")
           assert service.count("PredictionTapCaret364.arm(")==original.count("PredictionTapCaret364.arm(")
