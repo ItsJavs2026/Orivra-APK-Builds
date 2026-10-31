@@ -92,21 +92,25 @@ public final class MainActivity extends Activity {
 
         TextView notes = new TextView(this);
         notes.setText("\nBuild 413 — Measured typing-path performance experiment\n"+
-                "The full Orivra settings, SentenceFlow, personal learning and "+
-                "backup controls are preserved. Based on your Samsung tests: "+
-                "prediction OFF and WORKER ONLY were smooth, while FULL "+
-                "showed delay. Changing the theme did not fix it.\n"+
-                "\nThis build moves split-word calculations to the existing "+
-                "background prediction worker, combines duplicate candidate "+
-                "updates into the most recent display frame, and reuses "+
-                "unchanged suggestion-chip actions instead of rebuilding them. "+
-                "These changes need real device testing.\n"+
-                "\nYou can independently compare Rise ON/OFF, frame-based "+
-                "updates ON/OFF and opt-in aggregate performance timings. "+
-                "The report does not record what you type.\n"+
-                "\nSeparate experimental installation. Keep Gboard and your "+
-                "previous Orivra builds installed. Test non-sensitive text "+
-                "until this version is verified on your phone.\n");
+                "Your Galaxy S26 Ultra audit measured 21.09ms average letter "+
+                "handling and 40.71ms average Space handling. Rise, theme "+
+                "and individual prediction-chip binding were much faster. "+
+                "We need to fix the cost of typing, not hide predictions.\n"+
+                "\nBuild 413 preserves the full Orivra settings, SentenceFlow, "+
+                "learning, backups and Build 412 stable prediction bar. "+
+                "It adds a reversible fast composing acknowledgment, "+
+                "moves approved Space learning writes to a bounded "+
+                "Android-background-priority worker, and avoids a full "+
+                "keyboard rebuild after ordinary Backspace gestures.\n"+
+                "\nUse the independent ON/OFF controls for Fast verified "+
+                "composing ACK and Background approved Space learning to "+
+                "compare correctness and responsiveness. The local audit "+
+                "now separates pre/post Space work, composing/edit IPC, "+
+                "layout updates and background learning. No typed text "+
+                "is included in timing reports.\n"+
+                "\nThis is an experimental, separate installation. "+
+                "Keep Gboard and previous Orivra versions installed. "+
+                "Test non-sensitive text first.\n");
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
