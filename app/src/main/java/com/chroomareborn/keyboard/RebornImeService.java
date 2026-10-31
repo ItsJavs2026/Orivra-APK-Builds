@@ -88,6 +88,9 @@ public final class RebornImeService extends InputMethodService {
     private List<String> latestOptions=java.util.Collections.emptyList();
     private boolean predictionSwipeEnabled372=true;
     private boolean spaceAcceptEnabled372=true;
+    // Research 385: independent opt-in thumb-sized suggestion targets.
+    // OFF by default; Candidate 378 behavior is unchanged until enabled.
+    private boolean thumbTopBar385=false;
     // Transient, current-editor-only highlighted correction and gesture.
     private String highlightedExpected372;
     private String highlightedCandidate372;
@@ -109,6 +112,7 @@ public final class RebornImeService extends InputMethodService {
         Runnable hold;
         boolean longPreview;
         View preview;
+        TopBarTouch385 thumbGesture;
         PredictionTouch372(View view,InputConnection connection,
                 String input,long generation,int start,int end,
                 float x,float y,int from,boolean riseStart,
@@ -214,6 +218,16 @@ public final class RebornImeService extends InputMethodService {
                         event.getX(),event.getY(),index,fromRise,
                         visiblePredictionOptions372(false),
                         visiblePredictionOptions372(true));
+                if(thumbTopBar385) {
+                    try {
+                        activePredictionTouch372.thumbGesture=new TopBarTouch385(
+                                event.getPointerId(0),event.getX(0),event.getY(0),
+                                getResources().getDisplayMetrics().density);
+                    } catch(IllegalArgumentException malformed) {
+                        clearPredictionTouch372();
+                        return true;
+                    }
+                }
                 riseChipPressed=true; // lock RISE row during gesture
                 view.setPressed(true);
                 if(view.getParent()!=null)
@@ -233,9 +247,21 @@ public final class RebornImeService extends InputMethodService {
             case MotionEvent.ACTION_MOVE: {
                 PredictionTouch372 touch=activePredictionTouch372;
                 if(touch==null || touch.origin!=view)return true;
-                PredictionSwipe372.Direction dir=PredictionSwipe372.direction(
-                        event.getX()-touch.downX,event.getY()-touch.downY,
-                        dp(12),!touch.rise.isEmpty());
+                PredictionSwipe372.Direction dir;
+                if(thumbTopBar385 && touch.thumbGesture!=null) {
+                    int pointer=event.findPointerIndex(touch.thumbGesture.pointerId());
+                    if(pointer<0 || !touch.thumbGesture.move(
+                            event.getPointerId(pointer),event.getX(pointer),
+                            event.getY(pointer),!touch.rise.isEmpty())) {
+                        clearPredictionTouch372();
+                        return true;
+                    }
+                    dir=topBarSwipeDirection385(touch.thumbGesture.preview());
+                } else {
+                    dir=PredictionSwipe372.direction(
+                            event.getX()-touch.downX,event.getY()-touch.downY,
+                            dp(12),!touch.rise.isEmpty());
+                }
                 if(dir!=PredictionSwipe372.Direction.NONE) {
                     if(touch.hold!=null) {
                         suggestionHandler.removeCallbacks(touch.hold);
@@ -265,8 +291,19 @@ public final class RebornImeService extends InputMethodService {
                 if(touch==null || touch.origin!=view)return true;
                 float dx=event.getX()-touch.downX;
                 float dy=event.getY()-touch.downY;
-                PredictionSwipe372.Direction dir=PredictionSwipe372.direction(
-                        dx,dy,dp(12),!touch.rise.isEmpty());
+                TopBarTouch385.Decision thumbDecision=null;
+                PredictionSwipe372.Direction dir;
+                if(thumbTopBar385 && touch.thumbGesture!=null) {
+                    thumbDecision=touch.thumbGesture.release(
+                            event.getPointerId(event.getActionIndex()),
+                            event.getX(event.getActionIndex()),
+                            event.getY(event.getActionIndex()),
+                            !touch.rise.isEmpty());
+                    dir=topBarSwipeDirection385(thumbDecision);
+                } else {
+                    dir=PredictionSwipe372.direction(
+                            dx,dy,dp(12),!touch.rise.isEmpty());
+                }
                 String choice=PredictionSwipe372.choose(dir,touch.index,
                         touch.strip,touch.rise,touch.fromRise);
                 // Freezing the visuals cannot freeze the host editor.
@@ -288,9 +325,11 @@ public final class RebornImeService extends InputMethodService {
                 if(allowed && !previewed) {
                     if(dir!=PredictionSwipe372.Direction.NONE) {
                         if(choice!=null)acceptSuggestion(view,touch.expected,choice);
-                    } else if(Math.abs(dx)<dp(14) && Math.abs(dy)<dp(14)) {
-                        // performClick preserves existing accessibility and
-                        // original tap semantics: never commit on ACTION_DOWN.
+                    } else if((thumbDecision==TopBarTouch385.Decision.TAP) ||
+                            (thumbDecision==null &&
+                                    Math.abs(dx)<dp(14) && Math.abs(dy)<dp(14))) {
+                        // Same accessibility click path; tuned geometry only
+                        // permits a tap after the full safe gesture release.
                         view.performClick();
                     }
                 }
@@ -298,6 +337,16 @@ public final class RebornImeService extends InputMethodService {
                 return true;
             }
             default:return true;
+        }
+    }
+    private static PredictionSwipe372.Direction topBarSwipeDirection385(
+            TopBarTouch385.Decision decision) {
+        if(decision==null)return PredictionSwipe372.Direction.NONE;
+        switch(decision) {
+            case LEFT:return PredictionSwipe372.Direction.LEFT;
+            case RIGHT:return PredictionSwipe372.Direction.RIGHT;
+            case UP:return PredictionSwipe372.Direction.UP;
+            default:return PredictionSwipe372.Direction.NONE;
         }
     }
     private NextWordTapTicket340 idleWordTicket340;
@@ -1789,6 +1838,8 @@ public final class RebornImeService extends InputMethodService {
                 PredictionSwipe372.PREF,true);
         spaceAcceptEnabled372=visualOptions370.getBoolean(
                 HighlightedSpace372.PREF,true);
+        thumbTopBar385=visualOptions370.getBoolean(
+                TopBarTouch385.PREF,false);
         lastTypingTime=0L;
         averageTypingInterval=0;
         predictionsExpanded=false;
@@ -2230,8 +2281,22 @@ public final class RebornImeService extends InputMethodService {
             item.setPadding(dp(6),0,dp(6),0);
             item.setBackground(feedbackBackground(Color.TRANSPARENT));
             // No card backgrounds: match the regular suggestion strip.
-            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,dp(60),1f);
-            params.setMargins(dp(2),dp(1),dp(2),dp(1));
+            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(
+                    0,dp(TopBarTouch385.riseHeightDp(thumbTopBar385)),1f);
+            params.setMargins(
+                    dp(TopBarTouch385.riseHorizontalMarginDp(thumbTopBar385)),
+                    dp(TopBarTouch385.riseVerticalMarginDp(thumbTopBar385)),
+                    dp(TopBarTouch385.riseHorizontalMarginDp(thumbTopBar385)),
+                    dp(TopBarTouch385.riseVerticalMarginDp(thumbTopBar385)));
+            if(reuseRiseRow) {
+                LinearLayout.LayoutParams prior=(LinearLayout.LayoutParams)item.getLayoutParams();
+                if(prior.width!=params.width || prior.height!=params.height ||
+                        prior.leftMargin!=params.leftMargin ||
+                        prior.topMargin!=params.topMargin ||
+                        prior.rightMargin!=params.rightMargin ||
+                        prior.bottomMargin!=params.bottomMargin)
+                    item.setLayoutParams(params);
+            }
             if(!reuseRiseRow)row.addView(item,params);
             item.setOnTouchListener((v,event)->{
                 if(predictionSwipeEnabled372)
@@ -4171,12 +4236,17 @@ public final class RebornImeService extends InputMethodService {
                 option.setOnClickListener(null);
                 option.setOnLongClickListener(null);
                 int fixedWidth=Math.max(dp(70),(screenWidth-dp(30))/3);
+                int h=dp(TopBarTouch385.normalHeightDp(thumbTopBar385,false));
+                int hm=dp(TopBarTouch385.normalHorizontalMarginDp(thumbTopBar385));
+                int vm=dp(TopBarTouch385.normalVerticalMarginDp(thumbTopBar385));
                 LinearLayout.LayoutParams previous=
                         (LinearLayout.LayoutParams)option.getLayoutParams();
-                if(previous.width!=fixedWidth || previous.height!=dp(44)){
-                    LinearLayout.LayoutParams placeholder=new LinearLayout.LayoutParams(
-                            fixedWidth,dp(44));
-                    placeholder.setMargins(dp(2),dp(2),dp(2),dp(2));
+                if(previous.width!=fixedWidth || previous.height!=h ||
+                        previous.leftMargin!=hm || previous.rightMargin!=hm ||
+                        previous.topMargin!=vm || previous.bottomMargin!=vm) {
+                    LinearLayout.LayoutParams placeholder=
+                            new LinearLayout.LayoutParams(fixedWidth,h);
+                    placeholder.setMargins(hm,vm,hm,vm);
                     option.setLayoutParams(placeholder);
                 }
                 continue;
@@ -4260,12 +4330,16 @@ public final class RebornImeService extends InputMethodService {
                     stableSentenceStrip?maxCandidateWidth:
                     fullSentenceChip?maxCandidateWidth:
                     (!input.isEmpty() && i<3 ? Math.max(dp(70),(screenWidth-dp(30))/3) : -2),
-                    fullSentenceChip?dp(48):dp(44));
-            params.setMargins(dp(2),dp(2),dp(2),dp(2));
+                    dp(TopBarTouch385.normalHeightDp(thumbTopBar385,fullSentenceChip)));
+            int hm385=dp(TopBarTouch385.normalHorizontalMarginDp(thumbTopBar385));
+            int vm385=dp(TopBarTouch385.normalVerticalMarginDp(thumbTopBar385));
+            params.setMargins(hm385,vm385,hm385,vm385);
             if(reuseCells) {
                 LinearLayout.LayoutParams previous=
                         (LinearLayout.LayoutParams)option.getLayoutParams();
-                if(previous.width!=params.width || previous.height!=params.height)
+                if(previous.width!=params.width || previous.height!=params.height ||
+                        previous.leftMargin!=hm385 || previous.rightMargin!=hm385 ||
+                        previous.topMargin!=vm385 || previous.bottomMargin!=vm385)
                     option.setLayoutParams(params);
             } else candidates.addView(option,params);
             final String expected=input;

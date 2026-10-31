@@ -291,6 +291,31 @@ public final class MainActivity extends Activity {
         });
         root.addView(swipePredictions372);
 
+        TextView topBarInfo385=new TextView(this);
+        topBarInfo385.setText("\nTop prediction bar — broad-thumb trial\n"+
+                "Fill the existing strip height with larger suggestion touch "+
+                "targets and reduce the gaps between chips. When prediction "+
+                "swipe selection is ON, use more deliberate left/right/up "+
+                "gestures to avoid accidental corrections. Keyboard height "+
+                "and prediction ranking do not change.");
+        topBarInfo385.setTextSize(15);
+        topBarInfo385.setTextColor(0xFF303846);
+        root.addView(topBarInfo385);
+        Button topBarThumb385=new Button(this);
+        topBarThumb385.setAllCaps(false);
+        topBarThumb385.setText("Larger prediction touch targets: "+
+                (feedback.getBoolean(TopBarTouch385.PREF,false)?"ON":"OFF"));
+        topBarThumb385.setOnClickListener(v->{
+            boolean next=!feedback.getBoolean(TopBarTouch385.PREF,false);
+            feedback.edit().putBoolean(TopBarTouch385.PREF,next).apply();
+            topBarThumb385.setText("Larger prediction touch targets: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen a text field to apply top-bar trial",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(topBarThumb385);
+
         Button spaceCorrection372=new Button(this);
         spaceCorrection372.setAllCaps(false);
         spaceCorrection372.setText("Space accepts highlighted correction: "+
