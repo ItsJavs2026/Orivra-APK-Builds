@@ -694,6 +694,34 @@ public final class RebornImeService extends InputMethodService {
                 typedWords347.completedWords(prefix,3,typedWordsSession347),3);
     }
     private final Handler suggestionHandler = new Handler(Looper.getMainLooper());
+    // Research 401: heavy suggestion rendering is separated from physical
+    // letter/Space commits, especially for remote SystemUI reply editors.
+    // This small gate retains only a temporary editor reference/session,
+    // never typed text. Direct touches still use existing InputConnection.
+    private final TypingRefreshGate401 typingRefresh401=new TypingRefreshGate401();
+    private final Runnable typingRefreshRunnable401=()->{
+        if(!typingRefresh401.consume(
+                inputSessionGeneration,getCurrentInputConnection()))return;
+        if(!sensitive && editorAllowsSuggestions && candidates!=null)showSuggestions();
+    };
+    private void cancelTypingRefresh401(){
+        suggestionHandler.removeCallbacks(typingRefreshRunnable401);
+        typingRefresh401.cancel();
+    }
+    private void scheduleTypingRefresh401(){
+        InputConnection editor=getCurrentInputConnection();
+        if(editor==null || candidates==null)return;
+        if(typingRefresh401.isPendingFor(inputSessionGeneration,editor))
+            return;
+        // Replace only an outdated editor's pending callback; never let an
+        // old host field update the next reply or another application.
+        cancelTypingRefresh401();
+        if(!typingRefresh401.arm(inputSessionGeneration,editor))return;
+        predictionDispatcher.cancel();
+        clearSpaceHighlight372();
+        suggestionHandler.postDelayed(
+                typingRefreshRunnable401,TypingRefreshGate401.WAIT_MS);
+    }
     // Research 353: alpha keys retain down-order when two thumbs overlap.
     // Never store touch/text history; cancel the transient queue on lifecycle.
     private final HintKeyPressOrder353 hintPressOrder353=new HintKeyPressOrder353();
@@ -1076,6 +1104,14 @@ public final class RebornImeService extends InputMethodService {
                     return true;
                 case MotionEvent.ACTION_MOVE:
                     moveSpacebarDuringTouch(event);
+                    // A confirmed cursor swipe is NOT a Space tap. Cancel
+                    // its order token immediately, not on lift, so a held
+                    // navigation gesture cannot queue-block later letters.
+                    if(cursorSwipeNavigating && spaceOrderToken400[0]>0L){
+                        hintPressOrder353.cancel(spaceOrderToken400[0]);
+                        spaceOrderToken400[0]=-1L;
+                        requestRefreshAfterHint353();
+                    }
                     return true;
                 case MotionEvent.ACTION_UP: {
                     if(!spacebarTouchActive)return true;
@@ -1774,6 +1810,7 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onStartInput(EditorInfo info, boolean restarting) {
+        cancelTypingRefresh401();
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
         alphabetDownSerial386++;
@@ -1847,6 +1884,7 @@ public final class RebornImeService extends InputMethodService {
         shift = SentenceCapitalization.shouldCapitalize(ic.getTextBeforeCursor(160, 0));
     }
     @Override public void onStartInputView(EditorInfo info, boolean restarting) {
+        cancelTypingRefresh401();
         invalidateEditingTicket();
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
@@ -1859,6 +1897,7 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onFinishInput() {
+        cancelTypingRefresh401();
         clearPredictionTouch372();
         clearSpaceHighlight372();
         clearPendingCaretInsert364();
@@ -1881,6 +1920,7 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInput();
     }
     @Override public void onFinishInputView(boolean finishingInput) {
+        cancelTypingRefresh401();
         clearPredictionTouch372();
         clearSpaceHighlight372();
         clearPendingCaretInsert364();
@@ -1899,6 +1939,7 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInputView(finishingInput);
     }
     @Override public void onDestroy() {
+        cancelTypingRefresh401();
         appThemeDestroyed366=true;
         clearPredictionTouch372();
         clearSpaceHighlight372();
@@ -3074,7 +3115,15 @@ public final class RebornImeService extends InputMethodService {
                 breakTypedContext347();
             }
         }
-        showSuggestions();
+        if(value.length()==1 && Character.isLetter(value.charAt(0)) &&
+                TypingRefreshGate401.safeToCoalesce(sensitive,
+                        editorAllowsSuggestions,numericEditor,symbols,
+                        hasSelection())) {
+            scheduleTypingRefresh401();
+        } else {
+            cancelTypingRefresh401();
+            showSuggestions();
+        }
         if(value.length()==1 && Character.isLetter(value.charAt(0)) &&
                 beforeKeySelection342>=0 &&
                 !hasSelection() && typeSession340==inputSessionGeneration) {
@@ -3371,7 +3420,13 @@ public final class RebornImeService extends InputMethodService {
         // sentence-boundary Shift change needs in-place case relabeling.
         boolean previousShift=shift;
         updateSentenceShift();
-        showSuggestions();
+        if(TypingRefreshGate401.safeToCoalesce(
+                sensitive,editorAllowsSuggestions,numericEditor,symbols,
+                hasSelection())) scheduleTypingRefresh401();
+        else {
+            cancelTypingRefresh401();
+            showSuggestions();
+        }
         if(previousShift!=shift && !capsLock && !symbols)
             suggestionHandler.post(this::refreshShiftCase398);
     }
@@ -3883,6 +3938,12 @@ public final class RebornImeService extends InputMethodService {
     }
     private void showSuggestions() {
         if(candidates==null)return;
+        // Any synchronous selection callback or Shift-label refresh during
+        // a burst must not bypass the bounded budget. The queued callback
+        // consumes the token before executing this full refresh. Secure
+        // fields bypass the budget and clear the strip immediately.
+        if(!sensitive && typingRefresh401.isPendingFor(
+                inputSessionGeneration,getCurrentInputConnection()))return;
         final String snapshot=composing;
         // A delayed editor selection callback can leave editingInMiddle
         // stuck true after a long message. At the REAL document end, after
