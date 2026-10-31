@@ -1903,14 +1903,17 @@ public final class RebornImeService extends InputMethodService {
         if(newSelStart==0 && newSelEnd==0 && !sensitive &&
                 editorAllowsSuggestions && !numericEditor && !symbols) {
             final InputConnection live393=getCurrentInputConnection();
-            final boolean maybeStale393=!composing.isEmpty() ||
-                    !latestSnapshot.isEmpty() || editingInMiddle ||
-                    latestOptions.isEmpty() || idleWordTicket340==null;
-            if(live393!=null && maybeStale393) {
+            if(live393!=null) {
                 try{
+                    // A visible ticket can become stale after the host clears
+                    // the field without clearing the IME's in-memory options.
+                    final boolean ticketCurrent393=nextWordTicketCurrent340(live393);
+                    final boolean maybeStale393=!composing.isEmpty() ||
+                            !latestSnapshot.isEmpty() || editingInMiddle ||
+                            latestOptions.isEmpty() || !ticketCurrent393;
+                    if(!maybeStale393)return;
                     final CharSequence before393=live393.getTextBeforeCursor(1,0);
                     final CharSequence after393=live393.getTextAfterCursor(1,0);
-                    final boolean ticketCurrent393=nextWordTicketCurrent340(live393);
                     if(ChatComposerReset393.shouldRecover(newSelStart,newSelEnd,
                             before393,after393,composing,latestSnapshot,
                             editingInMiddle,latestOptions.size(),
