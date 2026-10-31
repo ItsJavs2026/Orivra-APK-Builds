@@ -1503,6 +1503,10 @@ public final class RebornImeService extends InputMethodService {
         numericAlphabeticOverride=false;
         symbols=false;
         extraSymbols=false;
+        // Read preference per editor focus, NOT on every letter press.
+        fastSymbolHold367=getSharedPreferences(SymbolHoldTiming367.PREFS,
+                MODE_PRIVATE).getBoolean(
+                        SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,true);
         lastTypingTime=0L;
         averageTypingInterval=0;
         predictionsExpanded=false;
@@ -2117,6 +2121,7 @@ public final class RebornImeService extends InputMethodService {
      * This intentionally keeps the hit target constant and lets multi-touch
      * cancellations fail closed. Hint TextViews are display-only.
      */
+    private boolean fastSymbolHold367=true;
     private void addHintLetterKey(LinearLayout row,String visible,String letter,String hint) {
         Button key=addKey(row,visible,1f,()->type(letter));
         LinearLayout.LayoutParams cellParams=(LinearLayout.LayoutParams)key.getLayoutParams();
@@ -2168,7 +2173,9 @@ public final class RebornImeService extends InputMethodService {
                     animateKeyPress(key,true);
                     keyHaptic(key);
                     suggestionHandler.postDelayed(
-                            hold,ViewConfiguration.getLongPressTimeout());
+                            hold,SymbolHoldTiming367.delayMs(
+                                    ViewConfiguration.getLongPressTimeout(),
+                                    fastSymbolHold367));
                     return true;
                 case MotionEvent.ACTION_MOVE: {
                     int index=event.findPointerIndex(primaryPointer[0]);
