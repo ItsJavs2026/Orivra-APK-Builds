@@ -85,13 +85,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 412 Stable Suggestion Bar");
+        title.setText("Orivra — Build 413 Keypress Fast Path");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nBuild 412 — Stable prediction-bar experiment\n"+
+        notes.setText("\nBuild 413 — Measured typing-path performance experiment\n"+
                 "The full Orivra settings, SentenceFlow, personal learning and "+
                 "backup controls are preserved. Based on your Samsung tests: "+
                 "prediction OFF and WORKER ONLY were smooth, while FULL "+
@@ -261,6 +261,57 @@ public final class MainActivity extends Activity {
         });
         root.addView(frameButton412);
 
+        TextView keypathHelp413=new TextView(this);
+        keypathHelp413.setText("\nBuild 413: the Samsung audit showed "+
+                "21.09ms average letter handling and 40.71ms Space handling. "+
+                "Fast positive composing acknowledgment skips one redundant "+
+                "editor read ONLY after Android explicitly accepts a "+
+                "composing edit; ambiguous/failed edits keep the previous "+
+                "verification. Background approved learning moves eligible "+
+                "post-Space preference writes off the typing thread. "+
+                "Both can be switched OFF to compare behavior. "+
+                "Reopen the keyboard after changing either setting.");
+        keypathHelp413.setTextSize(15);
+        keypathHelp413.setTextColor(0xFF303846);
+        root.addView(keypathHelp413);
+        final android.content.SharedPreferences keypathPrefs413=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        final String fastAckKey413="orivra_fast_compose_ack_413";
+        final String backgroundLearningKey413=
+                "orivra_background_space_learning_413";
+        Button fastAckButton413=new Button(this);
+        fastAckButton413.setAllCaps(false);
+        fastAckButton413.setText("Fast verified composing ACK: "+
+                (keypathPrefs413.getBoolean(fastAckKey413,true)?"ON":"OFF"));
+        fastAckButton413.setOnClickListener(v->{
+            boolean next=!keypathPrefs413.getBoolean(fastAckKey413,true);
+            keypathPrefs413.edit().putBoolean(fastAckKey413,next).apply();
+            fastAckButton413.setText("Fast verified composing ACK: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen a text field to apply",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(fastAckButton413);
+        Button learningWorkerButton413=new Button(this);
+        learningWorkerButton413.setAllCaps(false);
+        learningWorkerButton413.setText("Background approved Space learning: "+
+                (keypathPrefs413.getBoolean(backgroundLearningKey413,true)?
+                        "ON":"OFF"));
+        learningWorkerButton413.setOnClickListener(v->{
+            boolean next=!keypathPrefs413.getBoolean(
+                    backgroundLearningKey413,true);
+            keypathPrefs413.edit().putBoolean(backgroundLearningKey413,next)
+                    .apply();
+            learningWorkerButton413.setText(
+                    "Background approved Space learning: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen a text field to apply",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(learningWorkerButton413);
+
         TextView auditHelp411=new TextView(this);
         auditHelp411.setText("\nBUILD 411 • Local performance audit (OFF by default). "+
                 "Measures letter, Space, Backspace, suggestion processing, "+
@@ -329,6 +380,11 @@ public final class MainActivity extends Activity {
                             "orivra_rise_enabled_411",true)+
                     " | Frame updates: "+currentFeedback411.getBoolean(
                             "orivra_frame_updates_412",true)+
+                    " | Fast compose ACK: "+currentFeedback411.getBoolean(
+                            "orivra_fast_compose_ack_413",true)+
+                    " | Background Space learning: "+
+                            currentFeedback411.getBoolean(
+                            "orivra_background_space_learning_413",true)+
                     " | Theme: "+AppPalette.modeName(theme411);
             return OrivraPerfAudit411.report(settings411);
         };
@@ -404,7 +460,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra 412 Stable Strip keyboard");
+        picker.setText("2. Choose Orivra 413 Fast Key Test keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
