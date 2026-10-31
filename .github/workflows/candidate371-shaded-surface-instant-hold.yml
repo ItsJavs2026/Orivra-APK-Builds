@@ -38,6 +38,7 @@ jobs:
               "app/src/main/java/com/chroomareborn/keyboard/MainActivity.java",
               "app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java",
               "app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/AppIconColor366AndroidTest.java",
               ".github/workflows/candidate371-shaded-surface-instant-hold.yml",
           }
           assert changed==allowed, f"Unreviewed files: {changed ^ allowed}"
