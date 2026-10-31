@@ -44,7 +44,7 @@ final class AppIconColorSignature366 {
                 float min=Math.min(r,Math.min(g,b));
                 float delta=max-min;
                 float saturation=max==0?0:delta/max;
-                if(saturation<.23f || max<.18f || max>.995f ||
+                if(saturation<.23f || max<.18f ||
                         delta<.09f)continue;
                 chromatic++;
                 float hue;
