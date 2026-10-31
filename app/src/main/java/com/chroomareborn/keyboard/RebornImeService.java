@@ -1995,6 +1995,9 @@ public final class RebornImeService extends InputMethodService {
                 getSharedPreferences("keyboard_feedback",MODE_PRIVATE)
                         .getInt(PredictionIsolationMode409.PREF,
                                 PredictionIsolationMode409.OFF));
+        idlePredictionPaintEnabled410=getSharedPreferences(
+                "keyboard_feedback",MODE_PRIVATE)
+                        .getBoolean(IDLE_PAINT_PREF_410,true);
         predictionDispatcher.cancel();
         setColors(info);
         // AFTER the session-generation bump. Explicit permission is OFF
