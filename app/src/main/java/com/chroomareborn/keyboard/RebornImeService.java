@@ -1150,6 +1150,50 @@ public final class RebornImeService extends InputMethodService {
     }
     private String themeSource = "Neutral fallback";
     private boolean themeDark = true;
+    private boolean appThemeDestroyed366=false;
+    /** Async app-icon lookup is allowed only for the two App Match modes.
+     * The callback never reads/records editor text and never redraws while
+     * keys are pressed or a composing transaction is active.
+     */
+    private void requestAppIconHue366(EditorInfo editor) {
+        if(editor==null || editor.packageName==null)return;
+        int mode=AppPalette.normalized(getSharedPreferences(
+                AppPalette.PREFS,MODE_PRIVATE).getInt(
+                        AppPalette.KEY_MODE,AppPalette.DEFAULT));
+        if(mode!=AppPalette.APP_SHADED && mode!=AppPalette.APP_MATCH)return;
+        final String pkg=editor.packageName;
+        final long generation=inputSessionGeneration;
+        AppIconHueCache366.request(this,pkg,
+                ()->applyAppIconHueWhenIdle366(pkg,generation,0));
+    }
+    private void applyAppIconHueWhenIdle366(String pkg,long generation,int retries) {
+        if(appThemeDestroyed366 || generation!=inputSessionGeneration ||
+                !isInputViewShown() || base==null)return;
+        EditorInfo current=getCurrentInputEditorInfo();
+        if(current==null || !pkg.equals(current.packageName))return;
+        int mode=AppPalette.normalized(getSharedPreferences(
+                AppPalette.PREFS,MODE_PRIVATE).getInt(
+                        AppPalette.KEY_MODE,AppPalette.DEFAULT));
+        if(mode!=AppPalette.APP_SHADED && mode!=AppPalette.APP_MATCH)return;
+        final long time=android.os.SystemClock.uptimeMillis();
+        boolean busy=hintPressOrder353.hasOpenPresses() ||
+                spacebarTouchActive || enterTouchActive ||
+                backspaceTouchActive || deleteHeld || symbolHoldInProgress ||
+                cursorSwipeNavigating || composingTransaction340 ||
+                !composing.isEmpty() ||
+                (lastTypingTime>0 && time-lastTypingTime<420L);
+        if(busy) {
+            // No forced keyboard rebuild during two-thumb typing. If a
+            // continuous composing session never becomes idle, the cached
+            // color applies on the next editor focus instead.
+            if(retries<12)
+                suggestionHandler.postDelayed(()->
+                        applyAppIconHueWhenIdle366(pkg,generation,retries+1),230L);
+            return;
+        }
+        setColors(current);
+        refreshView();
+    }
     private String themeDetails() {
         int mode=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
                 .getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
@@ -1181,6 +1225,9 @@ public final class RebornImeService extends InputMethodService {
         suggestionTextColor=result.suggestionTextColor;
         rippleColor=result.rippleColor;
         syncNavigationBar();
+        // Icon loading is dispatched to one low-priority background worker.
+        // The first focus uses an immediate, legible preset/Material fallback.
+        requestAppIconHue366(editor);
     }
     private void syncNavigationBar() {
         Window window=getWindow()==null?null:getWindow().getWindow();
@@ -1569,6 +1616,7 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInputView(finishingInput);
     }
     @Override public void onDestroy() {
+        appThemeDestroyed366=true;
         clearPendingCaretInsert364();
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
