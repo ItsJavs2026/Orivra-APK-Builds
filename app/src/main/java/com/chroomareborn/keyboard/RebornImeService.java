@@ -1781,6 +1781,10 @@ public final class RebornImeService extends InputMethodService {
                 KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true);
         fastSymbolHold367=visualOptions370.getBoolean(
                 SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,true);
+        fatThumbDrift378=visualOptions370.getBoolean(
+                ThumbTapGuard377.PREF,true);
+        wideEdgeLetters378=visualOptions370.getBoolean(
+                EdgeKeyWeights378.PREF,true);
         predictionSwipeEnabled372=visualOptions370.getBoolean(
                 PredictionSwipe372.PREF,true);
         spaceAcceptEnabled372=visualOptions370.getBoolean(
@@ -2323,7 +2327,9 @@ public final class RebornImeService extends InputMethodService {
                 final String visible=shift&&!symbols?value.toUpperCase():value;
                 if(!symbols) {
                     String hint=KeyboardLayoutSpec.longPressHint(index,col);
-                    addHintLetterKey(row,visible,value,hint);
+                    addHintLetterKey(row,visible,value,hint,
+                            wideEdgeLetters378?
+                              EdgeKeyWeights378.weight(index,col,rows[index].length()):1f);
                 } else addKey(row,visible,1f,()->type(value));
             }
             if (index == 2) {
@@ -2423,8 +2429,11 @@ public final class RebornImeService extends InputMethodService {
      * cancellations fail closed. Hint TextViews are display-only.
      */
     private boolean fastSymbolHold367=true;
-    private void addHintLetterKey(LinearLayout row,String visible,String letter,String hint) {
-        Button key=addKey(row,visible,1f,()->type(letter));
+    // Read once on editor focus. Never resize active key targets mid-gesture.
+    private boolean fatThumbDrift378=true;
+    private boolean wideEdgeLetters378=true;
+    private void addHintLetterKey(LinearLayout row,String visible,String letter,String hint,float cellWeight) {
+        Button key=addKey(row,visible,cellWeight,()->type(letter));
         LinearLayout.LayoutParams cellParams=(LinearLayout.LayoutParams)key.getLayoutParams();
         row.removeView(key);
         FrameLayout cell=new FrameLayout(this);
@@ -2449,6 +2458,7 @@ public final class RebornImeService extends InputMethodService {
         final boolean[] triggered={false},cancelled={false};
         final long[] pressToken={-1L},pressSession={-1L};
         final int[] primaryPointer={-1};
+        final ThumbTapGuard377[] touchGuard378={null};
         final InputConnection[] pressEditor={null};
         final Runnable hold=()->{
             if(!cancelled[0] && pressToken[0]>0 &&
@@ -2470,6 +2480,18 @@ public final class RebornImeService extends InputMethodService {
                     pressEditor[0]=getCurrentInputConnection();
                     pressSession[0]=inputSessionGeneration;
                     pressToken[0]=hintPressOrder353.begin();
+                    touchGuard378[0]=null;
+                    if(fatThumbDrift378) {
+                        try {
+                            touchGuard378[0]=new ThumbTapGuard377(
+                                    primaryPointer[0],key.getWidth(),key.getHeight(),
+                                    event.getX(0),event.getY(0),
+                                    getResources().getDisplayMetrics().density);
+                        } catch(IllegalArgumentException invalidTouch) {
+                            // Fail closed; never crash the IME on malformed coordinates.
+                            cancelled[0]=true;
+                        }
+                    }
                     key.setPressed(true);
                     animateKeyPress(key,true);
                     keyHaptic(key);
@@ -2480,11 +2502,18 @@ public final class RebornImeService extends InputMethodService {
                     return true;
                 case MotionEvent.ACTION_MOVE: {
                     int index=event.findPointerIndex(primaryPointer[0]);
-                    if(index<0 || event.getX(index)<-dp(10) ||
-                            event.getX(index)>key.getWidth()+dp(10) ||
-                            event.getY(index)<-dp(10) ||
-                            event.getY(index)>key.getHeight()+dp(10)) {
+                    boolean rejected=index<0;
+                    if(!rejected) {
+                        float x=event.getX(index),y=event.getY(index);
+                        if(fatThumbDrift378)
+                            rejected=touchGuard378[0]==null ||
+                                    !touchGuard378[0].move(primaryPointer[0],x,y);
+                        else rejected=x<-dp(10) || x>key.getWidth()+dp(10) ||
+                                y<-dp(10) || y>key.getHeight()+dp(10);
+                    }
+                    if(rejected) {
                         cancelled[0]=true;
+                        if(touchGuard378[0]!=null)touchGuard378[0].cancel();
                         suggestionHandler.removeCallbacks(hold);
                     }
                     // A secondary finger never cancels the key owned by
@@ -2499,6 +2528,14 @@ public final class RebornImeService extends InputMethodService {
                     // Primary lifted while another pointer remains; resolve
                     // this key exactly as a normal ACTION_UP.
                 case MotionEvent.ACTION_UP: {
+                    if(fatThumbDrift378 && !cancelled[0]) {
+                        int index=event.findPointerIndex(primaryPointer[0]);
+                        if(index<0 || touchGuard378[0]==null ||
+                                !touchGuard378[0].release(primaryPointer[0],
+                                        event.getX(index),event.getY(index)))
+                            cancelled[0]=true;
+                    }
+                    touchGuard378[0]=null;
                     suggestionHandler.removeCallbacks(hold);
                     key.setPressed(false);
                     animateKeyPress(key,false);
@@ -2526,6 +2563,8 @@ public final class RebornImeService extends InputMethodService {
                 case MotionEvent.ACTION_CANCEL:
                     suggestionHandler.removeCallbacks(hold);
                     cancelled[0]=true;
+                    if(touchGuard378[0]!=null)touchGuard378[0].cancel();
+                    touchGuard378[0]=null;
                     key.setPressed(false);
                     animateKeyPress(key,false);
                     hintPressOrder353.cancel(pressToken[0]);
