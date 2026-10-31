@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build414livetrial"
+        applicationId = "com.chroomareborn.keyboard.build415speedtrial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 414
-        versionName = "1.0.68-build414-live-suggestions"
-        manifestPlaceholders["appLabel"] = "Orivra 414 Live Test"
+        versionCode = 415
+        versionName = "1.0.69-build415-quick-wake"
+        manifestPlaceholders["appLabel"] = "Orivra 415 Speed Test"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra 414 Live Test"
+            manifestPlaceholders["appLabel"] = "Orivra 415 Speed Test"
         }
     }
     compileOptions {
