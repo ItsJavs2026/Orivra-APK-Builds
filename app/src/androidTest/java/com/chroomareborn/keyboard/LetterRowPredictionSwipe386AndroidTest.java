@@ -93,7 +93,7 @@ public final class LetterRowPredictionSwipe386AndroidTest {
         for(String input:inputs){
             assertTrue(HighlightedSpace372.eligible(input,input,"tell",
                     true,true,true,true,true,false,false,false,
-                    false,false,false,false,false));
+                    false,false,false,false));
         }
     }
     @Test public void actualViewReceivesDownSwipeBeyondOriginalKeyBounds(){
