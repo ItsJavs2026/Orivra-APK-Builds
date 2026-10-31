@@ -1039,10 +1039,22 @@ public final class RebornImeService extends InputMethodService {
         final float step=Math.max(dp(16),touchSlop*1.5f);
         final float vertical=Math.max(dp(28),touchSlop*3f);
         spacebarCursorGesture=new SpacebarCursorGesture(activate,step,vertical);
+        // Research 400: letters commit through the down-order sequencer.
+        // Give the physical Space its own token at ACTION_DOWN too, or a
+        // rapidly overlapping next letter can overtake its Space boundary.
+        // No typed text or touch coordinates are retained by this queue.
+        final long[] spaceOrderToken400={-1L};
+        final long[] spaceSession400={-1L};
+        final InputConnection[] spaceEditor400={null};
         key.setOnTouchListener((view,event)->{
             switch(event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     stopSpacebarCursorGesture();
+                    if(spaceOrderToken400[0]>0L)
+                        hintPressOrder353.cancel(spaceOrderToken400[0]);
+                    spaceOrderToken400[0]=hintPressOrder353.begin();
+                    spaceSession400[0]=inputSessionGeneration;
+                    spaceEditor400[0]=getCurrentInputConnection();
                     spacebarButton=key;
                     spacebarTouchActive=true;
                     spacebarPointerId=event.getPointerId(0);
@@ -1057,6 +1069,9 @@ public final class RebornImeService extends InputMethodService {
                     // A second pointer must not turn a multi-finger gesture
                     // into an accidental space or editor-navigation command.
                     stopSpacebarCursorGesture();
+                    hintPressOrder353.cancel(spaceOrderToken400[0]);
+                    spaceOrderToken400[0]=-1L;
+                    requestRefreshAfterHint353();
                     animateKeyPress(view,false);
                     return true;
                 case MotionEvent.ACTION_MOVE:
@@ -1070,9 +1085,22 @@ public final class RebornImeService extends InputMethodService {
                     if(wasDragging)flushFinalCursorSwipe();
                     stopSpacebarCursorGesture();
                     animateKeyPress(view,false);
-                    if(insertSpace) {
-                        space();
-                    } else if(wasDragging) {
+                    final long token400=spaceOrderToken400[0];
+                    spaceOrderToken400[0]=-1L;
+                    final InputConnection editor400=spaceEditor400[0];
+                    final long session400=spaceSession400[0];
+                    if(insertSpace && editor400!=null) {
+                        hintPressOrder353.complete(token400,()->
+                                suggestionHandler.post(()->{
+                                    if(session400==inputSessionGeneration &&
+                                            editor400==getCurrentInputConnection())
+                                        space();
+                                }));
+                    } else {
+                        hintPressOrder353.cancel(token400);
+                    }
+                    requestRefreshAfterHint353();
+                    if(!insertSpace && wasDragging) {
                         // Let final editor selection callbacks settle before
                         // requesting corrections once, never per swipe step.
                         scheduleCursorReleaseSuggestions();
@@ -1081,6 +1109,9 @@ public final class RebornImeService extends InputMethodService {
                 }
                 case MotionEvent.ACTION_CANCEL:
                     stopSpacebarCursorGesture();
+                    hintPressOrder353.cancel(spaceOrderToken400[0]);
+                    spaceOrderToken400[0]=-1L;
+                    requestRefreshAfterHint353();
                     animateKeyPress(view,false);
                     return true;
                 default:return true;
