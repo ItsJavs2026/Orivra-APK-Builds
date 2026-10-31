@@ -44,7 +44,7 @@ Build 412 vs 413 subjectively improved but still not Gboard-level. Theme and Ris
 4. **Expanded aggregate audit:** stage `Idle word verification after typing stops` (separate from per-letter `Idle word observation`); counters `Stale untappable chips hidden`, `Outdated prediction frames discarded`, `Prediction frame refresh retries`. Counts and times only; no typed content, suggestions or app IDs in report. Reuse Build 411 opt-in reset/copy mechanism. Report header now shows Build 414.
 5. **Preserved:** complete full settings, SentenceFlow, English/Spanish research, personal dictionary and backups, 412 async split/one-frame strip, 413 fast compose ACK, bounded approved Space learning worker, Rise A/B and performance audit.
 6. Separate build identity: appId `com.chroomareborn.keyboard.build414livetrial`, versionCode 414, versionName `1.0.68-build414-live-suggestions`, display name `Orivra 414 Live Test`. Existing installed apps/learning data unaffected; personal data does NOT auto-migrate.
-7. **Tests added:** IdleWordCandidate414Test.java (7 pure-Java assertions: composing takes precedence, current-session direct-commit word, stale session blocked, unsupported fields, empty input, incomplete contractions). Existing ComposingMutation413FastPathTest.java covers 14 checks. Script run_orivra414_core_tests.sh compiles them with javac --release 17 and runs both before Android compile. These tests have not yet been executed on user's Samsung for Build 414; don't claim pass in advance.
+7. **Tests added:** IdleWordCandidate414Test.java (7 pure-Java assertions: composing takes precedence, current-session direct-commit word, stale session blocked, unsupported fields, empty input, incomplete contractions). Existing ComposingMutation413FastPathTest.java covers 14 checks. Script run_orivra414_core_tests.sh compiles them with javac --release 17 and runs both before Android compile. The pure helper's equivalent local Java17 copy passed 7 checks, but the user's Samsung and GitHub checkout still need the script's real compilation/tests; don't claim full APK readiness in advance.
 
 ## Phone compilation / offline workflows
 Android Code Studio's terminal, using the working local JDK17, Gradle 8.9 and native ARM64 AAPT2 override. No paid GitHub Actions needed:
@@ -67,3 +67,8 @@ Expected local APK: `/storage/emulated/0/AndroidIDEProjects/Orivra414Live/app/bu
 
 ## Other notes
 Work is on source branch, not GitHub Actions. GitHub Free spending allowance previously exhausted; phone-first is preferred. This checkpoint is intended for a fresh chat to continue exactly, without losing the latest results.
+
+## Latest source-level verification note
+- A matching independent local copy of `IdleWordCandidate414` and its 7-test Java suite compiled under `javac --release 17` and printed **IdleWordCandidate414Test PASS (7 checks)**. This is a test of the pure candidate policy only, not a full Android compilation, and the actual GitHub byte-for-byte checkout has not been locally downloaded. The on-phone Build 414 builder is configured to execute tests on the checked-out source before Gradle.
+- Source inspection reports balanced Java braces/parentheses across modified RebornImeService, MainActivity, OrivraPerfAudit411, and IdleWordCandidate414. That does not detect all compiler errors or runtime errors.
+- Actual Build 414 Android APK and new handset performance report remain **pending**. The user has not supplied any Build 414 result; do not misinterpret the repeated Build 413 performance audit as a new run.
