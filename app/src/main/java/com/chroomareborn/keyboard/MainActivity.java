@@ -745,19 +745,20 @@ public final class MainActivity extends Activity {
         root.addView(symbolHold370);
 
         TextView swipeInfo372=new TextView(this);
-        swipeInfo372.setText("\nPrediction gestures (experimental)\n"+
-                "On the suggestion strip, slide toward the next chip to "+
-                "select it. Swipe up to choose a RISE alternative when "+
-                "the expanded panel is visible. Normal taps still work.");
+        swipeInfo372.setText("\nPrediction-bar gestures (optional • OFF by default)\n"+
+                "Tap prediction chips normally. If enabled, horizontal and "+
+                "upward swipes within the prediction strip select other "+
+                "chips. Letter-key prediction swipes are a separate setting "+
+                "below and remain available whether this is ON or OFF.");
         swipeInfo372.setTextSize(15);
         swipeInfo372.setTextColor(0xFF303846);
         root.addView(swipeInfo372);
         Button swipePredictions372=new Button(this);
         swipePredictions372.setAllCaps(false);
         swipePredictions372.setText("Swipe prediction selection: "+
-                (feedback.getBoolean(PredictionSwipe372.PREF,true)?"ON":"OFF"));
+                (feedback.getBoolean(PredictionSwipe372.PREF,false)?"ON":"OFF"));
         swipePredictions372.setOnClickListener(v->{
-            boolean next=!feedback.getBoolean(PredictionSwipe372.PREF,true);
+            boolean next=!feedback.getBoolean(PredictionSwipe372.PREF,false);
             feedback.edit().putBoolean(PredictionSwipe372.PREF,next).apply();
             swipePredictions372.setText("Swipe prediction selection: "+
                     (next?"ON":"OFF"));
