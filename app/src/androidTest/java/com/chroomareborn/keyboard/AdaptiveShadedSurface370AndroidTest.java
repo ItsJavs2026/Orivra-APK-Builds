@@ -91,9 +91,10 @@ public final class AdaptiveShadedSurface370AndroidTest {
                     KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,false)
                     .putBoolean(SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,true)
                     .commit();
-            assertTrue(KeyPressVisualPolicy369.shouldScaleAnimate(
-                    !prefs.getBoolean(KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true),
-                    true)==false);
+            assertFalse(prefs.getBoolean(
+                    KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true));
+            assertTrue(KeyPressVisualPolicy369.shouldScaleAnimate(false,true));
+            assertFalse(KeyPressVisualPolicy369.shouldScaleAnimate(true,true));
             assertEquals(320,SymbolHoldTiming367.delayMs(500,
                     prefs.getBoolean(SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,false)));
         } finally {
