@@ -1,0 +1,100 @@
+name: Candidate 373 native emulator screenshots - option buttons and gesture area
+on:
+  push:
+    branches:
+      - research/build373-placement-screenshots-20261030
+    paths:
+      - ".github/workflows/visual-qa373-placements.yml"
+      - ".github/scripts/capture373-placement.sh"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: orivra-candidate373-ui-screenshots
+  cancel-in-progress: true
+jobs:
+  actual-android-screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Reconstruct verified pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile actual Candidate 373 keyboard APK (no new candidate)
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:assembleDebug
+          apk=$(find app/build/outputs/apk/debug -name '*.apk' -type f -print -quit)
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -1 |
+            grep -Fq "package: name='com.chroomareborn.keyboard.build373trial' versionCode='373'"
+      - name: Enable accelerated emulator
+        run: if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash .github/scripts/capture373-placement.sh
+      - name: Upload exact screenshots from emulator, not mockups
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-373-Native-Placement-Screenshots
+          path: placement_screenshots/*.png
+          retention-days: 30
+          if-no-files-found: error
+      - name: Commit screenshots in a visual-QA-only branch for user links
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,json,pathlib,subprocess,os
+          root=pathlib.Path("placement_screenshots")
+          expected=["candidate373_settings_buttons.png","candidate373_keyboard_prediction_strip.png"]
+          for name in expected:
+              file=root/name
+              assert file.is_file() and file.stat().st_size>5000,name
+              assert file.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"),name
+              dest=f"docs/visual-qa/candidate373/{name}"
+              payload={
+                  "message":f"Native emulator visual QA for Candidate 373: {name}",
+                  "content":base64.b64encode(file.read_bytes()).decode("ascii"),
+                  "branch":os.environ["GITHUB_REF_NAME"]
+              }
+              jsonpath=pathlib.Path("/tmp/put-"+name+".json")
+              jsonpath.write_text(json.dumps(payload))
+              p=subprocess.run(["gh","api","-X","PUT",
+                  "repos/"+os.environ["GITHUB_REPOSITORY"]+"/contents/"+dest,
+                  "--input",str(jsonpath)],capture_output=True,text=True)
+              if p.returncode!=0:
+                  raise RuntimeError(f"Failed to publish {name}: {p.stderr[:2000]}")
+              print("PUBLISHED native emulator PNG:",dest,"bytes=",file.stat().st_size)
+          PY
