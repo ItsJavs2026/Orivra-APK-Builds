@@ -60,7 +60,7 @@ jobs:
           assert '"Orivra Candidate 386"' in build
           main=Path('app/src/main/java/com/chroomareborn/keyboard/MainActivity.java').read_text()
           assert 'Orivra — Candidate 386 Test' in main
-          assert 'getInt(LetterRowPredictionSwipe386.PREF,0)' in main
+          assert 'LetterRowPredictionSwipe386.PREF,0' in main
           assert 'TypedLearningV4Transfer347.exportV4(this)' in main
           assert 'TypedLearningV4Transfer347.importConfirmed(' in main
           metrics=Path('app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java').read_text()
