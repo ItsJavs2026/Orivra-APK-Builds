@@ -3193,6 +3193,7 @@ public final class RebornImeService extends InputMethodService {
         return b;
     }
     private void type(String value) {
+        cancelSuggestionFrame412();
         final long auditStart411=OrivraPerfAudit411.begin();
         try {
         clearSpaceHighlight372();
@@ -3422,6 +3423,7 @@ public final class RebornImeService extends InputMethodService {
     // the final composing letter and briefly show an empty suggestion hint.
     private boolean singleBackspaceMutation338;
     private void backspace() {
+        cancelSuggestionFrame412();
         final long auditStart411=OrivraPerfAudit411.begin();
         try {
         clearSpaceHighlight372();
@@ -3550,6 +3552,7 @@ public final class RebornImeService extends InputMethodService {
         return true;
     }
     private void space() {
+        cancelSuggestionFrame412();
         final long auditStart411=OrivraPerfAudit411.begin();
         try {
         // A settled, visibly highlighted word correction may be accepted by
@@ -4563,7 +4566,8 @@ public final class RebornImeService extends InputMethodService {
     private InputConnection frameEditor412;
 
     private void cancelSuggestionFrame412(){
-        if(candidates!=null)candidates.removeCallbacks(applyFrameRunnable412);
+        if(frameScheduled412 && candidates!=null)
+            candidates.removeCallbacks(applyFrameRunnable412);
         frameScheduled412=false;
         frameInput412=null;
         frameOptions412=null;
@@ -4588,9 +4592,8 @@ public final class RebornImeService extends InputMethodService {
         if(input==null || options==null ||
                 session!=inputSessionGeneration ||
                 editor==null || editor!=getCurrentInputConnection() ||
-                sensitive || !editorAllowsSuggestions || pendingIdlePaint410() ||
-                frameSelectionStart412!=selectionStart ||
-                frameSelectionEnd412!=selectionEnd)return;
+                sensitive || !editorAllowsSuggestions ||
+                pendingIdlePaint410())return;
         if(!composing.isEmpty() && !composing.equals(input))return;
         if(composing.isEmpty() && input.length()>0 &&
                 (lastSelectionStart!=selectionStart ||
