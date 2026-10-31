@@ -56,6 +56,62 @@ public final class LetterRowPredictionSwipe386AndroidTest {
                 LetterRowPredictionSwipe386.Direction.DOWN,
                 Arrays.asList("tear","","test")));
     }
+    @Test public void centerOnlyShortWordStartsLetterRowGesture(){
+        java.util.List<String> onlyCenter=Arrays.asList("","a","");
+        assertTrue("Center-only chip must arm DOWN recognizer",
+                LetterRowPredictionSwipe386.hasSelectable(onlyCenter));
+        LetterRowPredictionSwipe386 g=
+                new LetterRowPredictionSwipe386(0,70f,20f,1f);
+        assertEquals(LetterRowPredictionSwipe386.Direction.DOWN,
+                g.release(0,70f,67f));
+        assertEquals("a",LetterRowPredictionSwipe386.chosen(
+                LetterRowPredictionSwipe386.Direction.DOWN,onlyCenter));
+        insert("a","a","","a ");
+    }
+    @Test public void twoLetterCenterOnlyCompletesWithOneSpace(){
+        java.util.List<String> onlyCenter=Arrays.asList("","te","");
+        assertTrue(LetterRowPredictionSwipe386.hasSelectable(onlyCenter));
+        LetterRowPredictionSwipe386 g=
+                new LetterRowPredictionSwipe386(4,70f,20f,1f);
+        assertEquals(LetterRowPredictionSwipe386.Direction.DOWN,
+                g.release(4,70f,64f));
+        insert("te","te","","te ");
+        insert("te","te"," ","te ");
+    }
+    @Test public void centerOnlyPunctuationAndExistingWhitespaceNeverDoubleSpace(){
+        java.util.List<String> onlyCenter=Arrays.asList("","I","");
+        assertTrue(LetterRowPredictionSwipe386.hasSelectable(onlyCenter));
+        insert("I","I","","I ");
+        insert("I","I"," ","I ");
+        insert("I","I",",","I,");
+        insert("I","I",".","I.");
+    }
+    @Test public void emptyAndAbsentCenterDoesNotArmLetterRowGesture(){
+        assertFalse(LetterRowPredictionSwipe386.hasSelectable(
+                Arrays.asList("","","")));
+        assertFalse(LetterRowPredictionSwipe386.hasSelectable(
+                java.util.Collections.emptyList()));
+        assertFalse(LetterRowPredictionSwipe386.hasSelectable(null));
+        assertFalse(LetterRowPredictionSwipe386.hasSelectable(
+                Arrays.asList(" ",null,"")));
+    }
+    @Test public void centerOnlyCannotBeForcedWithShortOrCanceledSwipe(){
+        java.util.List<String> onlyCenter=Arrays.asList("","a","");
+        assertTrue(LetterRowPredictionSwipe386.hasSelectable(onlyCenter));
+        LetterRowPredictionSwipe386 shortMove=
+                new LetterRowPredictionSwipe386(1,60f,20f,1f);
+        assertEquals(LetterRowPredictionSwipe386.Direction.NONE,
+                shortMove.release(1,60f,55f));
+        LetterRowPredictionSwipe386 wrongPointer=
+                new LetterRowPredictionSwipe386(1,60f,20f,1f);
+        assertEquals(LetterRowPredictionSwipe386.Direction.CANCEL,
+                wrongPointer.release(2,60f,70f));
+        LetterRowPredictionSwipe386 aborted=
+                new LetterRowPredictionSwipe386(1,60f,20f,1f);
+        aborted.cancel();
+        assertEquals(LetterRowPredictionSwipe386.Direction.CANCEL,
+                aborted.release(1,60f,70f));
+    }
     @Test public void middleRowPreferredButBothRowsOptional(){
         assertEquals(LetterRowPredictionSwipe386.MIDDLE_ONLY,
                 LetterRowPredictionSwipe386.next(LetterRowPredictionSwipe386.OFF));

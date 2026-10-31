@@ -1,0 +1,148 @@
+name: Orivra Research 387 - center-only letter row down (no APK)
+on:
+  push:
+    branches:
+      - research/build387-center-only-letter-row-down-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research387
+  cancel-in-progress: true
+jobs:
+  synthetic-center-only-space:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify isolated fix and preserve installed Candidate 386
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='7cf2a9d35aa7d5a4b85b02c326e1af9387236256'
+          changed=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          allowed={
+              'app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java',
+              'app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386AndroidTest.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386Research.java',
+              'docs/RESEARCH387_CENTER_ONLY_DOWN_20261030.md',
+              '.github/workflows/research387-center-only-down.yml',
+          }
+          assert changed==allowed,(changed^allowed)
+          old=lambda p:subprocess.check_output(['git','show',base+':'+p],text=True)
+          for path in [
+              'app/build.gradle.kts',
+              'app/src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+              'app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java',
+              'app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java',
+              'app/src/main/java/com/chroomareborn/keyboard/SuggestionContinuity353.java',
+              'app/src/main/java/com/chroomareborn/keyboard/ThumbTapGuard377.java',
+              'app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java',
+              'app/src/main/AndroidManifest.xml',
+          ]:assert old(path)==Path(path).read_text(),f'Baseline mutated: {path}'
+          ime=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'if(LetterRowPredictionSwipe386.hasSelectable(live)) {' in ime
+          assert 'acceptSuggestion(key,expected386,selectedRow386)' in ime
+          service=ime[ime.index('final String selectedRow386='):]
+          service=service[:service.index('if(fatThumbDrift378 && !cancelled[0])')]
+          assert 'space();' not in service
+          assert 'commitText(" ", 1)' not in service
+          build=Path('app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build386trial"' in build
+          assert 'versionCode = 386' in build
+          assert 'android.permission.INTERNET' not in Path('app/src/main/AndroidManifest.xml').read_text()
+          print('PASS: isolated center-only fix, Candidate 386 release remains intact')
+          PY
+      - name: Replay 130000 real letter-row gesture cases plus tiny-word Space boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/row387"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/row387" \
+            app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionContinuity353.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java \
+            app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386Research.java
+          java -cp "$RUNNER_TEMP/row387" \
+            com.chroomareborn.keyboard.LetterRowPredictionSwipe386Research
+  android35-center-only-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Restore pinned offline dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile qualified source and expanded center-only tests
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Require at least 249 Android tests, zero failures or skips
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,'No emulator test reports'
+          tests=failures=errors=skipped=0
+          for path in reports:
+              root=ET.parse(path).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  s for s in root.iter() if s.tag.endswith('testsuite')]
+              for suite in suites:
+                  tests+=int(suite.attrib.get('tests','0'))
+                  failures+=int(suite.attrib.get('failures','0'))
+                  errors+=int(suite.attrib.get('errors','0'))
+                  skipped+=int(suite.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skipped} skipped')
+          assert tests>=249 and failures==0 and errors==0 and skipped==0
+          PY

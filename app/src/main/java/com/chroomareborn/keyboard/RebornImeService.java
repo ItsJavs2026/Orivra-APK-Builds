@@ -2512,10 +2512,7 @@ public final class RebornImeService extends InputMethodService {
                             pressEditor[0]!=null && !latestSnapshot.isEmpty() &&
                             latestSnapshot.equals(composing)) {
                         java.util.List<String> live=visiblePredictionOptions372(false);
-                        if(LetterRowPredictionSwipe386.chosen(
-                                LetterRowPredictionSwipe386.Direction.LEFT,live)!=null ||
-                                LetterRowPredictionSwipe386.chosen(
-                                LetterRowPredictionSwipe386.Direction.RIGHT,live)!=null) {
+                        if(LetterRowPredictionSwipe386.hasSelectable(live)) {
                             try {
                                 rowSwipe386[0]=new LetterRowPredictionSwipe386(
                                         primaryPointer[0],event.getX(0),event.getY(0),

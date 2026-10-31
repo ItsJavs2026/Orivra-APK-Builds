@@ -34,6 +34,16 @@ final class LetterRowPredictionSwipe386 {
         return rowIndex==0 && (normalized==TOP_ONLY||normalized==TOP_AND_MIDDLE) ||
                 rowIndex==1 && (normalized==MIDDLE_ONLY||normalized==TOP_AND_MIDDLE);
     }
+    /** Arm the recognizer even if only the center candidate is visible.
+     * Research 386 accidentally required a side chip to exist on DOWN,
+     * making DOWN unavailable for single-letter, center-only suggestions.
+     * No movement or editor action occurs at this policy check.
+     */
+    static boolean hasSelectable(List<String> visible){
+        return chosen(Direction.LEFT,visible)!=null ||
+                chosen(Direction.RIGHT,visible)!=null ||
+                chosen(Direction.DOWN,visible)!=null;
+    }
     static String chosen(Direction direction,List<String> visible){
         if(visible==null || direction==null)return null;
         switch(direction){
