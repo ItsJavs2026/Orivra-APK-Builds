@@ -138,3 +138,17 @@ Before further code changes, compare short benign typing with **Idle prediction 
 
 ### Recommended next source candidate
 Do NOT blindly remove editor safety checks or show stale predictions with invalid tap handlers. On isolated research/candidate branch, opt-in aggregate counters for: deferred typing-refresh armed/consumed, full prediction pass started, immediate row with 1 vs 2+ actionable chips, worker UI callback skipped due pending-quiet versus stale generation versus mismatch, frame applied with one-vs-multiple actionable chips, and empty idle row after valid editor boundary. No typed text, package names, suggestions or personal data. Preserve 416B selected-text Backspace repair and 417 vocabulary work separately. Only implement a lightweight, verified current-word candidate preview if symptom is visual loss and measured device evidence justifies it.
+
+
+## Important symptom clarification: visible suggestions cannot be pressed (2026-10-31)
+User clarified prior report "predictions being forgotten": **suggestions appear, but do not accept a tap ("won't let you do anything, press etc")**. This strongly suggests a *tap/action validity or touch-interception issue*, rather than proven loss of persistent vocabulary, and may be distinct from the 145ms Idle Paint full-refresh delay. Do not claim this has been fixed.
+
+Source verification:
+- `MainActivity.java` has **Prediction gestures (experimental) > Swipe prediction selection**, pref `PredictionSwipe372.PREF = prediction_slide_select_372`, default **ON**.
+- `RebornImeService.onPredictionChipTouch372` intercepts prediction-chip ACTION_DOWN/UP when enabled and may silently reject taps on release via `PredictionSwipe372.safeRelease` (expected vs live word, same editor/session/selection, privacy, no active keys). When the setting is **OFF**, `onPredictionChipTouch372` returns false to delegate to the installed Android `OnClickListener` and its existing `acceptSuggestion` safety verification.
+- `acceptSuggestion` independently refuses stale word/idle tickets and refreshes suggestions. `NextWordTapTicket340` requires selection and 160-char before-caret snapshot matching. These guards intentionally fail closed and can also produce untappable visible chips if callbacks or cursor state are outdated.
+- Prior performance report: 59 *stale side chips intentionally hidden*, **not** equivalent to 59 user-tap failures; worker completed 159 jobs but no count of actionable chips or tap rejection paths.
+- **One-variable A/B test on installed Build 416**: keep FULL, Idle Paint ON (to avoid changing timing behavior), Calm and other settings unchanged; set Swipe prediction selection OFF; reopen keyboard; type a benign sentence, pause until a valid option appears, tap normally. If tap works OFF but not ON, focus on touch handler's safety/gesture state. If both fail, focus on chip action binding and `acceptSuggestion` ticket validation; add aggregate audit counters for touch DOWN/UP/allowed/rejected and commit outcomes on a separate candidate, no typed text.
+- Need consider if "press etc" includes letter key freezes; user context strongly ties it to predictions, but ask only if result remains ambiguous. No new APK required to run this A/B test. Preserve 416B selected-text Backspace hotfix uninstalled; it is a separate issue.
+
+When using future tests, don't count old phone data as proof of new fix. Do not bypass stale-editor verification merely to make dead chips clickable.
