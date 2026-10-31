@@ -208,6 +208,32 @@ public final class MainActivity extends Activity {
         });
         root.addView(idlePaintButton410);
 
+        TextView riseInfo411=new TextView(this);
+        riseInfo411.setText("\nRise panel isolation: disable the EXPANDED "+
+                "suggestion panel without disabling the normal prediction "+
+                "chips or SentenceFlow. OFF bypasses Rise UI updates; "+
+                "ON restores Rise. For a fair comparison, leave the "+
+                "other keyboard settings unchanged and reopen the editor.");
+        riseInfo411.setTextSize(15);
+        riseInfo411.setTextColor(0xFF303846);
+        root.addView(riseInfo411);
+        final android.content.SharedPreferences risePrefs411=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        final String risePref411="orivra_rise_enabled_411";
+        Button riseButton411=new Button(this);
+        riseButton411.setAllCaps(false);
+        riseButton411.setText("Rise expanded panel: "+
+                (risePrefs411.getBoolean(risePref411,true)?"ON":"OFF"));
+        riseButton411.setOnClickListener(v->{
+            boolean next=!risePrefs411.getBoolean(risePref411,true);
+            risePrefs411.edit().putBoolean(risePref411,next).apply();
+            riseButton411.setText("Rise expanded panel: "+(next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen the keyboard to compare Rise behavior",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(riseButton411);
+
         TextView auditHelp411=new TextView(this);
         auditHelp411.setText("\nBUILD 411 • Local performance audit (OFF by default). "+
                 "Measures letter, Space, Backspace, suggestion processing, "+
@@ -272,6 +298,8 @@ public final class MainActivity extends Activity {
                             "orivra_idle_paint_410",true)+
                     " | Calm: "+currentFeedback411.getBoolean(
                             "orivra_calm_predictions_408",true)+
+                    " | Rise: "+currentFeedback411.getBoolean(
+                            "orivra_rise_enabled_411",true)+
                     " | Theme: "+AppPalette.modeName(theme411);
             return OrivraPerfAudit411.report(settings411);
         };
