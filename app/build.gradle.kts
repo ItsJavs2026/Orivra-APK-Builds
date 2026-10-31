@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build407fulltrial"
+        applicationId = "com.chroomareborn.keyboard.build408calmtrial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 407
-        versionName = "1.0.61-build407-full-settings-recovery"
-        manifestPlaceholders["appLabel"] = "Orivra 407 Full Test"
+        versionCode = 408
+        versionName = "1.0.62-build408-calm-prediction"
+        manifestPlaceholders["appLabel"] = "Orivra 408 Calm Test"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra 407 Full Test"
+            manifestPlaceholders["appLabel"] = "Orivra 408 Calm Test"
         }
     }
     compileOptions {
