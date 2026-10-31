@@ -1954,6 +1954,13 @@ public final class RebornImeService extends InputMethodService {
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         super.onStartInputView(info, restarting);
+        // An already-running IME may reopen its view without a new input
+        // session. Apply the diagnostic toggle on every view activation.
+        predictionIsolationMode409=PredictionIsolationMode409.normalize(
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE)
+                        .getInt(PredictionIsolationMode409.PREF,
+                                PredictionIsolationMode409.OFF));
+        predictionDispatcher.cancel();
         setColors(info);
         // AFTER the session-generation bump. Explicit permission is OFF
         // by default; opening a text field activates newly changed settings.
