@@ -2507,6 +2507,7 @@ public final class RebornImeService extends InputMethodService {
                             !existingLetterPress386 && !sensitive &&
                             !symbols && !numericEditor &&
                             editorAllowsSuggestions && !hasSelection() &&
+                            !editingInMiddle && !cursorHasTextAfter() &&
                             !spacebarTouchActive && !backspaceTouchActive &&
                             pressEditor[0]!=null && !latestSnapshot.isEmpty() &&
                             latestSnapshot.equals(composing)) {
@@ -2642,7 +2643,8 @@ public final class RebornImeService extends InputMethodService {
                                     hasSelection(),symbols,
                                     !hintPressOrder353.hasOpenPresses() &&
                                     !spacebarTouchActive && !backspaceTouchActive);
-                            if(!valid386)return;
+                            if(!valid386 || editingInMiddle ||
+                                    cursorHasTextAfter())return;
                             java.util.List<String> now386=visiblePredictionOptions372(false);
                             String choice386=LetterRowPredictionSwipe386.chosen(
                                     committedDirection386,now386);
