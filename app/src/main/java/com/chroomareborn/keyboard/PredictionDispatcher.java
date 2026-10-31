@@ -16,6 +16,11 @@ final class PredictionDispatcher implements AutoCloseable {
     interface Listener {
         void onResult(long generation, String input, List<String> suggestions);
     }
+    /** 412: the same background worker prepares split text for the strip. */
+    interface SplitListener412 {
+        void onResult(long generation, String input, List<String> suggestions,
+                List<String> splitPhrases, List<String> nextWords);
+    }
     /** Test seam for deterministic cancellation races; production remains offline. */
     interface Predictor {
         List<String> predict(String input, boolean editing);
@@ -80,37 +85,61 @@ final class PredictionDispatcher implements AutoCloseable {
         });
     }
     synchronized long schedule(String input, Listener listener) {
-        return scheduleInternal(input, listener, false);
+        return scheduleInternal(input, listener, null, false, false);
     }
     synchronized long scheduleEditing(String input, Listener listener) {
-        return scheduleInternal(input, listener, true);
+        return scheduleInternal(input, listener, null, true, false);
     }
-    private synchronized long scheduleInternal(String input, Listener listener, boolean editing) {
+    synchronized long scheduleWithSplit412(
+            String input, boolean splitEnabled, SplitListener412 listener) {
+        if(listener==null)throw new IllegalArgumentException("listener required");
+        return scheduleInternal(input, null, listener, false, splitEnabled);
+    }
+    private synchronized long scheduleInternal(String input,
+            Listener listener, SplitListener412 splitListener,
+            boolean editing, boolean splitEnabled) {
         if (closed) return -1L;
         long id = generation.incrementAndGet();
-        // Interrupt a superseded computation, not just a queued debounce.
-        // The offline prediction loops check interruption between batches.
         if (scheduled != null) scheduled.cancel(true);
-        final String snapshot = input;
-        scheduled = worker.schedule(() -> {
+        final String snapshot=input;
+        scheduled=worker.schedule(()->{
             try {
-                if (!isCurrent(id)) return;
-                // Time only the background algorithm, never record input.
-                final long perfStart411=OrivraPerfAudit411.begin();
+                if(!isCurrent(id))return;
+                final long predictStart411=OrivraPerfAudit411.begin();
                 List<String> choices;
                 try {
                     choices=predictor.predict(snapshot, editing);
                 } finally {
                     OrivraPerfAudit411.end(
-                            OrivraPerfAudit411.PREDICT_WORKER,perfStart411);
+                            OrivraPerfAudit411.PREDICT_WORKER,predictStart411);
                 }
-                if (isCurrent(id)) listener.onResult(id, snapshot, choices);
+                if(!isCurrent(id))return;
+                if(splitListener!=null) {
+                    List<String> phrases=java.util.Collections.emptyList();
+                    List<String> next=java.util.Collections.emptyList();
+                    if(splitEnabled) {
+                        // Never do this typo segmentation from renderSuggestions
+                        // (the Android UI thread). A cancelled request does
+                        // not deliver stale candidates to the next editor.
+                        final long splitStart412=OrivraPerfAudit411.begin();
+                        try {
+                            phrases=PredictionLite.splitPhraseSuggestions(snapshot);
+                            if(!isCurrent(id))return;
+                            next=PredictionLite.splitNextWords(snapshot);
+                        } finally {
+                            OrivraPerfAudit411.end(
+                                    OrivraPerfAudit411.SPLIT_WORKER_412,splitStart412);
+                        }
+                    }
+                    if(isCurrent(id))splitListener.onResult(
+                            id,snapshot,choices,phrases,next);
+                } else if(isCurrent(id)) {
+                    listener.onResult(id,snapshot,choices);
+                }
             } finally {
-                // Release references to finished input/listener captures instead
-                // of retaining them inside the last ScheduledFuture.
                 clearCompleted(id);
             }
-        }, debounceMillisFor(snapshot,editing), TimeUnit.MILLISECONDS);
+        }, debounceMillisFor(snapshot,editing),TimeUnit.MILLISECONDS);
         return id;
     }
     private synchronized void clearCompleted(long id) {
