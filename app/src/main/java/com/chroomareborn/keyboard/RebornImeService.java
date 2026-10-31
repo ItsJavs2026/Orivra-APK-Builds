@@ -86,7 +86,9 @@ public final class RebornImeService extends InputMethodService {
     private String riseRenderedSignature="";
     private boolean manuallyCollapsedPredictions=false;
     private List<String> latestOptions=java.util.Collections.emptyList();
-    private boolean predictionSwipeEnabled372=true;
+    // 416C: prediction-bar swipes are optional and default OFF.
+    // Standard taps and independently configured LETTER-ROW swipes remain.
+    private boolean predictionSwipeEnabled372=false;
     private boolean spaceAcceptEnabled372=true;
     // Research 386: independent letter-row prediction swipe, default OFF.
     // Normal letter, two-thumb and special-symbol handlers stay unchanged
@@ -2164,7 +2166,7 @@ public final class RebornImeService extends InputMethodService {
         wideEdgeLetters378=visualOptions370.getBoolean(
                 EdgeKeyWeights378.PREF,true);
         predictionSwipeEnabled372=visualOptions370.getBoolean(
-                PredictionSwipe372.PREF,true);
+                PredictionSwipe372.PREF,false);
         spaceAcceptEnabled372=visualOptions370.getBoolean(
                 HighlightedSpace372.PREF,true);
         letterRowSwipeMode386=LetterRowPredictionSwipe386.normalize(
@@ -2217,7 +2219,7 @@ public final class RebornImeService extends InputMethodService {
         // Apply prediction-swipe setting when the view returns too; this
         // makes gesture-vs-normal-tap A/B settings actually take effect.
         predictionSwipeEnabled372=fullOptions411.getBoolean(
-                PredictionSwipe372.PREF,true);
+                PredictionSwipe372.PREF,false);
         applyFastQuietPolicy415();
         reloadHaptics415(fullOptions411);
         riseEnabled411=fullOptions411.getBoolean(RISE_ENABLED_PREF_411,true);
