@@ -4043,6 +4043,12 @@ public final class RebornImeService extends InputMethodService {
         if(candidates==null)return;
         if(!PredictionIsolationMode409.renders(predictionIsolationMode409)) {
             clearPredictionDisplay409();
+            // Preserve the normal typing-refresh gate when computing unseen
+            // words; selection callbacks should not multiply worker jobs.
+            if(predictionIsolationMode409==PredictionIsolationMode409.WORKER_ONLY &&
+                    typingRefresh401.isPendingFor(
+                            inputSessionGeneration,getCurrentInputConnection()))
+                return;
             // WORKER_ONLY isolates offline computation from all suggestion
             // rendering and UI merge callbacks. The result is discarded.
             if(predictionIsolationMode409==PredictionIsolationMode409.WORKER_ONLY &&
