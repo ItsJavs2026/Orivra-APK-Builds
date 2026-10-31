@@ -1911,23 +1911,24 @@ public final class RebornImeService extends InputMethodService {
                     final boolean maybeStale393=!composing.isEmpty() ||
                             !latestSnapshot.isEmpty() || editingInMiddle ||
                             latestOptions.isEmpty() || !ticketCurrent393;
-                    if(!maybeStale393)return;
-                    final CharSequence before393=live393.getTextBeforeCursor(1,0);
-                    final CharSequence after393=live393.getTextAfterCursor(1,0);
-                    if(ChatComposerReset393.shouldRecover(newSelStart,newSelEnd,
-                            before393,after393,composing,latestSnapshot,
-                            editingInMiddle,latestOptions.size(),
-                            ticketCurrent393,false)) {
-                        predictionDispatcher.cancel();
-                        invalidateEditingTicket();
-                        clearPredictionTouch372();
-                        clearSpaceHighlight372();
-                        resetKeyEcho342();
-                        composing="";
-                        editingInMiddle=false;
-                        idleWordTicket340=null;
-                        showSuggestions();
-                        return;
+                    if(maybeStale393) {
+                        final CharSequence before393=live393.getTextBeforeCursor(1,0);
+                        final CharSequence after393=live393.getTextAfterCursor(1,0);
+                        if(ChatComposerReset393.shouldRecover(newSelStart,newSelEnd,
+                                before393,after393,composing,latestSnapshot,
+                                editingInMiddle,latestOptions.size(),
+                                ticketCurrent393,false)) {
+                            predictionDispatcher.cancel();
+                            invalidateEditingTicket();
+                            clearPredictionTouch372();
+                            clearSpaceHighlight372();
+                            resetKeyEcho342();
+                            composing="";
+                            editingInMiddle=false;
+                            idleWordTicket340=null;
+                            showSuggestions();
+                            return;
+                        }
                     }
                 }catch(RuntimeException detached393) {
                     // A host may detach its editor during Send. Ignore it;
