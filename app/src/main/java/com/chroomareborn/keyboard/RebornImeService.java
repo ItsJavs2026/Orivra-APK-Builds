@@ -636,7 +636,9 @@ public final class RebornImeService extends InputMethodService {
     private int rippleColor=0x665A79DE;
     // Predictions never run on the keyboard UI thread. Result callbacks are guarded
     // against stale editor text and posted to the main thread before touching views.
-    private final PredictionDispatcher predictionDispatcher = new PredictionDispatcher();
+    // Diagnostic 409: do not warm the dictionary on service startup.
+    // FULL/WORKER_ONLY requests initialize it on the existing worker instead.
+    private final PredictionDispatcher predictionDispatcher = new PredictionDispatcher(false);
     private final PrefixCandidateCache340 personalPrefixCache340=
             new PrefixCandidateCache340();
     // Research 340: opt-in, strictly transient word-by-word next-word
@@ -731,6 +733,10 @@ public final class RebornImeService extends InputMethodService {
     private final PredictionUiBudget408 predictionUiBudget408=new PredictionUiBudget408();
     private static final String CALM_PREDICTIONS_PREF_408="orivra_calm_predictions_408";
     private boolean calmPredictions408=true;
+    // Read at editor activation. OFF keeps key commits/composition unchanged,
+    // only skipping suggestion calculation and view updates.
+    private int predictionIsolationMode409=PredictionIsolationMode409.OFF;
+    private static final String ISOLATION_TAG_409="isolation409";
     private final Runnable typingRefreshRunnable401=this::runTypingRefresh401;
     // Method reference avoids Java's illegal forward reference to the
     // input-session field declared later in this large IME service.
@@ -751,6 +757,7 @@ public final class RebornImeService extends InputMethodService {
         predictionUiBudget408.reset();
     }
     private void scheduleTypingRefresh401(){
+        if(!PredictionIsolationMode409.computes(predictionIsolationMode409))return;
         InputConnection editor=getCurrentInputConnection();
         if(editor==null || candidates==null)return;
         if(typingRefresh401.isPendingFor(inputSessionGeneration,editor)) {
@@ -1906,6 +1913,9 @@ public final class RebornImeService extends InputMethodService {
                 getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
         calmPredictions408=visualOptions370.getBoolean(
                 CALM_PREDICTIONS_PREF_408,true);
+        predictionIsolationMode409=PredictionIsolationMode409.normalize(
+                visualOptions370.getInt(PredictionIsolationMode409.PREF,
+                        PredictionIsolationMode409.OFF));
         instantKeyFeedback369=visualOptions370.getBoolean(
                 KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true);
         fastSymbolHold367=visualOptions370.getBoolean(
@@ -4010,8 +4020,40 @@ public final class RebornImeService extends InputMethodService {
         if(left==before.length() && right==0)return "";
         return before.subSequence(left,before.length()).toString()+after.subSequence(0,right).toString();
     }
+    private void clearPredictionDisplay409() {
+        if(candidates==null || PredictionIsolationMode409.renders(
+                predictionIsolationMode409))return;
+        // Only clear the view once per editor/mode; never rebuild on key taps.
+        if(!ISOLATION_TAG_409.equals(candidates.getTag())) {
+            clearPredictionTouch372();
+            clearSpaceHighlight372();
+            candidates.removeAllViews();
+            candidates.setTag(ISOLATION_TAG_409);
+            predictionsExpanded=false;
+            splitSnapshot340=null;
+            splitPhrases=java.util.Collections.emptyList();
+            splitNextWords=java.util.Collections.emptyList();
+            latestOptions=java.util.Collections.emptyList();
+            latestSnapshot="";
+            if(expandedSuggestions!=null)
+                expandedSuggestions.setVisibility(View.GONE);
+        }
+    }
     private void showSuggestions() {
         if(candidates==null)return;
+        if(!PredictionIsolationMode409.renders(predictionIsolationMode409)) {
+            clearPredictionDisplay409();
+            // WORKER_ONLY isolates offline computation from all suggestion
+            // rendering and UI merge callbacks. The result is discarded.
+            if(predictionIsolationMode409==PredictionIsolationMode409.WORKER_ONLY &&
+                    !sensitive && editorAllowsSuggestions && !numericEditor &&
+                    !symbols && !composing.isEmpty()) {
+                predictionDispatcher.schedule(composing,(id,input,options)->{});
+            } else {
+                predictionDispatcher.cancel();
+            }
+            return;
+        }
         // Any synchronous selection callback or Shift-label refresh during
         // a burst must not bypass the bounded budget. The queued callback
         // consumes the token before executing this full refresh. Secure
@@ -4303,6 +4345,10 @@ public final class RebornImeService extends InputMethodService {
     }
     private void renderSuggestions(String input,List<String> options,
             boolean preliminary345) {
+        if(!PredictionIsolationMode409.renders(predictionIsolationMode409)) {
+            clearPredictionDisplay409();
+            return;
+        }
         // Hold immutable on-screen chip labels throughout one finger swipe.
         // An async predictor result may arrive during a gesture, but must not
         // change the text/target under that finger before release.
