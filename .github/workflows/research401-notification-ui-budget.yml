@@ -79,7 +79,9 @@ jobs:
           assert 'offlineNextWordSeed=null;' in ime
           assert 'closeOptionalDictionary();' in ime
           hue=Path('app/src/main/java/com/chroomareborn/keyboard/AppIconHueCache366.java').read_text()
-          assert 'MAX_IN_FLIGHT=8' in hue
+          assert 'MAX_IN_FLIGHT=2' in hue
+          assert 'new ArrayBlockingQueue<>(1)' in hue
+          assert 'WORKER.getQueue().poll()' in hue
           assert 'static void trimMemory()' in hue
           worker=Path('app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java').read_text()
           assert 'MAX_PENDING_SPACE_UPDATES=128' in worker
