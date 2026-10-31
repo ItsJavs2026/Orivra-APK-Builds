@@ -14,7 +14,7 @@ import java.util.List;
 final class PredictionSwipe372 {
     private PredictionSwipe372() {}
     static final String PREF="prediction_slide_select_372";
-    enum Direction { NONE, LEFT, RIGHT, UP }
+    enum Direction { NONE, LEFT, RIGHT, UP, DOWN }
 
     static Direction direction(float dx,float dy,float slop,boolean riseVisible) {
         if(!Float.isFinite(dx)||!Float.isFinite(dy))return Direction.NONE;
@@ -25,6 +25,10 @@ final class PredictionSwipe372 {
             return dx<0?Direction.LEFT:Direction.RIGHT;
         if(riseVisible && dy<=-threshold && ay>=ax*1.2f)
             return Direction.UP;
+        // Explicit DOWN from the existing center prediction chip. Keep
+        // vertical tap drift below 32dp and reject diagonal moves.
+        if(dy>=Math.max(32f,slop*2.67f) && ay>=ax*1.55f)
+            return Direction.DOWN;
         return Direction.NONE;
     }
 
@@ -35,6 +39,16 @@ final class PredictionSwipe372 {
             if(startOnRise || rise==null)return null;
             for(String option:rise)if(valid(option))return option;
             return null;
+        }
+        if(direction==Direction.DOWN) {
+            // Never infer a non-center choice or touch the Rise row. For
+            // a physically centered singleton, the only visible item is
+            // index 0; a three-slot strip uses its actual center index 1.
+            if(startOnRise || row==null)return null;
+            int center=row.size()==1?0:1;
+            if(from!=center || center>=row.size())return null;
+            String suggestion=row.get(center);
+            return valid(suggestion)?suggestion:null;
         }
         List<String> active=startOnRise?rise:row;
         if(active==null || from<0 || from>=active.size())return null;
