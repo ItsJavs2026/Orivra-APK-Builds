@@ -221,6 +221,53 @@ public final class MainActivity extends Activity {
         });
         root.addView(hapticButton);
 
+        // Research 370 isolated visual feedback A/B controls. Each change
+        // takes effect at the next editor focus, never mid-keypress.
+        TextView experimentTitle370=new TextView(this);
+        experimentTitle370.setText("\nShaded Surface trial • keyboard responsiveness");
+        experimentTitle370.setTextSize(16);
+        experimentTitle370.setTextColor(0xFF303846);
+        root.addView(experimentTitle370);
+
+        Button visualFeedback370=new Button(this);
+        visualFeedback370.setAllCaps(false);
+        visualFeedback370.setText("Instant key visual feedback: "+
+                (feedback.getBoolean(
+                        KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true)?
+                        "ON (no key shrink)":"OFF (original animation)"));
+        visualFeedback370.setOnClickListener(v->{
+            boolean nextEnabled=!feedback.getBoolean(
+                    KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true);
+            feedback.edit().putBoolean(
+                    KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,nextEnabled).apply();
+            visualFeedback370.setText("Instant key visual feedback: "+
+                    (nextEnabled?"ON (no key shrink)":
+                            "OFF (original animation)"));
+            android.widget.Toast.makeText(this,
+                    "Reopen the keyboard to compare key feel",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(visualFeedback370);
+
+        Button symbolHold370=new Button(this);
+        symbolHold370.setAllCaps(false);
+        symbolHold370.setText("Special character hold: "+
+                (feedback.getBoolean(
+                        SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,true)?
+                        "Fast (320 ms)":"Android system timing"));
+        symbolHold370.setOnClickListener(v->{
+            boolean nextEnabled=!feedback.getBoolean(
+                    SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,true);
+            feedback.edit().putBoolean(
+                    SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,nextEnabled).apply();
+            symbolHold370.setText("Special character hold: "+
+                    (nextEnabled?"Fast (320 ms)":"Android system timing"));
+            android.widget.Toast.makeText(this,
+                    "Reopen the keyboard to compare special-character holds",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(symbolHold370);
+
         boolean follow=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
                 .getBoolean(AppPalette.KEY_FOLLOW_SYSTEM,true);
         Button system=new Button(this);
