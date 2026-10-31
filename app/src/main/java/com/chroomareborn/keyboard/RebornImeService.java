@@ -871,10 +871,16 @@ public final class RebornImeService extends InputMethodService {
 
     // Reuse a single interpolator. Do not allocate extra Animators per key,
     // mutate layout bounds, or animate suggestion panels during fast typing.
+    // Trial-only visual A/B. No change to key press ordering, haptics or
+    // InputConnection; instant feedback omits scale animators, not ripples.
+    private boolean instantKeyFeedback369=true;
     private static final android.view.animation.Interpolator KEY_MOTION_EASE=
             new android.view.animation.DecelerateInterpolator(1.35f);
     private void animateKeyPress(View view, boolean pressed) {
         if(view==null)return;
+        // Pressed-state ripple still fires. Avoid animator allocation/cancel
+        // in the fast A/B variant; the old motion remains a settings toggle.
+        if(instantKeyFeedback369)return;
         view.animate().cancel();
         // Respect OS animation disable/reduced-motion settings.
         boolean enabled=android.animation.ValueAnimator.areAnimatorsEnabled();
@@ -1550,6 +1556,13 @@ public final class RebornImeService extends InputMethodService {
         numericAlphabeticOverride=false;
         symbols=false;
         extraSymbols=false;
+        // One preferences read per editor activation, never every letter.
+        android.content.SharedPreferences visualOptions370=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        instantKeyFeedback369=visualOptions370.getBoolean(
+                KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true);
+        fastSymbolHold367=visualOptions370.getBoolean(
+                SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,true);
         lastTypingTime=0L;
         averageTypingInterval=0;
         predictionsExpanded=false;
@@ -2165,6 +2178,7 @@ public final class RebornImeService extends InputMethodService {
      * This intentionally keeps the hit target constant and lets multi-touch
      * cancellations fail closed. Hint TextViews are display-only.
      */
+    private boolean fastSymbolHold367=true;
     private void addHintLetterKey(LinearLayout row,String visible,String letter,String hint) {
         Button key=addKey(row,visible,1f,()->type(letter));
         LinearLayout.LayoutParams cellParams=(LinearLayout.LayoutParams)key.getLayoutParams();
@@ -2216,7 +2230,9 @@ public final class RebornImeService extends InputMethodService {
                     animateKeyPress(key,true);
                     keyHaptic(key);
                     suggestionHandler.postDelayed(
-                            hold,ViewConfiguration.getLongPressTimeout());
+                            hold,SymbolHoldTiming367.delayMs(
+                                    ViewConfiguration.getLongPressTimeout(),
+                                    fastSymbolHold367));
                     return true;
                 case MotionEvent.ACTION_MOVE: {
                     int index=event.findPointerIndex(primaryPointer[0]);
