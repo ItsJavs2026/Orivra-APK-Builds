@@ -77,7 +77,7 @@ final class OrivraPerfAudit411 {
     }
     static synchronized String report(String settings){
         StringBuilder b=new StringBuilder(900);
-        b.append("ORIVRA BUILD 411 LOCAL PERFORMANCE AUDIT\n");
+        b.append("ORIVRA BUILD 413 KEY/PREDICTION PERFORMANCE AUDIT\n");
         b.append("Counts and timings only. No typing stored or transmitted.\n");
         b.append("Audit: ").append(enabled?"ON":"OFF");
         b.append(" | elapsed since reset: ")
