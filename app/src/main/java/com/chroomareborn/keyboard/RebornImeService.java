@@ -413,6 +413,8 @@ public final class RebornImeService extends InputMethodService {
             final InputConnection editor=getCurrentInputConnection();
             if(editor==null)return;
             final Runnable observer=()->{
+                final long deferredVerifyStart414=OrivraPerfAudit411.begin();
+                try {
                 pendingStableWord329=null;
                 // The editor may have switched, typing resumed, or consent
                 // changed during the idle interval. No stale persistence.
@@ -449,6 +451,11 @@ public final class RebornImeService extends InputMethodService {
                     stableWordSession329=session;
                 } catch(RuntimeException detached) {
                     // Aborted/changed editor: do not retry an ambiguous read.
+                }
+                } finally {
+                    OrivraPerfAudit411.end(
+                            OrivraPerfAudit411.IDLE_WORD_VERIFICATION_414,
+                            deferredVerifyStart414);
                 }
             };
             pendingStableWord329=observer;
