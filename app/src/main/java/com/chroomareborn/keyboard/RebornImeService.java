@@ -699,7 +699,10 @@ public final class RebornImeService extends InputMethodService {
     // This small gate retains only a temporary editor reference/session,
     // never typed text. Direct touches still use existing InputConnection.
     private final TypingRefreshGate401 typingRefresh401=new TypingRefreshGate401();
-    private final Runnable typingRefreshRunnable401=()->{
+    private final Runnable typingRefreshRunnable401=this::runTypingRefresh401;
+    // Method reference avoids Java's illegal forward reference to the
+    // input-session field declared later in this large IME service.
+    private void runTypingRefresh401() {
         if(!typingRefresh401.consume(
                 inputSessionGeneration,getCurrentInputConnection()))return;
         if(!sensitive && editorAllowsSuggestions && candidates!=null) {
@@ -708,7 +711,7 @@ public final class RebornImeService extends InputMethodService {
             CandidateLatencyMetrics.recordDeferredUi401(
                     start401,System.nanoTime());
         }
-    };
+    }
     private void cancelTypingRefresh401(){
         suggestionHandler.removeCallbacks(typingRefreshRunnable401);
         typingRefresh401.cancel();
