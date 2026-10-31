@@ -1,0 +1,64 @@
+name: Orivra Research 368 - neutral shaded surface with app accent (NO APK)
+on:
+  push:
+    branches:
+      - research/build368-shaded-surface-app-accent-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  neutral-surfaces:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Check source scope and untouched touch behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="4fafab74eb3b74d762f140b9e20621e041db97f7"
+          changed=set(subprocess.check_output(["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          expected={
+            "app/src/main/java/com/chroomareborn/keyboard/AppSurfaceAccent368.java",
+            "app/src/main/java/com/chroomareborn/keyboard/AppPalette.java",
+            "app/src/testsupport/java/com/chroomareborn/keyboard/AppSurfaceAccent368Research.java",
+            ".github/workflows/research368-shaded-surface-accent.yml"
+          }
+          assert changed==expected,f"Unexpected or missing research files: {changed ^ expected}"
+          for rel in [
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java",
+              "app/src/main/java/com/chroomareborn/keyboard/TypingMotionPolicy.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppIconHueCache366.java",
+          ]:
+              assert subprocess.check_output(["git","show",base+":"+rel],text=True)==Path(rel).read_text(),rel
+          source=Path("app/src/main/java/com/chroomareborn/keyboard/AppPalette.java").read_text()
+          assert "shadedSurface368(hue,dark" in source
+          assert "AppSurfaceAccent368.colors(hue,dark)" in source
+          assert "AppIconHueCache366.cachedHue(packageName)" in source
+          assert "if(mode==MATERIAL_AUTO)" in source
+          assert "if(mode==CLEAN_NEUTRAL)" in source
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert "android.permission.INTERNET" not in manifest
+          assert "android.permission.QUERY_ALL_PACKAGES" not in manifest
+          print("PASS surface-only research: no typing or permissions change")
+          PY
+      - name: Run 360-degree hue invariant and contrast fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/AppSurfaceAccent368.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/AppSurfaceAccent368Research.java
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.AppSurfaceAccent368Research
