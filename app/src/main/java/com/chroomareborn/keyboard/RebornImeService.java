@@ -4988,11 +4988,15 @@ public final class RebornImeService extends InputMethodService {
                 // 3->1->3 change is the flicker in the Samsung recording.
                 // Keep prior side-chip visuals briefly, NEVER their tap
                 // actions, until the real current async result arrives.
+                // 414: NEVER keep a visible but untappable stale guess.
+                // The old 345 visual-only continuity left chips visible
+                // while their click handlers were disabled; on an expensive
+                // or dropped async update the user saw a dead prediction bar.
+                // INVISIBLE preserves the row geometry until CURRENT valid
+                // actions arrive. Do not keep a ghost action on display.
                 if(i>0 && keepSides345 &&
-                        PredictionStripContinuity345.holdVisualOnly(option)) {
-                    option.setTag(R.id.orivra_chip_binding_412,null);
-                    continue;
-                }
+                        option.getVisibility()==View.VISIBLE)
+                    OrivraPerfAudit411.recordHiddenStaleChip414();
                 // INVISIBLE is intentional: unlike GONE, it does not resize
                 // adjacent predictions as the async model adds/removes chips.
                 if(option.getVisibility()!=View.INVISIBLE)
@@ -5098,7 +5102,8 @@ public final class RebornImeService extends InputMethodService {
             } else candidates.addView(option,params);
             final Object priorBinding412=
                     option.getTag(R.id.orivra_chip_binding_412);
-            final boolean reuseAction412=priorBinding412 instanceof ChipActionBinding412 &&
+            final boolean reuseAction412=option.isClickable() &&
+                    priorBinding412 instanceof ChipActionBinding412 &&
                     ((ChipActionBinding412)priorBinding412).matches(
                             input,suggestion,inputSessionGeneration,fullSentenceChip);
             if(!reuseAction412) {
