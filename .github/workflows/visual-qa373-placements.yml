@@ -10,7 +10,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: orivra-candidate373-ui-screenshots-exact-release
+  group: orivra-candidate373-ui-screenshots-correct-dimensions
   cancel-in-progress: true
 jobs:
   actual-android-screenshots:
