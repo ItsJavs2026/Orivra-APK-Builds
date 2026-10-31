@@ -14,8 +14,15 @@ import java.util.concurrent.TimeUnit;
 final class ApprovedSpaceLearning413 implements AutoCloseable {
     private final ThreadPoolExecutor worker=new ThreadPoolExecutor(
             1,1,0L,TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<>(32),r->{
-                Thread t=new Thread(r,"OrivraApprovedSpaceLearning");
+            new ArrayBlockingQueue<>(128),r->{
+                // Android OS background priority avoids competing with
+                // touch/key UI dispatch and music playback under CPU load.
+                Runnable backgroundTask=()->{
+                    android.os.Process.setThreadPriority(
+                            android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    r.run();
+                };
+                Thread t=new Thread(backgroundTask,"OrivraApprovedSpaceLearning");
                 t.setDaemon(true);
                 t.setPriority(Thread.NORM_PRIORITY-1);
                 return t;
