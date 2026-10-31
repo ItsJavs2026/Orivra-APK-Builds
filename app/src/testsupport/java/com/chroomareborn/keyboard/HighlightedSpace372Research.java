@@ -37,8 +37,8 @@ public final class HighlightedSpace372Research {
                 "Long speculative expansion blocked");
         check(eligible("john","john","john",true,true),false,
                 "Known name remains original");
-        check(eligible("let's","let's","lets",true,true),true,
-                "Contraction short correction may be allowed");
+        check(eligible("let's","let's","lets",true,true),false,
+                "Removing intentional apostrophe cannot be automatic");
         check(eligible("I am","I am","I'm",true,true),false,
                 "Space handles only active ONE word");
         check(eligible("tekk","tekk","tell",true,true),true,
