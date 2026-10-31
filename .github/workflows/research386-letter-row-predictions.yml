@@ -1,0 +1,141 @@
+name: Orivra Research 386 - real letter-row prediction swipes and Space completion
+on:
+  push:
+    branches:
+      - research/build386-letter-row-prediction-swipe-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research386
+  cancel-in-progress: true
+jobs:
+  gestures-and-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify Candidate 378 remains unchanged and trial defaults off
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='1df1e3065e7fabe939633ec75dfdd42022481304'
+          changes=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          allow={
+              'app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
+              'app/src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+              'app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386AndroidTest.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386Research.java',
+              'docs/RESEARCH386_LETTER_ROW_GESTURES_20261030.md',
+              '.github/workflows/research386-letter-row-predictions.yml',
+          }
+          assert changes==allow,(changes^allow)
+          ime=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'LetterRowPredictionSwipe386.PREF,' in ime
+          assert 'LetterRowPredictionSwipe386.OFF' in ime
+          assert 'SentenceSuggestionCommit.insert(' in ime
+          assert 'acceptSuggestion(key,expected386,selectedRow386)' in ime
+          # Never silently append a second Space to a row swipe.
+          excerpt=ime[ime.index('final String selectedRow386='):]
+          excerpt=excerpt[:excerpt.index('if(fatThumbDrift378 && !cancelled[0])')]
+          assert 'space();' not in excerpt
+          assert 'commitText(" ", 1)' not in excerpt
+          manifest=Path('app/src/main/AndroidManifest.xml').read_text()
+          assert 'android.permission.INTERNET' not in manifest
+          build=Path('app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build378trial"' in build
+          assert 'versionCode = 378' in build
+          print('PASS: research-only, release identity unchanged, opt-in and single Space path')
+          PY
+      - name: Offline 100k gestures and one/tiny-word Space policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/row386"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/row386" \
+            app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionContinuity353.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java \
+            app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386Research.java
+          java -cp "$RUNNER_TEMP/row386" \
+            com.chroomareborn.keyboard.LetterRowPredictionSwipe386Research
+  android35-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Restore pinned offline dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile modified IME and Android tests
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Require all baseline plus ten new Android tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,'No Android test reports'
+          tests=errors=failures=skips=0
+          for report in reports:
+              root=ET.parse(report).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [x for x in root.iter() if x.tag.endswith('testsuite')]
+              for suite in suites:
+                  tests+=int(suite.attrib.get('tests','0'))
+                  failures+=int(suite.attrib.get('failures','0'))
+                  errors+=int(suite.attrib.get('errors','0'))
+                  skips+=int(suite.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
+          assert tests>=244 and failures==0 and errors==0 and skips==0
+          PY
