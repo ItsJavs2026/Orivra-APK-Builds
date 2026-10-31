@@ -8,16 +8,21 @@ package com.chroomareborn.keyboard;
 final class IdlePredictionPaint410 {
     static final long QUIET_AFTER_KEY_MS = 210L;
     private long lastKeyMs = -1L;
+    private long quietAfterKeyMs=QUIET_AFTER_KEY_MS;
+
+    void setQuietAfterKeyMs(long delayMs) {
+        quietAfterKeyMs=Math.max(110L,Math.min(QUIET_AFTER_KEY_MS,delayMs));
+    }
 
     long onKey(long uptimeMs) {
         lastKeyMs = uptimeMs;
-        return QUIET_AFTER_KEY_MS;
+        return quietAfterKeyMs;
     }
 
     boolean isQuiet(long uptimeMs) {
         return lastKeyMs < 0L ||
                 (uptimeMs >= lastKeyMs &&
-                        uptimeMs - lastKeyMs >= QUIET_AFTER_KEY_MS);
+                        uptimeMs - lastKeyMs >= quietAfterKeyMs);
     }
 
     void reset() { lastKeyMs = -1L; }
