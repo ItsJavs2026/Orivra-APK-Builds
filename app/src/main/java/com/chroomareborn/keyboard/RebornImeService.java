@@ -3623,6 +3623,8 @@ public final class RebornImeService extends InputMethodService {
         String completedWord328=null;
         long session=inputSessionGeneration;
         String tappedWord340=null;
+        final long spacePreStart413=OrivraPerfAudit411.begin();
+        try {
         if(lastTappedSession340==session && !lastTappedWord340.isEmpty() &&
                 editorAllowsPersonalLearning && PersonalLearning.enabled(this) &&
                 !sensitive && !editingInMiddle && !hasSelection() &&
@@ -3650,6 +3652,11 @@ public final class RebornImeService extends InputMethodService {
                         hasSelection(),cursorHasTextAfter(),symbols);
             } catch(RuntimeException detached) { used=null; }
         }
+        } finally {
+            OrivraPerfAudit411.end(
+                    OrivraPerfAudit411.SPACE_PRECOMMIT_CHECKS_413,
+                    spacePreStart413);
+        }
         boolean alreadyCounted329=completedWord328!=null &&
                 completedWord328.equals(stableWordCounted329) &&
                 session==stableWordSession329;
@@ -3667,6 +3674,8 @@ public final class RebornImeService extends InputMethodService {
             clearTapSequence340();
             return;
         }
+        final long spacePostStart413=OrivraPerfAudit411.begin();
+        try {
         // Candidate 347: one verified successful Space boundary is queued
         // for the strictly opt-in worker; no disk writes or ranking work here.
         // Null means a pasted/edited/unverified word and breaks word pairs.
@@ -3719,6 +3728,11 @@ public final class RebornImeService extends InputMethodService {
                         OrivraPerfAudit411.SPACE_APPROVED_LEARNING_413,
                         learnStart413);
             }
+        }
+        } finally {
+            OrivraPerfAudit411.end(
+                    OrivraPerfAudit411.SPACE_POSTCOMMIT_413,
+                    spacePostStart413);
         }
         stableWordCounted329="";
         stableWordSession329=-1L;
