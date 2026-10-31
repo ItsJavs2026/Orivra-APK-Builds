@@ -11,8 +11,9 @@ adb install -r "$APK"
 adb shell ime enable "$IME"
 adb shell ime set "$IME"
 adb shell settings get secure default_input_method
-W=$(adb shell wm size | sed -n 's/.*\([0-9][0-9][0-9][0-9]*\)x\([0-9][0-9][0-9][0-9]*\).*/\1/p' | tail -n1)
-H=$(adb shell wm size | sed -n 's/.*\([0-9][0-9][0-9][0-9]*\)x\([0-9][0-9][0-9][0-9]*\).*/\2/p' | tail -n1)
+DIM=$(adb shell wm size | grep -Eo '[0-9]+x[0-9]+' | tail -n1)
+W=$(printf '%s' "$DIM" | cut -dx -f1)
+H=$(printf '%s' "$DIM" | cut -dx -f2)
 if [ -z "$W" ];then W=1080;fi
 if [ -z "$H" ];then H=2400;fi
 echo "Visual QA emulator pixels: $W x $H"
