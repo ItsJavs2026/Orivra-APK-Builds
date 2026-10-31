@@ -4454,12 +4454,25 @@ public final class RebornImeService extends InputMethodService {
         // Do not dim visible predictions while an asynchronous update runs.
         // The old alpha toggle visibly flashed during fast typing/backspace.
         final long startedAt=CandidateLatencyMetrics.start(getPackageName());
-        predictionDispatcher.schedule(snapshot,(id,input,options)->{
+        final boolean splitEnabled412=splitPredictionsEnabled();
+        predictionDispatcher.scheduleWithSplit412(snapshot,splitEnabled412,
+                (id,input,options,splitPhrases412,splitNextWords412)->{
             final long computedAt=startedAt==0L?0L:System.nanoTime();
             suggestionHandler.post(()->{
                 if(pendingIdlePaint410())return;
                 if(!predictionDispatcher.isCurrent(id)||candidates==null||
                         sensitive||!input.equals(composing))return;
+                // Atomic UI-thread swap: the worker performed expensive split
+                // segmentation. Only current-editor data may affect the bar.
+                if(splitEnabled412) {
+                    splitSnapshot340=input;
+                    splitPhrasesCache340=splitPhrases412;
+                    splitNextCache340=splitNextWords412;
+                } else {
+                    splitSnapshot340=null;
+                    splitPhrasesCache340=java.util.Collections.emptyList();
+                    splitNextCache340=java.util.Collections.emptyList();
+                }
                 // A manually saved personal word is considered only for the
                 // matching prefix, never from ambient typing or editor history.
                 // This runs on the IME UI callback, reading at most 250 entries.
@@ -4570,22 +4583,12 @@ public final class RebornImeService extends InputMethodService {
                 SuggestionContinuity353.splitNextWordsOnlyDuringLiveComposition(
                         !composing.isEmpty(),sensitive,editorAllowsSuggestions,
                         !input.isEmpty(),editingInMiddle,cursorHasTextAfter());
-        if(splitActive) {
-            if(!input.equals(splitSnapshot340)) {
-                splitSnapshot340=input;
-                final long splitStart411=OrivraPerfAudit411.begin();
-                try {
-                    splitPhrasesCache340=PredictionLite.splitPhraseSuggestions(input);
-                    splitNextCache340=PredictionLite.splitNextWords(input);
-                } finally {
-                    OrivraPerfAudit411.end(OrivraPerfAudit411.SPLIT_ON_UI,
-                            splitStart411);
-                }
-            }
+        if(splitActive && input.equals(splitSnapshot340)) {
+            // Show the worker's immutable, latest-snapshot split options.
+            // A preliminary suggestion frame never runs heavy segmentation.
             splitPhrases=splitPhrasesCache340;
             splitNextWords=splitNextCache340;
         } else {
-            splitSnapshot340=null;
             splitPhrases=java.util.Collections.emptyList();
             splitNextWords=java.util.Collections.emptyList();
         }
