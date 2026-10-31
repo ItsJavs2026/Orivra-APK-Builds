@@ -12,13 +12,13 @@ adb install -r "$APK"
 # after adb install has already returned "Success".
 registered=0
 for attempt in $(seq 1 24); do
-  if adb shell ime list -s | tr -d '\r' | grep -Fq "$IME"; then
+  if adb shell ime list -a -s | tr -d '\r' | grep -Fq "$IME"; then
     registered=1
     break
   fi
   sleep 1
 done
-adb shell ime list -s
+adb shell ime list -a -s
 if [ "$registered" -ne 1 ]; then
   echo "FATAL: installed IME never registered after PackageManager scan"
   adb shell pm list packages | grep chroomareborn || true
