@@ -727,10 +727,15 @@ public final class RebornImeService extends InputMethodService {
     // This small gate retains only a temporary editor reference/session,
     // never typed text. Direct touches still use existing InputConnection.
     private final TypingRefreshGate401 typingRefresh401=new TypingRefreshGate401();
+    // 408: no typed text/editor stored here; only the uptime of this burst.
+    private final PredictionUiBudget408 predictionUiBudget408=new PredictionUiBudget408();
+    private static final String CALM_PREDICTIONS_PREF_408="orivra_calm_predictions_408";
+    private boolean calmPredictions408=true;
     private final Runnable typingRefreshRunnable401=this::runTypingRefresh401;
     // Method reference avoids Java's illegal forward reference to the
     // input-session field declared later in this large IME service.
     private void runTypingRefresh401() {
+        predictionUiBudget408.reset();
         if(!typingRefresh401.consume(
                 inputSessionGeneration,getCurrentInputConnection()))return;
         if(!sensitive && editorAllowsSuggestions && candidates!=null) {
@@ -743,20 +748,32 @@ public final class RebornImeService extends InputMethodService {
     private void cancelTypingRefresh401(){
         suggestionHandler.removeCallbacks(typingRefreshRunnable401);
         typingRefresh401.cancel();
+        predictionUiBudget408.reset();
     }
     private void scheduleTypingRefresh401(){
         InputConnection editor=getCurrentInputConnection();
         if(editor==null || candidates==null)return;
-        if(typingRefresh401.isPendingFor(inputSessionGeneration,editor))
+        if(typingRefresh401.isPendingFor(inputSessionGeneration,editor)) {
+            if(!calmPredictions408)return; // Preserve the proven 401 behavior.
+            // Trailing-edge debounce: avoid rendering heavy predictions at
+            // a fixed rate while rapid letters are still being committed.
+            // A capped burst still allows updates during uninterrupted typing.
+            suggestionHandler.removeCallbacks(typingRefreshRunnable401);
+            suggestionHandler.postDelayed(typingRefreshRunnable401,
+                    predictionUiBudget408.delayAfterKey(
+                            android.os.SystemClock.uptimeMillis()));
             return;
-        // Replace only an outdated editor's pending callback; never let an
-        // old host field update the next reply or another application.
+        }
+        // An editor switch invalidates the old pending callback and budget.
         cancelTypingRefresh401();
         if(!typingRefresh401.arm(inputSessionGeneration,editor))return;
         predictionDispatcher.cancel();
         clearSpaceHighlight372();
-        suggestionHandler.postDelayed(
-                typingRefreshRunnable401,TypingRefreshGate401.WAIT_MS);
+        suggestionHandler.postDelayed(typingRefreshRunnable401,
+                calmPredictions408?
+                        predictionUiBudget408.delayAfterKey(
+                                android.os.SystemClock.uptimeMillis()):
+                        TypingRefreshGate401.WAIT_MS);
     }
     // Research 353: alpha keys retain down-order when two thumbs overlap.
     // Never store touch/text history; cancel the transient queue on lifecycle.
@@ -1887,6 +1904,8 @@ public final class RebornImeService extends InputMethodService {
         // One preferences read per editor activation, never every letter.
         android.content.SharedPreferences visualOptions370=
                 getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        calmPredictions408=visualOptions370.getBoolean(
+                CALM_PREDICTIONS_PREF_408,true);
         instantKeyFeedback369=visualOptions370.getBoolean(
                 KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true);
         fastSymbolHold367=visualOptions370.getBoolean(
@@ -4391,10 +4410,13 @@ public final class RebornImeService extends InputMethodService {
                 else predictionsExpanded=false;
             }
             manuallyCollapsedPredictions=false;
-        } else if(!freezeRiseDuringDelete && !sensitive && !manuallyCollapsedPredictions
+        } else if(!calmPredictions408 && !freezeRiseDuringDelete &&
+                !sensitive && !manuallyCollapsedPredictions
                 && input.length()>=2 && (!splitPhrases.isEmpty() || options.size()>3)) {
             predictionsExpanded=true;
-        } else if(!freezeRiseDuringDelete && (options.isEmpty() || (splitPhrases.isEmpty() && options.size()<=3))
+        } else if(!freezeRiseDuringDelete &&
+                (calmPredictions408 || options.isEmpty() ||
+                        (splitPhrases.isEmpty() && options.size()<=3))
                 && !manuallyCollapsedPredictions) {
             if(predictionsExpanded)suggestionHandler.postDelayed(delayedRiseDismiss,riseDurationMs());
             else predictionsExpanded=false;
