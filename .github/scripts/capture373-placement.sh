@@ -8,6 +8,22 @@ mkdir -p "$OUT"
 APK=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
 test -s "$APK"
 adb install -r "$APK"
+# Android 35's InputMethodManager can register a freshly installed IME
+# after adb install has already returned "Success".
+registered=0
+for attempt in $(seq 1 24); do
+  if adb shell ime list -s | tr -d '\r' | grep -Fq "$IME"; then
+    registered=1
+    break
+  fi
+  sleep 1
+done
+adb shell ime list -s
+if [ "$registered" -ne 1 ]; then
+  echo "FATAL: installed IME never registered after PackageManager scan"
+  adb shell pm list packages | grep chroomareborn || true
+  exit 1
+fi
 adb shell ime enable "$IME"
 adb shell ime set "$IME"
 adb shell settings get secure default_input_method
