@@ -682,6 +682,34 @@ public final class RebornImeService extends InputMethodService {
         lastTappedSession340=-1L;
         tappedSequence340.resetContext();
     }
+    /**
+     * Memory audit 401: an inactive SystemUI notification/editor must not
+     * retain its suggestion strings, learner session maps, cursor tickets or
+     * candidate snapshots for the rest of the long-lived IME process.
+     *
+     * Call ONLY at editor/input-view exit or while the input view is hidden.
+     * Never touch the saved learning stores, composing text or V4 backups.
+     */
+    private void releaseInactiveSuggestionMemory401() {
+        suggestionHandler.removeCallbacks(delayedRiseDismiss);
+        cancelCursorReleaseSuggestions();
+        personalPrefixCache340.clear();
+        tappedSequence340.clear();
+        splitSnapshot340=null;
+        splitPhrases=java.util.Collections.emptyList();
+        splitNextWords=java.util.Collections.emptyList();
+        splitPhrasesCache340=java.util.Collections.emptyList();
+        splitNextCache340=java.util.Collections.emptyList();
+        latestOptions=java.util.Collections.emptyList();
+        latestSnapshot="";
+        riseRenderedSignature="";
+        manualCollapseSnapshot="";
+        idleWordTicket340=null;
+        clearSpaceHighlight372();
+        invalidateEditingTicket();
+        clearPendingCaretInsert364();
+        resetKeyEcho342();
+    }
     private List<String> personalizedPrefix340(String prefix) {
         List<String> established=personalPrefixCache340.get(prefix,
                 word->PersonalWordFrequency328.matching(this,word,3));
@@ -1924,6 +1952,7 @@ public final class RebornImeService extends InputMethodService {
         predictionDispatcher.cancel();
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
+        releaseInactiveSuggestionMemory401();
         currentFinish();
         super.onFinishInput();
     }
@@ -1944,6 +1973,7 @@ public final class RebornImeService extends InputMethodService {
         predictionDispatcher.cancel();
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
+        releaseInactiveSuggestionMemory401();
         super.onFinishInputView(finishingInput);
     }
     @Override public void onDestroy() {
@@ -1963,7 +1993,23 @@ public final class RebornImeService extends InputMethodService {
         closeOptionalDictionary();
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
+        releaseInactiveSuggestionMemory401();
         super.onDestroy();
+    }
+    @Override public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        // Android may keep a keyboard service process resident after the
+        // notification reply closes. Do not interfere with active typing.
+        if(level>=android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN &&
+                !isInputViewShown()) {
+            cancelTypingRefresh401();
+            releaseInactiveSuggestionMemory401();
+            // Optional public seed + opt-in 79k-word dictionary are reloadable;
+            // never purge current composing text or persistent learning.
+            offlineNextWordSeed=null;
+            offlineNextWordSeedLoadAttempted=false;
+            closeOptionalDictionary();
+        }
     }
     @Override public void onUpdateSelection(int oldSelStart, int oldSelEnd,
             int newSelStart, int newSelEnd, int candidatesStart, int candidatesEnd) {
