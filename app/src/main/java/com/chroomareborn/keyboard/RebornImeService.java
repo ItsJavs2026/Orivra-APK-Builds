@@ -697,6 +697,7 @@ public final class RebornImeService extends InputMethodService {
         cancelCursorReleaseSuggestions();
         personalPrefixCache340.clear();
         tappedSequence340.clear();
+        clearChipActionBindings412();
         splitSnapshot340=null;
         splitPhrases=java.util.Collections.emptyList();
         splitNextWords=java.util.Collections.emptyList();
@@ -4565,6 +4566,19 @@ public final class RebornImeService extends InputMethodService {
     private int frameSelectionStart412=-1,frameSelectionEnd412=-1;
     private InputConnection frameEditor412;
 
+    private void clearChipActionBindings412(){
+        if(candidates==null)return;
+        for(int i=0;i<candidates.getChildCount();i++) {
+            View v=candidates.getChildAt(i);
+            if(v instanceof TextView &&
+                    v.getTag(R.id.orivra_chip_binding_412)!=null) {
+                v.setTag(R.id.orivra_chip_binding_412,null);
+                v.setOnClickListener(null);
+                v.setOnLongClickListener(null);
+                v.setOnTouchListener(null);
+            }
+        }
+    }
     private void cancelSuggestionFrame412(){
         if(frameScheduled412 && candidates!=null)
             candidates.removeCallbacks(applyFrameRunnable412);
@@ -4758,6 +4772,7 @@ public final class RebornImeService extends InputMethodService {
             options=java.util.Collections.singletonList(input);
         }
         if(options.isEmpty()) {
+            clearChipActionBindings412();
             if(!PredictionStripStability342.showPrivateStatus(
                     sensitive,editorAllowsSuggestions)) {
                 // No "Keep typing" or "NW OFF" in an ordinary editor.
@@ -4865,16 +4880,20 @@ public final class RebornImeService extends InputMethodService {
                 // Keep prior side-chip visuals briefly, NEVER their tap
                 // actions, until the real current async result arrives.
                 if(i>0 && keepSides345 &&
-                        PredictionStripContinuity345.holdVisualOnly(option))
+                        PredictionStripContinuity345.holdVisualOnly(option)) {
+                    option.setTag(R.id.orivra_chip_binding_412,null);
                     continue;
+                }
                 // INVISIBLE is intentional: unlike GONE, it does not resize
                 // adjacent predictions as the async model adds/removes chips.
                 if(option.getVisibility()!=View.INVISIBLE)
                     option.setVisibility(View.INVISIBLE);
                 if(option.length()!=0)option.setText("");
                 option.setContentDescription(null);
+                option.setTag(R.id.orivra_chip_binding_412,null);
                 option.setOnClickListener(null);
                 option.setOnLongClickListener(null);
+                option.setOnTouchListener(null);
                 int fixedWidth=Math.max(dp(70),(screenWidth-dp(30))/3);
                 LinearLayout.LayoutParams previous=
                         (LinearLayout.LayoutParams)option.getLayoutParams();
@@ -4919,14 +4938,9 @@ public final class RebornImeService extends InputMethodService {
             String description344="Insert suggestion "+shownSuggestion;
             if(!TextUtils.equals(option.getContentDescription(),description344))
                 option.setContentDescription(description344);
-            // Long press previews the complete candidate without accepting
-            // or changing the editor. Toast uses only the current local text.
-            if(fullSentenceChip)option.setOnLongClickListener(v->{
-                android.widget.Toast.makeText(this,suggestionCase(suggestion),
-                        android.widget.Toast.LENGTH_LONG).show();
-                return true;
-            });
-            else option.setOnLongClickListener(null);
+            // Click, swipe and long-press bindings are installed together
+            // ONLY if this chip's action actually changed. Display styling
+            // remains separately diffed below.
             // Emphasize the best displayed correction, without indicating
             // verified accuracy or changing the prediction rank/accepted text.
             // Never mark unchanged typed text as a confident correction.
@@ -4973,10 +4987,28 @@ public final class RebornImeService extends InputMethodService {
                 if(previous.width!=params.width || previous.height!=params.height)
                     option.setLayoutParams(params);
             } else candidates.addView(option,params);
-            final String expected=input;
-            option.setOnClickListener(v->acceptSuggestion(v,expected,suggestion));
-            option.setOnTouchListener((v,event)->
-                    onPredictionChipTouch372(v,event,false));
+            final Object priorBinding412=
+                    option.getTag(R.id.orivra_chip_binding_412);
+            final boolean reuseAction412=priorBinding412 instanceof ChipActionBinding412 &&
+                    ((ChipActionBinding412)priorBinding412).matches(
+                            input,suggestion,inputSessionGeneration,fullSentenceChip);
+            if(!reuseAction412) {
+                final String expected=input;
+                option.setOnClickListener(v->acceptSuggestion(
+                        v,expected,suggestion));
+                option.setOnTouchListener((v,event)->
+                        onPredictionChipTouch372(v,event,false));
+                if(fullSentenceChip)option.setOnLongClickListener(v->{
+                    android.widget.Toast.makeText(this,suggestionCase(suggestion),
+                            android.widget.Toast.LENGTH_LONG).show();
+                    return true;
+                });
+                else option.setOnLongClickListener(null);
+                option.setTag(R.id.orivra_chip_binding_412,
+                        new ChipActionBinding412(
+                                expected,suggestion,inputSessionGeneration,
+                                fullSentenceChip));
+            }
             if(!reuseCells && SuggestionStripLayoutPolicy.dividerAfter(
                     i,shownCount,emptyInput)) {
                 View separator=new View(this);
