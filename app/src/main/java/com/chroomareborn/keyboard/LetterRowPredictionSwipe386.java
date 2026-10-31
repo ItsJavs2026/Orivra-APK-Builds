@@ -88,6 +88,19 @@ final class LetterRowPredictionSwipe386 {
     int pointerId(){return pointer;}
     boolean active(){return active;}
     Direction preview(){return active?locked:Direction.CANCEL;}
+    /**
+     * A slow, deliberate downward stroke must cancel secondary-symbol
+     * long-press before it reaches the full 32dp activation distance.
+     * This NEVER accepts a suggestion; the full recognizer plus live
+     * editor/selection guards still decide at ACTION_UP.
+     */
+    boolean earlyDownIntent(int id,float x,float y){
+        if(!active || id!=pointer || !Float.isFinite(x) ||
+                !Float.isFinite(y))return false;
+        float dy=y-y0,dx=Math.abs(x-x0);
+        return dy>=12f*density && dy<=120f*density &&
+                dy>=dx*1.6f;
+    }
     void cancel(){active=false;}
     boolean move(int id,float x,float y){
         if(!active)return false;
