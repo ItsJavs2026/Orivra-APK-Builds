@@ -100,8 +100,10 @@ final class PredictionDispatcher implements AutoCloseable {
             boolean editing, boolean splitEnabled) {
         if (closed) return -1L;
         long id = generation.incrementAndGet();
-        if (scheduled != null) scheduled.cancel(true);
+        if (scheduled != null && scheduled.cancel(true))
+            OrivraPerfAudit411.recordPredictionPreempted415();
         final String snapshot=input;
+        OrivraPerfAudit411.recordPredictionScheduled415();
         scheduled=worker.schedule(()->{
             try {
                 if(!isCurrent(id))return;
@@ -131,9 +133,13 @@ final class PredictionDispatcher implements AutoCloseable {
                                     OrivraPerfAudit411.SPLIT_WORKER_412,splitStart412);
                         }
                     }
-                    if(isCurrent(id))splitListener.onResult(
-                            id,snapshot,choices,phrases,next);
+                    if(isCurrent(id)) {
+                        OrivraPerfAudit411.recordPredictionCompleted415();
+                        splitListener.onResult(
+                                id,snapshot,choices,phrases,next);
+                    }
                 } else if(isCurrent(id)) {
+                    OrivraPerfAudit411.recordPredictionCompleted415();
                     listener.onResult(id,snapshot,choices);
                 }
             } finally {
@@ -151,7 +157,8 @@ final class PredictionDispatcher implements AutoCloseable {
     synchronized void cancel() {
         generation.incrementAndGet();
         if (scheduled != null) {
-            scheduled.cancel(true);
+            if(scheduled.cancel(true))
+                OrivraPerfAudit411.recordPredictionPreempted415();
             scheduled = null;
         }
     }
