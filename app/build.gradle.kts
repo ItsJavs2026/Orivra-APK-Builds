@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build386trial"
+        applicationId = "com.chroomareborn.keyboard.build391trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 386
-        versionName = "1.0.53-build386-letter-row-swipe"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 386"
+        versionCode = 391
+        versionName = "1.0.55-build391-v4-union-idle-swipes"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 391"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 386"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 391"
         }
     }
     compileOptions {
