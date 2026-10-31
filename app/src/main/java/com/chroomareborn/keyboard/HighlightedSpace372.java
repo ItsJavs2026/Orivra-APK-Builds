@@ -13,6 +13,7 @@ import java.util.Locale;
  */
 final class HighlightedSpace372 {
     private HighlightedSpace372() {}
+    static final String PREF="space_accept_highlight_372";
     static boolean eligible(String expected,String composing,
             String correction,boolean finalRendered,
             boolean visuallyEmphasized,boolean sameSession,
