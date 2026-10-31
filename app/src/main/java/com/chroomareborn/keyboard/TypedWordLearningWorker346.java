@@ -12,6 +12,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Candidate 347 opt-in worker, researched and emulator-qualified in 346.
@@ -28,6 +30,14 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
     private static final TypedWordEvidenceStore341.Snapshot EMPTY=
             new TypedWordEvidenceStore341.Snapshot(Map.of(),Map.of());
     private final Context app;
+    // Bound training callbacks queued by very long typing sessions. UI text
+    // insertion NEVER waits for this worker. On saturation, pause only the
+    // optional learning for the current editor and drop its pending word
+    // evidence rather than retaining thousands of private tokens in RAM.
+    // Saved learning and backup files are never deleted or rewritten here.
+    static final int MAX_PENDING_SPACE_UPDATES=128;
+    private final AtomicInteger pendingSpaceUpdates=new AtomicInteger();
+    private volatile long overloadedSession=-1L;
     private final ExecutorService worker=Executors.newSingleThreadExecutor(r->{
         Thread t=new Thread(r,"OrivraTypedWords346");
         t.setDaemon(true);
@@ -56,6 +66,7 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
         if(closed)return;
         visible=EMPTY;
         visibleSession=session;
+        overloadedSession=-1L;
         worker.execute(()->{
             workerSession=session;
             priorWord=null;
@@ -86,32 +97,51 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
      */
     void committedSpace(String verifiedWord,long editorSession,
             boolean editorAllowsLearning,boolean successfullyCommitted) {
-        if(closed)return;
+        if(closed || overloadedSession==editorSession)return;
         final String word=TypedSequenceArchive341.canonical(verifiedWord);
-        worker.execute(()->{
-            if(workerSession!=editorSession || !editorAllowsLearning ||
-                    !successfullyCommitted || consentEpoch<0L || word==null) {
-                priorWord=null;
-                return;
-            }
-            try {
-                TypedWordBoundaryStore346.Result updated=
-                        TypedWordBoundaryStore346.record(
-                        app,word,priorWord,true,true,consentEpoch);
-                if(!updated.stored) {
-                    priorWord=null;
-                    if(visibleSession==editorSession && !TypedWordsConsent341
-                            .mayRemember(app,true))visible=EMPTY;
-                    return;
+        // A slow disk or resource-constrained phone must not accumulate an
+        // unbounded number of verified-word tasks while keys are still used.
+        final int waiting=pendingSpaceUpdates.incrementAndGet();
+        if(waiting>MAX_PENDING_SPACE_UPDATES){
+            pendingSpaceUpdates.decrementAndGet();
+            overloadedSession=editorSession;
+            return; // only optional learning paused, never typed text
+        }
+        try {
+            worker.execute(()->{
+                try {
+                    if(overloadedSession==editorSession ||
+                            workerSession!=editorSession ||
+                            !editorAllowsLearning || !successfullyCommitted ||
+                            consentEpoch<0L || word==null) {
+                        priorWord=null;
+                        return;
+                    }
+                    try {
+                        TypedWordBoundaryStore346.Result updated=
+                                TypedWordBoundaryStore346.record(
+                                app,word,priorWord,true,true,consentEpoch);
+                        if(!updated.stored) {
+                            priorWord=null;
+                            if(visibleSession==editorSession &&
+                                    !TypedWordsConsent341.mayRemember(app,true))
+                                visible=EMPTY;
+                            return;
+                        }
+                        priorWord=word;
+                        if(visibleSession==editorSession)visible=updated.evidence;
+                    } catch(RuntimeException invalidState) {
+                        priorWord=null;
+                        if(visibleSession==editorSession)visible=EMPTY;
+                    }
+                } finally {
+                    pendingSpaceUpdates.decrementAndGet();
                 }
-                priorWord=word;
-                if(visibleSession==editorSession)visible=updated.evidence;
-            } catch(RuntimeException invalidState) {
-                // Never delete/rewrite unknown data. No user text in logs.
-                priorWord=null;
-                if(visibleSession==editorSession)visible=EMPTY;
-            }
-        });
+            });
+        } catch(RejectedExecutionException closedWhileQueued) {
+            pendingSpaceUpdates.decrementAndGet();
+            overloadedSession=editorSession;
+        }
     }
 
     /** A punctuation, navigation or other hard boundary must not form
@@ -197,6 +227,20 @@ final class TypedWordLearningWorker346 implements AutoCloseable {
     /** Deterministic Android test seam. Never call from the IME main thread. */
     Future<?> workerIdleForTest() {
         return worker.submit(()->{});
+    }
+    int pendingSpaceUpdatesForTest(){
+        return pendingSpaceUpdates.get();
+    }
+    boolean overloadedForTest(long session){
+        return overloadedSession==session;
+    }
+    Future<?> pauseWorkerForTest(java.util.concurrent.CountDownLatch gate){
+        return worker.submit(()->{
+            try { gate.await(5,TimeUnit.SECONDS); }
+            catch(InterruptedException interrupted){
+                Thread.currentThread().interrupt();
+            }
+        });
     }
 
     @Override public void close(){
