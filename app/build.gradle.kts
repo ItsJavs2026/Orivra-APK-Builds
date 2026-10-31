@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build373trial"
+        applicationId = "com.chroomareborn.keyboard.build376trial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 373
-        versionName = "1.0.49-build373-prediction-gestures-space-correction"
-        manifestPlaceholders["appLabel"] = "Orivra Candidate 373"
+        versionCode = 376
+        versionName = "1.0.50-build376-short-space-caret-continuity"
+        manifestPlaceholders["appLabel"] = "Orivra Candidate 376"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra Candidate 373"
+            manifestPlaceholders["appLabel"] = "Orivra Candidate 376"
         }
     }
     compileOptions {
