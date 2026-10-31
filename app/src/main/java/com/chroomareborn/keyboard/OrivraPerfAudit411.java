@@ -58,6 +58,10 @@ final class OrivraPerfAudit411 {
     private static long spaceFastShift416,spaceFallbackShift416;
     private static long selectedBackspaceApplied416B,selectedBackspaceUncertain416B,
             selectedBackspaceStale416B;
+    // 416C: no words, source app, tap positions or private editor snapshots.
+    private static long cursorTicketRetained416C,cursorTicketCleared416C,
+            cursorTapRejected416C,cursorTapApplied416C,
+            swipeTapRejected416C;
 
     private OrivraPerfAudit411(){}
 
@@ -116,7 +120,24 @@ final class OrivraPerfAudit411 {
             default: break;
         }
     }
+    static synchronized void recordCursorTicketRetained416C(){
+        if(enabled)cursorTicketRetained416C++;
+    }
+    static synchronized void recordCursorTicketCleared416C(){
+        if(enabled)cursorTicketCleared416C++;
+    }
+    static synchronized void recordCursorTapRejected416C(){
+        if(enabled)cursorTapRejected416C++;
+    }
+    static synchronized void recordCursorTapApplied416C(){
+        if(enabled)cursorTapApplied416C++;
+    }
+    static synchronized void recordSwipeTapRejected416C(){
+        if(enabled)swipeTapRejected416C++;
+    }
     static synchronized void reset(){
+        cursorTicketRetained416C=cursorTicketCleared416C=0;
+        cursorTapRejected416C=cursorTapApplied416C=swipeTapRejected416C=0;
         spaceFastShift416=spaceFallbackShift416=0;
         selectedBackspaceApplied416B=selectedBackspaceUncertain416B=
                 selectedBackspaceStale416B=0;
@@ -138,7 +159,7 @@ final class OrivraPerfAudit411 {
     }
     static synchronized String report(String settings){
         StringBuilder b=new StringBuilder(900);
-        b.append("ORIVRA BUILD 416B KEY/PREDICTION PERFORMANCE AUDIT\n");
+        b.append("ORIVRA BUILD 416C KEY/PREDICTION PERFORMANCE AUDIT\n");
         b.append("Counts and timings only. No typing stored or transmitted.\n");
         b.append("Audit: ").append(enabled?"ON":"OFF");
         b.append(" | elapsed since reset: ")
@@ -179,6 +200,16 @@ final class OrivraPerfAudit411 {
                 .append(selectedBackspaceUncertain416B).append('\n');
         b.append("Selected-text Backspace stale session: ")
                 .append(selectedBackspaceStale416B).append('\n');
+        b.append("Cursor-word ticket retained at paint: ")
+                .append(cursorTicketRetained416C).append('\n');
+        b.append("Cursor-word ticket cleared at paint: ")
+                .append(cursorTicketCleared416C).append('\n');
+        b.append("Cursor-word suggestion tap applied: ")
+                .append(cursorTapApplied416C).append('\n');
+        b.append("Cursor-word suggestion tap rejected: ")
+                .append(cursorTapRejected416C).append('\n');
+        b.append("Suggestion-swipe touch release rejected: ")
+                .append(swipeTapRejected416C).append('\n');
         b.append("Note: render/panel timings overlap with suggestion "+
                 "entry; don't add their times together.\n");
         b.append("Slow handlers do not establish physical touch-to-frame "+
