@@ -733,6 +733,21 @@ public final class RebornImeService extends InputMethodService {
     private final PredictionUiBudget408 predictionUiBudget408=new PredictionUiBudget408();
     private static final String CALM_PREDICTIONS_PREF_408="orivra_calm_predictions_408";
     private boolean calmPredictions408=true;
+    // 410: when enabled, FULL mode defers heavyweight suggestion UI work
+    // until a genuine key-free interval. OFF/WORKER ONLY stay unchanged.
+    private static final String IDLE_PAINT_PREF_410="orivra_idle_paint_410";
+    private boolean idlePredictionPaintEnabled410=true;
+    private final IdlePredictionPaint410 idlePredictionPaint410=
+            new IdlePredictionPaint410();
+    private boolean idlePaintActive410() {
+        return idlePredictionPaintEnabled410 &&
+                predictionIsolationMode409==PredictionIsolationMode409.FULL;
+    }
+    private boolean pendingIdlePaint410() {
+        return idlePaintActive410() && !sensitive &&
+                typingRefresh401.isPendingFor(
+                        inputSessionGeneration,getCurrentInputConnection());
+    }
     // Read at editor activation. OFF keeps key commits/composition unchanged,
     // only skipping suggestion calculation and view updates.
     private int predictionIsolationMode409=PredictionIsolationMode409.OFF;
@@ -744,6 +759,7 @@ public final class RebornImeService extends InputMethodService {
         predictionUiBudget408.reset();
         if(!typingRefresh401.consume(
                 inputSessionGeneration,getCurrentInputConnection()))return;
+        idlePredictionPaint410.reset();
         if(!sensitive && editorAllowsSuggestions && candidates!=null) {
             long start401=CandidateLatencyMetrics.start(getPackageName());
             showSuggestions();
@@ -755,11 +771,28 @@ public final class RebornImeService extends InputMethodService {
         suggestionHandler.removeCallbacks(typingRefreshRunnable401);
         typingRefresh401.cancel();
         predictionUiBudget408.reset();
+        idlePredictionPaint410.reset();
     }
     private void scheduleTypingRefresh401(){
         if(!PredictionIsolationMode409.computes(predictionIsolationMode409))return;
         InputConnection editor=getCurrentInputConnection();
         if(editor==null || candidates==null)return;
+        if(idlePaintActive410()) {
+            // Never force a 1ms repaint in the middle of a long key burst.
+            // One editor-scoped runnable is rescheduled after every key;
+            // a pause is required before the heavy FULL path can render.
+            if(!typingRefresh401.isPendingFor(inputSessionGeneration,editor)) {
+                cancelTypingRefresh401();
+                if(!typingRefresh401.arm(inputSessionGeneration,editor))return;
+                predictionDispatcher.cancel();
+                clearSpaceHighlight372();
+            }
+            suggestionHandler.removeCallbacks(typingRefreshRunnable401);
+            suggestionHandler.postDelayed(typingRefreshRunnable401,
+                    idlePredictionPaint410.onKey(
+                            android.os.SystemClock.uptimeMillis()));
+            return;
+        }
         if(typingRefresh401.isPendingFor(inputSessionGeneration,editor)) {
             if(!calmPredictions408)return; // Preserve the proven 401 behavior.
             // Trailing-edge debounce: avoid rendering heavy predictions at
@@ -1913,6 +1946,8 @@ public final class RebornImeService extends InputMethodService {
                 getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
         calmPredictions408=visualOptions370.getBoolean(
                 CALM_PREDICTIONS_PREF_408,true);
+        idlePredictionPaintEnabled410=visualOptions370.getBoolean(
+                IDLE_PAINT_PREF_410,true);
         predictionIsolationMode409=PredictionIsolationMode409.normalize(
                 visualOptions370.getInt(PredictionIsolationMode409.PREF,
                         PredictionIsolationMode409.OFF));
@@ -3206,7 +3241,12 @@ public final class RebornImeService extends InputMethodService {
                 breakTypedContext347();
             }
         }
-        if(value.length()==1 && Character.isLetter(value.charAt(0)) &&
+        // 410: ordinary punctuation joins the deferred UI path in FULL
+        // mode; the typed punctuation is still committed immediately.
+        boolean deferPunctuation410=idlePaintActive410() &&
+                value.length()==1 && PunctuationSpacing.isClosingPunctuation(value);
+        if((value.length()==1 && Character.isLetter(value.charAt(0)) ||
+                deferPunctuation410) &&
                 TypingRefreshGate401.safeToCoalesce(sensitive,
                         editorAllowsSuggestions,numericEditor,symbols,
                         hasSelection())) {
@@ -3372,7 +3412,14 @@ public final class RebornImeService extends InputMethodService {
         }
         boolean oldShift=shift;
         updateSentenceShift();
-        showSuggestions();
+        // Avoid a heavyweight FULL strip refresh on every Backspace repeat.
+        if(idlePaintActive410() &&
+                TypingRefreshGate401.safeToCoalesce(
+                        sensitive,editorAllowsSuggestions,numericEditor,symbols,
+                        hasSelection()))
+            scheduleTypingRefresh401();
+        else
+            showSuggestions();
         // The previous per-repeat refresh recreated every key ~15 times/sec.
         // Preserve the live backspace touch target until release.
         if(!deleteHeld && oldShift!=shift)refreshView();
@@ -4141,6 +4188,7 @@ public final class RebornImeService extends InputMethodService {
                         predictionDispatcher.scheduleEditing(cursorWord,(id,input,options)->{
                             final long computedAt=startedAt==0L?0L:System.nanoTime();
                             suggestionHandler.post(()->{
+                if(pendingIdlePaint410())return;
                                 if(!predictionDispatcher.isCurrent(id) ||
                                         candidates==null || sensitive ||
                                         !editorAllowsSuggestions || !composing.isEmpty() ||
@@ -4186,6 +4234,7 @@ public final class RebornImeService extends InputMethodService {
                 predictionDispatcher.scheduleEditing(word,(id,input,options)->{
                     final long computedAt=startedAt==0L?0L:System.nanoTime();
                     suggestionHandler.post(()->{
+                if(pendingIdlePaint410())return;
                         if(!predictionDispatcher.isCurrent(id)||sensitive||!composing.isEmpty()
                                 ||!input.equals(wordAtCursor())
                                 ||!isEditingTicketCurrent(editTicket))return;
@@ -4311,6 +4360,7 @@ public final class RebornImeService extends InputMethodService {
         predictionDispatcher.schedule(snapshot,(id,input,options)->{
             final long computedAt=startedAt==0L?0L:System.nanoTime();
             suggestionHandler.post(()->{
+                if(pendingIdlePaint410())return;
                 if(!predictionDispatcher.isCurrent(id)||candidates==null||
                         sensitive||!input.equals(composing))return;
                 // A manually saved personal word is considered only for the
@@ -4377,6 +4427,9 @@ public final class RebornImeService extends InputMethodService {
     }
     private void renderSuggestions(String input,List<String> options,
             boolean preliminary345) {
+        // An async result may arrive after the next key was committed.
+        // Never let it spend UI-frame time repainting the strip mid-typing.
+        if(pendingIdlePaint410())return;
         if(!PredictionIsolationMode409.renders(predictionIsolationMode409)) {
             clearPredictionDisplay409();
             return;
