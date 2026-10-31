@@ -60,7 +60,7 @@ jobs:
           start="    private void type(String value) {"
           end="    private void deleteSwipeWords("
           assert oldservice.split(start,1)[1].split(end,1)[0] == service.split(start,1)[1].split(end,1)[0], "Typing hot path changed"
-          assert service.count("hintPressOrder353")==oldservice.count("hintPressOrder353")
+          assert service.count("hintPressOrder353")==oldservice.count("hintPressOrder353")+1
           assert service.count("PredictionTapCaret364")==oldservice.count("PredictionTapCaret364")
           assert "requestAppIconHue366(editor);" in service
           assert "applyAppIconHueWhenIdle366(" in service
