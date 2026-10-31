@@ -82,7 +82,7 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Candidate 401 Test");
+        title.setText("Orivra — Build 407 Full Settings Test");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
@@ -148,7 +148,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra Candidate 401 keyboard");
+        picker.setText("2. Choose Orivra 407 Full Test keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
