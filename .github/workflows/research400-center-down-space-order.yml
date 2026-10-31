@@ -1,0 +1,157 @@
+name: Orivra Research 400 - center DOWN and physical Space order (NO APK)
+on:
+  push:
+    branches:
+      - research/build400-center-down-space-order-20261031
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research400
+  cancel-in-progress: true
+jobs:
+  source-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Exact changes from published Candidate 399 and safety review
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='cc73b1d5d36c23395fc91e98caa8b1c4ffe22b7a'
+          changed=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          expected={
+              'app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java',
+              'app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/CenterDownSpaceOrder400Research.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/CenterDownSpaceOrder400AndroidTest.java',
+              'docs/RESEARCH400_CENTER_DOWN_SPACE_ORDER_20261031.md',
+              '.github/workflows/research400-center-down-space-order.yml',
+          }
+          assert changed==expected,(changed^expected)
+          old=lambda p:subprocess.check_output(['git','show',base+':'+p],text=True)
+          for p in [
+              'app/build.gradle.kts','app/src/main/AndroidManifest.xml',
+              'app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
+              'app/src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java',
+              'app/src/main/java/com/chroomareborn/keyboard/AlphabetCaseRelabel398.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PublicPhraseIndex397.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PersonalWordFrequency328.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PersonalContextLearning319.java',
+              'app/src/main/java/com/chroomareborn/keyboard/TypedLearningV4Codec341.java',
+              'app/src/main/java/com/chroomareborn/keyboard/SpacebarCursorGesture.java',
+              'app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java',
+          ]: assert Path(p).read_text()==old(p),p
+          swipe=Path('app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java').read_text()
+          assert 'UP, DOWN' in swipe
+          assert 'if(from!=center || center>=row.size())return null;' in swipe
+          ime=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'hintPressOrder353.complete(token400' in ime
+          assert 'hintPressOrder353.cancel(spaceOrderToken400[0])' in ime
+          assert 'rowSwipe386[0].earlyDownIntent(' in ime
+          assert 'com.chroomareborn.keyboard.build399trial' in Path('app/build.gradle.kts').read_text()
+          assert 'android.permission.INTERNET' not in Path('app/src/main/AndroidManifest.xml').read_text()
+          print('PASS: research only; protected V4, original candidate package, learning, prediction and privacy preserved')
+          PY
+      - name: Stress 150k DOWN and 35k overlapping Space/letter order
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/r400"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/r400" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java \
+            app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java \
+            app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/CenterDownSpaceOrder400Research.java
+          java -cp "$RUNNER_TEMP/r400" \
+            com.chroomareborn.keyboard.CenterDownSpaceOrder400Research
+  android35-full-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Restore pinned offline dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile full IME and guarded DOWN/Space instrumentation
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable Android emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -e
+            adb logcat -c
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+            echo "---- R394 aggregate loaded-learning timing; fictional data only ----"
+            adb logcat -d -v brief -s OrivraPerf394:I | grep 'R394 .*p50='
+            echo "---- Same-run original vs optimized p95; synthetic learning only ----"
+            adb logcat -d -v brief -s OrivraPerf395:I | grep 'R395 .*SAME-RUN p95'
+            echo "---- End of aggregate profile ----"
+      - name: Require 299+ Android tests including DOWN, long typing and latency parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,'Missing Android test results'
+          tests=failures=errors=skips=0
+          for f in reports:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  x for x in root.iter() if x.tag.endswith('testsuite')]
+              for s in suites:
+                  tests+=int(s.attrib.get('tests','0'))
+                  failures+=int(s.attrib.get('failures','0'))
+                  errors+=int(s.attrib.get('errors','0'))
+                  skips+=int(s.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
+          assert tests>=299 and failures==0 and errors==0 and skips==0
+          PY
