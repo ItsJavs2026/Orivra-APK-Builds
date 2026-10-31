@@ -745,8 +745,10 @@ public final class RebornImeService extends InputMethodService {
     }
     private boolean pendingIdlePaint410() {
         return idlePaintActive410() && !sensitive &&
-                typingRefresh401.isPendingFor(
-                        inputSessionGeneration,getCurrentInputConnection());
+                (typingRefresh401.isPendingFor(
+                        inputSessionGeneration,getCurrentInputConnection()) ||
+                 !idlePredictionPaint410.isQuiet(
+                        android.os.SystemClock.uptimeMillis()));
     }
     // Read at editor activation. OFF keeps key commits/composition unchanged,
     // only skipping suggestion calculation and view updates.
