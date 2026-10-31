@@ -23,8 +23,9 @@ final class OrivraPerfAudit411 {
             SPACE_EDITOR_COMMIT_413=18, LEARNING_WORKER_413=19,
             SPACE_PRECOMMIT_CHECKS_413=20, SPACE_POSTCOMMIT_413=21,
             IDLE_WORD_VERIFICATION_414=22, HAPTIC_TOUCH_415=23,
-            SPACE_SHIFT_415=24, SPACE_REFRESH_415=25;
-    static final int SIZE=26;
+            SPACE_SHIFT_415=24, SPACE_REFRESH_415=25,
+            SELECTED_BACKSPACE_416B=26;
+    static final int SIZE=27;
     private static final String[] NAMES={
         "Letter key handler", "Space handler", "Backspace handler",
         "Suggestion scheduling", "Suggestion rendering", "Rise panel UI",
@@ -37,7 +38,8 @@ final class OrivraPerfAudit411 {
         "Space finish/commit IPC", "Approved learning background worker",
         "Space boundary checks before commit", "Space processing after commit",
         "Idle word verification after typing stops", "Key haptic feedback",
-        "Space cursor/sentence state", "Space suggestion refresh schedule"
+        "Space cursor/sentence state", "Space suggestion refresh schedule",
+        "Selected-text Backspace 416B"
     };
     private static volatile boolean enabled;
     private static final long[] count=new long[SIZE];
@@ -54,6 +56,8 @@ final class OrivraPerfAudit411 {
             predictionCompleted415;
     // 416: aggregate Space fast/fallback decisions, no character content.
     private static long spaceFastShift416,spaceFallbackShift416;
+    private static long selectedBackspaceApplied416B,selectedBackspaceUncertain416B,
+            selectedBackspaceStale416B;
 
     private OrivraPerfAudit411(){}
 
@@ -102,8 +106,20 @@ final class OrivraPerfAudit411 {
     static synchronized void recordFallbackSpaceShift416(){
         if(enabled)spaceFallbackShift416++;
     }
+    static synchronized void recordSelectedBackspace416B(
+            SelectedBackspace416B.Outcome outcome) {
+        if(!enabled || outcome==null)return;
+        switch(outcome){
+            case APPLIED: selectedBackspaceApplied416B++;break;
+            case UNCERTAIN: selectedBackspaceUncertain416B++;break;
+            case STALE: selectedBackspaceStale416B++;break;
+            default: break;
+        }
+    }
     static synchronized void reset(){
         spaceFastShift416=spaceFallbackShift416=0;
+        selectedBackspaceApplied416B=selectedBackspaceUncertain416B=
+                selectedBackspaceStale416B=0;
         learningQueueOverflow413=0;
         hiddenStaleChip414=discardedFrame414=recoveredFrame414=0;
         predictionScheduled415=predictionPreempted415=
@@ -122,7 +138,7 @@ final class OrivraPerfAudit411 {
     }
     static synchronized String report(String settings){
         StringBuilder b=new StringBuilder(900);
-        b.append("ORIVRA BUILD 416 KEY/PREDICTION PERFORMANCE AUDIT\n");
+        b.append("ORIVRA BUILD 416B KEY/PREDICTION PERFORMANCE AUDIT\n");
         b.append("Counts and timings only. No typing stored or transmitted.\n");
         b.append("Audit: ").append(enabled?"ON":"OFF");
         b.append(" | elapsed since reset: ")
@@ -157,6 +173,12 @@ final class OrivraPerfAudit411 {
                 .append(spaceFastShift416).append('\n');
         b.append("Space quick-shift fallback to editor: ")
                 .append(spaceFallbackShift416).append('\n');
+        b.append("Selected-text Backspace applied: ")
+                .append(selectedBackspaceApplied416B).append('\n');
+        b.append("Selected-text Backspace uncertain: ")
+                .append(selectedBackspaceUncertain416B).append('\n');
+        b.append("Selected-text Backspace stale session: ")
+                .append(selectedBackspaceStale416B).append('\n');
         b.append("Note: render/panel timings overlap with suggestion "+
                 "entry; don't add their times together.\n");
         b.append("Slow handlers do not establish physical touch-to-frame "+
