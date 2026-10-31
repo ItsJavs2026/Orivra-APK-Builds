@@ -85,27 +85,34 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 414 Faster Typing + Live Suggestions");
+        title.setText("Orivra — Build 415 Faster Typing + Prediction Recovery");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nBuild 414 — Faster typing and responsive prediction chips\n"+
-                "Your Samsung Build 413 audit showed letters averaging 14.15ms, "+
-                "with idle-word observation alone taking 11.64ms per letter. "+
-                "Space averaged 29.44ms. Rise and suggestion-chip binding "+
-                "were much quicker. This version targets the measured cost.\n"+
-                "\nWhen enabled, verified idle-word learning waits until "+
-                "typing stops instead of reading the editor on every key. "+
-                "The old method is available with a reversible switch.\n"+
-                "\nOld, unclickable side predictions are now hidden rather "+
-                "than shown as if active. A dropped outdated display frame "+
-                "can request one bounded, editor-checked refresh. Current "+
-                "suggestions still require safe editor verification on tap.\n"+
-                "\nThe full Orivra settings, SentenceFlow, backups and "+
-                "personal learning remain. This is a separate experimental "+
-                "APK. Keep your existing Orivra versions and Gboard.\n");
+        notes.setText("\nBuild 415 — Faster typing and prediction recovery\n"+
+                "Your Build 414 audit: letters averaged 3.55ms, down from "+
+                "14.15ms in Build 413. Idle-word observation fell from "+
+                "11.64ms to 0.07ms. Yet fast typing could still freeze "+
+                "on a rare 202ms editor read, Space averaged 31.22ms, "+
+                "and 42 stale side prediction chips were hidden.\n"+
+                "\n415 adds a guarded option to skip one redundant editor "+
+                "punctuation sample when continuing a normal composing "+
+                "word. The actual composing mutation still verifies the "+
+                "live editor. FULL predictions can return after a shorter "+
+                "145ms typing pause instead of 210ms, never forcing a "+
+                "heavy refresh during sustained typing. Each option "+
+                "can be compared independently.\n"+
+                "\nKey vibration settings are now cached on editor focus "+
+                "and the audit measures the actual haptic call. We also "+
+                "count prediction jobs scheduled, preempted and delivered, "+
+                "and separate Space cursor checks from suggestion scheduling.\n"+
+                "\nThis is a separate experimental installation. Full "+
+                "SentenceFlow, personal learning, full settings and backup "+
+                "features are preserved. Keep Gboard and previous Orivra "+
+                "versions installed. Reopen a text field after changing "+
+                "performance or vibration settings.\n");
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
@@ -339,6 +346,48 @@ public final class MainActivity extends Activity {
         });
         root.addView(deferredButton414);
 
+        TextView speedHelp415=new TextView(this);
+        speedHelp415.setText("\nBUILD 415 • Fast typing controls. "+
+                "Quick prediction recovery ON: show FULL results after "+
+                "145ms of actual typing silence, rather than 210ms. "+
+                "Safe editor sample ON: do not ask Android for an "+
+                "unnecessary 1-character punctuation sample when safely "+
+                "extending an existing composing word. Old behavior is "+
+                "available with OFF. Both require reopening the editor.");
+        speedHelp415.setTextSize(15);
+        speedHelp415.setTextColor(0xFF303846);
+        root.addView(speedHelp415);
+        final android.content.SharedPreferences speedPrefs415=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        final String quickPref415="orivra_quick_wake_415";
+        final String samplePref415="orivra_safe_sample_415";
+        Button quickButton415=new Button(this);
+        quickButton415.setAllCaps(false);
+        quickButton415.setText("Quick prediction recovery: "+
+                (speedPrefs415.getBoolean(quickPref415,true)?"ON":"OFF"));
+        quickButton415.setOnClickListener(v->{
+            boolean next=!speedPrefs415.getBoolean(quickPref415,true);
+            speedPrefs415.edit().putBoolean(quickPref415,next).apply();
+            quickButton415.setText("Quick prediction recovery: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,"Reopen keyboard to apply",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(quickButton415);
+        Button sampleButton415=new Button(this);
+        sampleButton415.setAllCaps(false);
+        sampleButton415.setText("Safe composing editor sample: "+
+                (speedPrefs415.getBoolean(samplePref415,true)?"ON":"OFF"));
+        sampleButton415.setOnClickListener(v->{
+            boolean next=!speedPrefs415.getBoolean(samplePref415,true);
+            speedPrefs415.edit().putBoolean(samplePref415,next).apply();
+            sampleButton415.setText("Safe composing editor sample: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,"Reopen keyboard to apply",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(sampleButton415);
+
         TextView auditHelp411=new TextView(this);
         auditHelp411.setText("\nBUILD 411 • Local performance audit (OFF by default). "+
                 "Measures letter, Space, Backspace, suggestion processing, "+
@@ -415,6 +464,14 @@ public final class MainActivity extends Activity {
                     " | Deferred idle word: "+
                             currentFeedback411.getBoolean(
                             "orivra_deferred_stable_word_414",true)+
+                    " | Quick wake 145ms: "+
+                            currentFeedback411.getBoolean(
+                            "orivra_quick_wake_415",true)+
+                    " | Safe editor sample: "+
+                            currentFeedback411.getBoolean(
+                            "orivra_safe_sample_415",true)+
+                    " | Haptics: "+currentFeedback411.getBoolean(
+                            "orivra_haptic_enabled",true)+
                     " | Theme: "+AppPalette.modeName(theme411);
             return OrivraPerfAudit411.report(settings411);
         };
@@ -490,7 +547,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra 414 Live Test keyboard");
+        picker.setText("2. Choose Orivra 415 Speed Test keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
