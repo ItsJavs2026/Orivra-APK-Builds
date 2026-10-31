@@ -4543,8 +4543,14 @@ public final class RebornImeService extends InputMethodService {
         if(splitActive) {
             if(!input.equals(splitSnapshot340)) {
                 splitSnapshot340=input;
-                splitPhrasesCache340=PredictionLite.splitPhraseSuggestions(input);
-                splitNextCache340=PredictionLite.splitNextWords(input);
+                final long splitStart411=OrivraPerfAudit411.begin();
+                try {
+                    splitPhrasesCache340=PredictionLite.splitPhraseSuggestions(input);
+                    splitNextCache340=PredictionLite.splitNextWords(input);
+                } finally {
+                    OrivraPerfAudit411.end(OrivraPerfAudit411.SPLIT_ON_UI,
+                            splitStart411);
+                }
             }
             splitPhrases=splitPhrasesCache340;
             splitNextWords=splitNextCache340;
@@ -4726,6 +4732,8 @@ public final class RebornImeService extends InputMethodService {
                 candidates.setTag(cellSignature);
             }
         }
+        final long chipStart411=OrivraPerfAudit411.begin();
+        try {
         for (int i=0;i<shownCount;i++) {
             String rawSuggestion344=stableWord344?
                     PredictionStripFrame344.slotValue(options,i):options.get(i);
@@ -4859,6 +4867,9 @@ public final class RebornImeService extends InputMethodService {
                 divider.setMargins(dp(3),0,dp(3),0);
                 candidates.addView(separator,divider);
             }
+        }
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.CHIP_BIND,chipStart411);
         }
     
         } finally {
