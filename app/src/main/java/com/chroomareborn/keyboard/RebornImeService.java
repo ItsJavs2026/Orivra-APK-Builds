@@ -2659,9 +2659,12 @@ public final class RebornImeService extends InputMethodService {
                                     !rowSwipe386[0].move(primaryPointer[0],x,y))
                                 rowSwipe386[0].cancel();
                             else if(rowSwipe386[0].preview()!=
-                                    LetterRowPredictionSwipe386.Direction.NONE)
-                                // A deliberate gesture must not accidentally
-                                // become a 320ms secondary-symbol hold.
+                                    LetterRowPredictionSwipe386.Direction.NONE ||
+                                    rowSwipe386[0].earlyDownIntent(
+                                            primaryPointer[0],x,y))
+                                // Research 400: a slow DOWN can spend time
+                                // between 12dp intent and 32dp recognition.
+                                // Prevent long-press hint from stealing it.
                                 suggestionHandler.removeCallbacks(hold);
                         }
                         if(fatThumbDrift378)
