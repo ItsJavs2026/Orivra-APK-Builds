@@ -4191,7 +4191,7 @@ public final class RebornImeService extends InputMethodService {
                         predictionDispatcher.scheduleEditing(cursorWord,(id,input,options)->{
                             final long computedAt=startedAt==0L?0L:System.nanoTime();
                             suggestionHandler.post(()->{
-                if(pendingIdlePaint410())return;
+                                if(pendingIdlePaint410())return;
                                 if(!predictionDispatcher.isCurrent(id) ||
                                         candidates==null || sensitive ||
                                         !editorAllowsSuggestions || !composing.isEmpty() ||
@@ -4237,7 +4237,7 @@ public final class RebornImeService extends InputMethodService {
                 predictionDispatcher.scheduleEditing(word,(id,input,options)->{
                     final long computedAt=startedAt==0L?0L:System.nanoTime();
                     suggestionHandler.post(()->{
-                if(pendingIdlePaint410())return;
+                        if(pendingIdlePaint410())return;
                         if(!predictionDispatcher.isCurrent(id)||sensitive||!composing.isEmpty()
                                 ||!input.equals(wordAtCursor())
                                 ||!isEditingTicketCurrent(editTicket))return;
