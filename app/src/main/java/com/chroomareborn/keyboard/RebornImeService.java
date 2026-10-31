@@ -340,6 +340,17 @@ public final class RebornImeService extends InputMethodService {
     private static final String HAPTIC_PREF = "orivra_haptic_enabled";
     // 1=Light, 2=Standard, 3=Crisp. 0 is handled by the existing on/off preference.
     private static final String HAPTIC_STYLE_PREF = "orivra_haptic_style";
+    // 415: cache haptic preference lookups at editor activation, not on each
+    // ACTION_DOWN. Reopening a field applies the user's ON/OFF comparison.
+    private boolean hapticEnabledCached415=true;
+    private int hapticStyleCached415=KeyboardHapticStyle.STANDARD;
+    private void reloadHaptics415(
+            android.content.SharedPreferences feedback) {
+        hapticEnabledCached415=feedback.getBoolean(HAPTIC_PREF,true);
+        hapticStyleCached415=KeyboardHapticStyle.normalize(
+                feedback.getInt(HAPTIC_STYLE_PREF,
+                        KeyboardHapticStyle.STANDARD));
+    }
     private static final String ANIMATION_PREF = "sentenceflow_rise_ms";
     private long lastTypingTime=0L;
     private double averageTypingInterval=0;
@@ -364,23 +375,27 @@ public final class RebornImeService extends InputMethodService {
         return mode;
     }
     private boolean hapticsEnabled() {
-        return getSharedPreferences("keyboard_feedback", MODE_PRIVATE).getBoolean(HAPTIC_PREF, true);
+        return hapticEnabledCached415;
     }
     private int hapticStyle() {
-        int style=getSharedPreferences("keyboard_feedback", MODE_PRIVATE)
-                .getInt(HAPTIC_STYLE_PREF,KeyboardHapticStyle.STANDARD);
-        return style>=KeyboardHapticStyle.LIGHT && style<=KeyboardHapticStyle.CRISP ?
-                style:KeyboardHapticStyle.STANDARD;
+        return hapticStyleCached415;
     }
     private void keyHaptic(View view) {
-        if(view==null || !hapticsEnabled())return;
-        // Use Android's system-tuned haptics rather than VIBRATE permission.
-        // Actual strength is device-dependent and respects system settings.
-        final int effect=hapticStyle()==1 ? HapticFeedbackConstants.CLOCK_TICK :
-                hapticStyle()==3 && Build.VERSION.SDK_INT>=30 ?
-                        HapticFeedbackConstants.CONFIRM :
-                        HapticFeedbackConstants.KEYBOARD_TAP;
-        view.performHapticFeedback(effect);
+        final long hapticStart415=OrivraPerfAudit411.begin();
+        try {
+            if(view==null || !hapticsEnabled())return;
+            // Use Android system-tuned haptics; avoid preference IPC on
+            // touch-down. Cached mode is loaded at each editor activation.
+            final int style=hapticStyle();
+            final int effect=style==1 ? HapticFeedbackConstants.CLOCK_TICK :
+                    style==3 && Build.VERSION.SDK_INT>=30 ?
+                            HapticFeedbackConstants.CONFIRM :
+                            HapticFeedbackConstants.KEYBOARD_TAP;
+            view.performHapticFeedback(effect);
+        } finally {
+            OrivraPerfAudit411.end(
+                    OrivraPerfAudit411.HAPTIC_TOUCH_415,hapticStart415);
+        }
     }
     private int currentRowHeightDp=72;
     // Candidate 329 research: one completed-word observation per stable
@@ -824,6 +839,17 @@ public final class RebornImeService extends InputMethodService {
     // This small gate retains only a temporary editor reference/session,
     // never typed text. Direct touches still use existing InputConnection.
     private final TypingRefreshGate401 typingRefresh401=new TypingRefreshGate401();
+    // 415: faster post-burst suggestions and safe editor sample skipping
+    // are independent, reversible trial switches.
+    private static final String QUICK_WAKE_PREF_415="orivra_quick_wake_415";
+    private static final String SAFE_SAMPLE_PREF_415="orivra_safe_sample_415";
+    private boolean quickPredictionWake415=true;
+    private boolean safeEditorSample415=true;
+    private void applyFastQuietPolicy415() {
+        idlePredictionPaint410.setQuietAfterKeyMs(
+                quickPredictionWake415?145L:
+                        IdlePredictionPaint410.QUIET_AFTER_KEY_MS);
+    }
     // A/B gate for 414's low-IPC stable-word observer (default ON).
     private static final String DEFER_STABLE_WORD_PREF_414=
             "orivra_deferred_stable_word_414";
@@ -2077,6 +2103,12 @@ public final class RebornImeService extends InputMethodService {
                 CALM_PREDICTIONS_PREF_408,true);
         idlePredictionPaintEnabled410=visualOptions370.getBoolean(
                 IDLE_PAINT_PREF_410,true);
+        quickPredictionWake415=visualOptions370.getBoolean(
+                QUICK_WAKE_PREF_415,true);
+        safeEditorSample415=visualOptions370.getBoolean(
+                SAFE_SAMPLE_PREF_415,true);
+        applyFastQuietPolicy415();
+        reloadHaptics415(visualOptions370);
         frameUpdatesEnabled412=visualOptions370.getBoolean(
                 FRAME_PREF_412,true);
         deferredStableWord414=visualOptions370.getBoolean(
@@ -2143,6 +2175,12 @@ public final class RebornImeService extends InputMethodService {
                 getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
         idlePredictionPaintEnabled410=fullOptions411.getBoolean(
                 IDLE_PAINT_PREF_410,true);
+        quickPredictionWake415=fullOptions411.getBoolean(
+                QUICK_WAKE_PREF_415,true);
+        safeEditorSample415=fullOptions411.getBoolean(
+                SAFE_SAMPLE_PREF_415,true);
+        applyFastQuietPolicy415();
+        reloadHaptics415(fullOptions411);
         riseEnabled411=fullOptions411.getBoolean(RISE_ENABLED_PREF_411,true);
         frameUpdatesEnabled412=fullOptions411.getBoolean(FRAME_PREF_412,true);
         deferredStableWord414=fullOptions411.getBoolean(
@@ -3343,14 +3381,26 @@ public final class RebornImeService extends InputMethodService {
         clearPendingCaretInsert364();
         // Reuse this existing punctuation sample for cursor recovery; do
         // NOT add an editor IPC or dictionary read to the key's hot path.
-        final long readStart413=OrivraPerfAudit411.begin();
         final CharSequence beforeKey360;
-        try {
-            beforeKey360=ic.getTextBeforeCursor(1,0);
-        } finally {
-            OrivraPerfAudit411.end(
-                    OrivraPerfAudit411.KEY_INITIAL_EDITOR_READ_413,
-                    readStart413);
+        if(safeEditorSample415 &&
+                FastKeySample415.skipInitialBeforeRead(
+                        composing,value,editingInMiddle,hasSelection(),
+                        sensitive,numericEditor,symbols,
+                        editorAllowsSuggestions)) {
+            // Only ongoing ordinary composed letters skip this redundant
+            // punctuation sample. ComposingMutation340 still validates the
+            // actual editor text before changing it. At a word boundary,
+            // punctuation or selection, preserve the original read.
+            beforeKey360="";
+        } else {
+            final long readStart413=OrivraPerfAudit411.begin();
+            try {
+                beforeKey360=ic.getTextBeforeCursor(1,0);
+            } finally {
+                OrivraPerfAudit411.end(
+                        OrivraPerfAudit411.KEY_INITIAL_EDITOR_READ_413,
+                        readStart413);
+            }
         }
         prepareCursorEdit(ic);
         boolean insertLeftBoundary364=false;
@@ -3644,7 +3694,10 @@ public final class RebornImeService extends InputMethodService {
             showSuggestions();
         // The previous per-repeat refresh recreated every key ~15 times/sec.
         // Preserve the live backspace touch target until release.
-        if(!deleteHeld && oldShift!=shift)refreshView();
+        if(!deleteHeld && oldShift!=shift) {
+            if(!symbols && !numericEditor)refreshShiftCase398();
+            else refreshView();
+        }
     
         } finally {
             OrivraPerfAudit411.end(OrivraPerfAudit411.BACKSPACE,auditStart411);
