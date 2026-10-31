@@ -1,0 +1,54 @@
+name: Orivra Research 382 - deferred editor mutation order (no APK)
+on:
+  push:
+    branches:
+      - research/build382-deferred-editor-action-order-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research382
+  cancel-in-progress: true
+jobs:
+  pure-java-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Protect installed Candidate 378 and no APK changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='daa12b44f0c65972de505c30dfbe16201bad2f8b'
+          changed=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          expected={
+              'app/src/testsupport/java/com/chroomareborn/keyboard/DeferredEditorOrder382Research.java',
+              'docs/RESEARCH382_DEFERRED_EDITOR_ACTION_ORDER_20261030.md',
+              '.github/workflows/research382-deferred-action-order.yml',
+          }
+          assert changed==expected,(changed,expected)
+          assert 'MixedThumbOrder380' not in Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build378trial"' in Path('app/build.gradle.kts').read_text()
+          assert 'versionCode = 378' in Path('app/build.gradle.kts').read_text()
+          print('PASS: synthetic research only; no production, APK or signing changes')
+          PY
+      - name: Compile and verify deferred mutation sequencing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deferred382"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/deferred382" \
+            app/src/main/java/com/chroomareborn/keyboard/MixedThumbOrder380.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/DeferredEditorOrder382Research.java
+          java -cp "$RUNNER_TEMP/deferred382" \
+            com.chroomareborn.keyboard.DeferredEditorOrder382Research
