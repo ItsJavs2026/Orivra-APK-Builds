@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build409isolationtrial"
+        applicationId = "com.chroomareborn.keyboard.build410idletrial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 409
-        versionName = "1.0.63-build409-prediction-isolation"
-        manifestPlaceholders["appLabel"] = "Orivra 409 Isolation Test"
+        versionCode = 410
+        versionName = "1.0.64-build410-idle-paint"
+        manifestPlaceholders["appLabel"] = "Orivra 410 Idle Test"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra 409 Isolation Test"
+            manifestPlaceholders["appLabel"] = "Orivra 410 Idle Test"
         }
     }
     compileOptions {
