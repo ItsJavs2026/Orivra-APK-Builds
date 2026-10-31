@@ -88,6 +88,11 @@ public final class RebornImeService extends InputMethodService {
     private List<String> latestOptions=java.util.Collections.emptyList();
     private boolean predictionSwipeEnabled372=true;
     private boolean spaceAcceptEnabled372=true;
+    // Research 386: independent letter-row prediction swipe, default OFF.
+    // Normal letter, two-thumb and special-symbol handlers stay unchanged
+    // when this experiment is disabled.
+    private int letterRowSwipeMode386=LetterRowPredictionSwipe386.OFF;
+    private long alphabetDownSerial386=0L;
     // Transient, current-editor-only highlighted correction and gesture.
     private String highlightedExpected372;
     private String highlightedCandidate372;
@@ -1740,6 +1745,7 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onStartInput(EditorInfo info, boolean restarting) {
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
+        alphabetDownSerial386++;
         clearPredictionTouch372();
         clearSpaceHighlight372();
         clearPendingCaretInsert364();
@@ -1789,6 +1795,9 @@ public final class RebornImeService extends InputMethodService {
                 PredictionSwipe372.PREF,true);
         spaceAcceptEnabled372=visualOptions370.getBoolean(
                 HighlightedSpace372.PREF,true);
+        letterRowSwipeMode386=LetterRowPredictionSwipe386.normalize(
+                visualOptions370.getInt(LetterRowPredictionSwipe386.PREF,
+                        LetterRowPredictionSwipe386.OFF));
         lastTypingTime=0L;
         averageTypingInterval=0;
         predictionsExpanded=false;
@@ -2329,7 +2338,8 @@ public final class RebornImeService extends InputMethodService {
                     String hint=KeyboardLayoutSpec.longPressHint(index,col);
                     addHintLetterKey(row,visible,value,hint,
                             wideEdgeLetters378?
-                              EdgeKeyWeights378.weight(index,col,rows[index].length()):1f);
+                              EdgeKeyWeights378.weight(index,col,rows[index].length()):1f,
+                            index);
                 } else addKey(row,visible,1f,()->type(value));
             }
             if (index == 2) {
@@ -2432,7 +2442,8 @@ public final class RebornImeService extends InputMethodService {
     // Read once on editor focus. Never resize active key targets mid-gesture.
     private boolean fatThumbDrift378=true;
     private boolean wideEdgeLetters378=true;
-    private void addHintLetterKey(LinearLayout row,String visible,String letter,String hint,float cellWeight) {
+    private void addHintLetterKey(LinearLayout row,String visible,String letter,String hint,
+            float cellWeight,int rowIndex386) {
         Button key=addKey(row,visible,cellWeight,()->type(letter));
         LinearLayout.LayoutParams cellParams=(LinearLayout.LayoutParams)key.getLayoutParams();
         row.removeView(key);
@@ -2460,6 +2471,11 @@ public final class RebornImeService extends InputMethodService {
         final int[] primaryPointer={-1};
         final ThumbTapGuard377[] touchGuard378={null};
         final InputConnection[] pressEditor={null};
+        final LetterRowPredictionSwipe386[] rowSwipe386={null};
+        final String[] rowExpected386={null};
+        final java.util.List<String>[] rowOptions386=new java.util.List[]{null};
+        final long[] rowDownSerial386={-1L};
+        final int[] rowSelectionStart386={-1},rowSelectionEnd386={-1};
         final Runnable hold=()->{
             if(!cancelled[0] && pressToken[0]>0 &&
                     key.isPressed() &&
@@ -2479,6 +2495,39 @@ public final class RebornImeService extends InputMethodService {
                     primaryPointer[0]=event.getPointerId(0);
                     pressEditor[0]=getCurrentInputConnection();
                     pressSession[0]=inputSessionGeneration;
+                    final boolean existingLetterPress386=
+                            hintPressOrder353.hasOpenPresses();
+                    alphabetDownSerial386++;
+                    rowDownSerial386[0]=alphabetDownSerial386;
+                    rowSwipe386[0]=null;
+                    rowExpected386[0]=null;
+                    rowOptions386[0]=null;
+                    if(LetterRowPredictionSwipe386.enabledForRow(
+                            letterRowSwipeMode386,rowIndex386) &&
+                            !existingLetterPress386 && !sensitive &&
+                            !symbols && !numericEditor &&
+                            editorAllowsSuggestions && !hasSelection() &&
+                            !spacebarTouchActive && !backspaceTouchActive &&
+                            pressEditor[0]!=null && !latestSnapshot.isEmpty() &&
+                            latestSnapshot.equals(composing)) {
+                        java.util.List<String> live=visiblePredictionOptions372(false);
+                        if(LetterRowPredictionSwipe386.chosen(
+                                LetterRowPredictionSwipe386.Direction.LEFT,live)!=null ||
+                                LetterRowPredictionSwipe386.chosen(
+                                LetterRowPredictionSwipe386.Direction.RIGHT,live)!=null) {
+                            try {
+                                rowSwipe386[0]=new LetterRowPredictionSwipe386(
+                                        primaryPointer[0],event.getX(0),event.getY(0),
+                                        getResources().getDisplayMetrics().density);
+                                rowExpected386[0]=latestSnapshot;
+                                rowOptions386[0]=live;
+                                rowSelectionStart386[0]=lastSelectionStart;
+                                rowSelectionEnd386[0]=lastSelectionEnd;
+                            } catch(IllegalArgumentException malformed) {
+                                rowSwipe386[0]=null;
+                            }
+                        }
+                    }
                     pressToken[0]=hintPressOrder353.begin();
                     touchGuard378[0]=null;
                     if(fatThumbDrift378) {
@@ -2505,6 +2554,11 @@ public final class RebornImeService extends InputMethodService {
                     boolean rejected=index<0;
                     if(!rejected) {
                         float x=event.getX(index),y=event.getY(index);
+                        if(rowSwipe386[0]!=null &&
+                                (triggered[0] ||
+                                rowDownSerial386[0]!=alphabetDownSerial386 ||
+                                !rowSwipe386[0].move(primaryPointer[0],x,y)))
+                            rowSwipe386[0].cancel();
                         if(fatThumbDrift378)
                             rejected=touchGuard378[0]==null ||
                                     !touchGuard378[0].move(primaryPointer[0],x,y);
@@ -2521,13 +2575,68 @@ public final class RebornImeService extends InputMethodService {
                     return true;
                 }
                 case MotionEvent.ACTION_POINTER_DOWN:
+                    if(rowSwipe386[0]!=null)rowSwipe386[0].cancel();
                     return true;
                 case MotionEvent.ACTION_POINTER_UP:
                     if(event.getPointerId(event.getActionIndex())!=
-                            primaryPointer[0])return true;
+                            primaryPointer[0]){
+                        if(rowSwipe386[0]!=null)rowSwipe386[0].cancel();
+                        return true;
+                    }
                     // Primary lifted while another pointer remains; resolve
                     // this key exactly as a normal ACTION_UP.
                 case MotionEvent.ACTION_UP: {
+                    LetterRowPredictionSwipe386.Direction rowDirection386=
+                            LetterRowPredictionSwipe386.Direction.NONE;
+                    if(rowSwipe386[0]!=null && !triggered[0] &&
+                            rowDownSerial386[0]==alphabetDownSerial386) {
+                        int at=event.findPointerIndex(primaryPointer[0]);
+                        if(at>=0)
+                            rowDirection386=rowSwipe386[0].release(
+                                    primaryPointer[0],event.getX(at),event.getY(at));
+                    }
+                    final String selectedRow386=
+                            LetterRowPredictionSwipe386.chosen(
+                                    rowDirection386,rowOptions386[0]);
+                    if(selectedRow386!=null && pressEditor[0]!=null) {
+                        // A deliberate letter-row swipe consumes the starting
+                        // letter; never type both the letter and correction.
+                        suggestionHandler.removeCallbacks(hold);
+                        key.setPressed(false);
+                        animateKeyPress(key,false);
+                        final long token386=pressToken[0];
+                        pressToken[0]=-1L;
+                        hintPressOrder353.cancel(token386);
+                        final InputConnection editor386=pressEditor[0];
+                        final long session386=pressSession[0];
+                        final String expected386=rowExpected386[0];
+                        final int start386=rowSelectionStart386[0];
+                        final int end386=rowSelectionEnd386[0];
+                        rowSwipe386[0]=null;
+                        requestRefreshAfterHint353();
+                        suggestionHandler.post(()->{
+                            if(editor386!=getCurrentInputConnection() ||
+                                    session386!=inputSessionGeneration ||
+                                    rowDownSerial386[0]!=alphabetDownSerial386)
+                                return;
+                            String live386=composing.isEmpty()?wordAtCursor():composing;
+                            boolean valid386=PredictionSwipe372.safeRelease(
+                                    expected386,live386,true,true,
+                                    start386==lastSelectionStart &&
+                                            end386==lastSelectionEnd,
+                                    sensitive,editorAllowsSuggestions,numericEditor,
+                                    hasSelection(),symbols,
+                                    !hintPressOrder353.hasOpenPresses() &&
+                                    !spacebarTouchActive && !backspaceTouchActive);
+                            if(!valid386)return;
+                            java.util.List<String> now386=visiblePredictionOptions372(false);
+                            String choice386=LetterRowPredictionSwipe386.chosen(
+                                    rowDirection386,now386);
+                            if(selectedRow386.equals(choice386))
+                                acceptSuggestion(key,expected386,selectedRow386);
+                        });
+                        return true;
+                    }
                     if(fatThumbDrift378 && !cancelled[0]) {
                         int index=event.findPointerIndex(primaryPointer[0]);
                         if(index<0 || touchGuard378[0]==null ||
@@ -2536,6 +2645,7 @@ public final class RebornImeService extends InputMethodService {
                             cancelled[0]=true;
                     }
                     touchGuard378[0]=null;
+                    rowSwipe386[0]=null;
                     suggestionHandler.removeCallbacks(hold);
                     key.setPressed(false);
                     animateKeyPress(key,false);
@@ -2563,6 +2673,8 @@ public final class RebornImeService extends InputMethodService {
                 case MotionEvent.ACTION_CANCEL:
                     suggestionHandler.removeCallbacks(hold);
                     cancelled[0]=true;
+                    if(rowSwipe386[0]!=null)rowSwipe386[0].cancel();
+                    rowSwipe386[0]=null;
                     if(touchGuard378[0]!=null)touchGuard378[0].cancel();
                     touchGuard378[0]=null;
                     key.setPressed(false);

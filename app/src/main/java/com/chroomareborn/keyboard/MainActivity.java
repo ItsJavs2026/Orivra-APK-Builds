@@ -291,6 +291,33 @@ public final class MainActivity extends Activity {
         });
         root.addView(swipePredictions372);
 
+        TextView actualLetterSwipe386=new TextView(this);
+        actualLetterSwipe386.setText("\nPrediction swipes on LETTER KEYS (experimental)\n"+
+                "Swipe left/right directly over QWERTY or ASDF keys to "+
+                "select a visible prediction. A deliberate swipe replaces "+
+                "the starting letter; quick taps still type normally. "+
+                "Independent of the prediction-strip gesture setting. "+
+                "This is not glide-to-spell typing.");
+        actualLetterSwipe386.setTextSize(15);
+        actualLetterSwipe386.setTextColor(0xFF303846);
+        root.addView(actualLetterSwipe386);
+        Button rowSwipeMode386=new Button(this);
+        rowSwipeMode386.setAllCaps(false);
+        rowSwipeMode386.setText("Swipe predictions from letter rows: "+
+                LetterRowPredictionSwipe386.label(feedback.getInt(
+                        LetterRowPredictionSwipe386.PREF,0)));
+        rowSwipeMode386.setOnClickListener(v->{
+            int mode=LetterRowPredictionSwipe386.next(
+                    feedback.getInt(LetterRowPredictionSwipe386.PREF,0));
+            feedback.edit().putInt(LetterRowPredictionSwipe386.PREF,mode).apply();
+            rowSwipeMode386.setText("Swipe predictions from letter rows: "+
+                    LetterRowPredictionSwipe386.label(mode));
+            android.widget.Toast.makeText(this,
+                    "Reopen a text field to change the letter-row swipe mode",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(rowSwipeMode386);
+
         Button spaceCorrection372=new Button(this);
         spaceCorrection372.setAllCaps(false);
         spaceCorrection372.setText("Space accepts highlighted correction: "+
