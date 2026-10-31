@@ -20,6 +20,10 @@ final class CandidateLatencyMetrics {
     private static final long[] keyHandler340=new long[CAPACITY];
     private static final long[] deferredUi401=new long[CAPACITY];
     private static int readySamples, frameSamples, keySamples340,deferredSamples401;
+    // Sampling once per 16 keys avoids creating a memory profiler that
+    // itself slows typing. Counts only; no text, timestamps or app identity.
+    private static int heapSamples401;
+    private static long lastJavaHeap401,peakJavaHeap401;
     private static boolean enabled;
 
     static boolean isCandidate(String packageName) {
@@ -47,6 +51,9 @@ final class CandidateLatencyMetrics {
         frameSamples=0;
         keySamples340=0;
         deferredSamples401=0;
+        heapSamples401=0;
+        lastJavaHeap401=0L;
+        peakJavaHeap401=0L;
     }
     static synchronized long start(String packageName) {
         return enabled(packageName)?System.nanoTime():0L;
@@ -71,6 +78,13 @@ final class CandidateLatencyMetrics {
                 end-start>MAX_DURATION_NANOS)return;
         keyHandler340[keySamples340%CAPACITY]=end-start;
         keySamples340++;
+        if(keySamples340%16==0) {
+            Runtime rt=Runtime.getRuntime();
+            long used=Math.max(0L,rt.totalMemory()-rt.freeMemory());
+            lastJavaHeap401=used;
+            peakJavaHeap401=Math.max(peakJavaHeap401,used);
+            heapSamples401++;
+        }
     }
     /** One coalesced suggestion refresh, numeric duration only, not editor text. */
     static synchronized void recordDeferredUi401(long start,long end) {
@@ -96,6 +110,21 @@ final class CandidateLatencyMetrics {
         return String.format(Locale.US,"n=%d, median %.1f ms, p95 %.1f ms, max %.1f ms",
                 count,median,p95,max);
     }
+    private static String memoryStatus401() {
+        Runtime rt=Runtime.getRuntime();
+        long used=Math.max(0L,rt.totalMemory()-rt.freeMemory());
+        long peak=Math.max(peakJavaHeap401,used);
+        long nativeBytes=android.os.Debug.getNativeHeapAllocatedSize();
+        return String.format(Locale.US,
+                "Java heap now: %.1f MB (max %.1f MB)\\n"+
+                "Java heap peak sampled: %.1f MB (n=%d, every 16 key events)\\n"+
+                "Native heap allocated now: %.1f MB\\n"+
+                "Heap size changes do not by themselves prove a memory leak.\\n",
+                used/(1024.0*1024.0),
+                rt.maxMemory()/(1024.0*1024.0),
+                peak/(1024.0*1024.0),
+                heapSamples401,nativeBytes/(1024.0*1024.0));
+    }
     static synchronized String summary(String packageName) {
         if(!isCandidate(packageName))
             return "Diagnostics unavailable: only the separate Orivra Candidate may record timings.";
@@ -108,6 +137,7 @@ final class CandidateLatencyMetrics {
                 +"Typed-key UI work: "+stats(keyHandler340,keySamples340)+"\n"
                 +"Deferred suggestion UI work: "+
                     stats(deferredUi401,deferredSamples401)+"\n"
+                +memoryStatus401()
                 +"Includes the 40 ms prediction debounce. "
                 +"The animation callback is before frame rendering, "
                 +"not proof that pixels reached the screen.\n"
