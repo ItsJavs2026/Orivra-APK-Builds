@@ -100,5 +100,5 @@ jobs:
                   errors+=int(suite.attrib.get('errors','0'))
                   skips+=int(suite.attrib.get('skipped','0'))
           print(f'Android emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
-          assert tests>=241 and failures==0 and errors==0 and skips==0
+          assert tests>=242 and failures==0 and errors==0 and skips==0
           PY

@@ -141,10 +141,12 @@ public final class MixedLetterSpace381AndroidTest {
                     (1<<MotionEvent.ACTION_POINTER_INDEX_SHIFT),
                     new int[]{1,0},new float[]{340,40});
         }
-        boolean releaseSpaceFirst(){
+        boolean releaseSpaceFirst(){return releaseSpaceFirst(40f);}
+        // Never teleport a still-held thumb when the OTHER thumb lifts.
+        boolean releaseSpaceFirst(float letterX){
             return send(MotionEvent.ACTION_POINTER_UP|
                     (1<<MotionEvent.ACTION_POINTER_INDEX_SHIFT),
-                    new int[]{0,1},new float[]{40,340});
+                    new int[]{0,1},new float[]{letterX,340});
         }
         boolean releaseLetterFirst(){
             return send(MotionEvent.ACTION_POINTER_UP,new int[]{0,1},
@@ -224,11 +226,33 @@ public final class MixedLetterSpace381AndroidTest {
                     (1<<MotionEvent.ACTION_POINTER_INDEX_SHIFT),
                     new int[]{0,1},new float[]{190,340}));
             assertTrue(h.send(MotionEvent.ACTION_MOVE,new int[]{0,1},new float[]{211,340}));
-            assertTrue(h.releaseSpaceFirst());
+            assertTrue(h.releaseSpaceFirst(211f));
             assertTrue(h.send(MotionEvent.ACTION_UP,new int[]{0},new float[]{211}));
             assertEquals("a ",h.output.toString());
         });
     }
+    @Test public void largeSlideThenReturnCannotResurrectOriginalLetter(){
+        ui(()->{
+            Harness h=new Harness();
+            assertTrue(h.send(MotionEvent.ACTION_DOWN,
+                    new int[]{0},new float[]{190}));
+            assertTrue(h.send(MotionEvent.ACTION_POINTER_DOWN|
+                    (1<<MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+                    new int[]{0,1},new float[]{190,340}));
+            // The original letter exits its conservative travel threshold.
+            assertTrue(h.send(MotionEvent.ACTION_MOVE,
+                    new int[]{0,1},new float[]{260,340}));
+            assertTrue(h.send(MotionEvent.ACTION_MOVE,
+                    new int[]{0,1},new float[]{190,340}));
+            assertTrue(h.releaseSpaceFirst(190f));
+            assertTrue(h.send(MotionEvent.ACTION_UP,
+                    new int[]{0},new float[]{190}));
+            // Space remains valid, but the canceled letter never returns.
+            assertEquals(" ",h.output.toString());
+            assertFalse(h.order.hasOpenPresses());
+        });
+    }
+
     @Test public void oldSessionActionsNeverReachFakeEditor(){
         ui(()->{
             Harness h=new Harness();
