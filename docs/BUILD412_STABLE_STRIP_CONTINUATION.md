@@ -32,7 +32,7 @@ These are subjective device test reports, not instrumented timings.
 ## Engineering verification and limits
 - Source-file inspection confirms no remaining synchronous PredictionLite.splitPhraseSuggestions(input) call in RebornImeService renderSuggestions. The helper now runs on the prediction worker.
 - Checked balanced Java braces/comments/string syntax in changed main classes by a lightweight scanner; NOT a Java compiler check.
-- New pure-Java ChipActionBinding412Test defines six action identity checks; NOT yet run against Android build.
+- New pure-Java ChipActionBinding412Test defines six action identity checks; the equivalent local Java 17 standalone class and test compiled and passed 6 checks. This does NOT validate the Android APK.
 - The **full Android APK has not yet been compiled or installed on Samsung** at this checkpoint. Source changes may still expose compile/runtime issues. No reduction in keypress latency is claimed as verified.
 
 ## Phone-first build recipe
@@ -57,3 +57,7 @@ Expected APK: /storage/emulated/0/AndroidIDEProjects/Orivra412Strip/app/build/ou
 - If frame coalescing helps but chip binding still >16 ms, replace remaining non-word structural row rebuilds with a permanently mounted layout and true style diff; review high-frequency InputConnection IPC in render path.
 - If Rise OFF helps strongly, make the Rise panel update independently only on explicit user expansion and a confirmed new prediction batch; maintain swipe and one-tap behavior.
 - If no improvement, inspect timing report and Android perf trace; move personalized ranking/editor queries off the main thread where safe, measure allocation/GC and avoid throwing away the existing prediction engine.
+
+## Implementation follow-up
+- Latest setup screen text was revised to describe the new frame-based rendering, worker-side split calculation, preserved full settings and the user's exact 409/410 test results accurately.
+- Build 412 Android APK is still awaiting Samsung compilation; full Java/Android resources and runtime not yet verified. Do not claim performance fixed.
