@@ -47,6 +47,34 @@ public final class LetterRowPredictionSwipe386Research {
                 LetterRowPredictionSwipe386.Direction.DOWN,
                 Arrays.asList("there","the",""))),"no side fallback");
     }
+    private static void centerOnlyRegressions(){
+        List<String> single=Arrays.asList("","a","");
+        ok(LetterRowPredictionSwipe386.hasSelectable(single),
+                "Center-only suggestion must arm a letter-row gesture");
+        ok("a".equals(LetterRowPredictionSwipe386.chosen(
+                LetterRowPredictionSwipe386.Direction.DOWN,single)),
+                "DOWN must choose center-only word");
+        ok(!LetterRowPredictionSwipe386.hasSelectable(
+                Arrays.asList("","","")), "Empty strip fails closed");
+        ok(!LetterRowPredictionSwipe386.hasSelectable(null),
+                "Missing strip fails closed");
+        Random rng=new Random(38720261030L);
+        for(int i=0;i<30000;i++){
+            final String center=(i%4==0?"a":i%4==1?"I":i%4==2?"te":"t");
+            List<String> options=Arrays.asList("",center,"");
+            ok(LetterRowPredictionSwipe386.hasSelectable(options),
+                    "Center-only accepted for all short prefixes");
+            LetterRowPredictionSwipe386 g=
+                    new LetterRowPredictionSwipe386(i%11,100f,30f,1f);
+            int down=43+rng.nextInt(60);
+            ok(g.release(i%11,100f,30f+down)==
+                    LetterRowPredictionSwipe386.Direction.DOWN,
+                    "Explicit DOWN recognizes only-center");
+            ok(center.equals(LetterRowPredictionSwipe386.chosen(
+                    LetterRowPredictionSwipe386.Direction.DOWN,options)),
+                    "DOWN returns exact existing center slot");
+        }
+    }
     private static void directionalAndCancellation(){
         LetterRowPredictionSwipe386 down=new LetterRowPredictionSwipe386(2,30,20,1);
         ok(down.release(2,31,68)==LetterRowPredictionSwipe386.Direction.DOWN,
@@ -161,8 +189,9 @@ public final class LetterRowPredictionSwipe386Research {
         }
     }
     public static void main(String[] args){
-        modes();center();directionalAndCancellation();shortWords();randomized();
+        modes();center();centerOnlyRegressions();
+        directionalAndCancellation();shortWords();randomized();
         System.out.println("PASS LetterRowPredictionSwipe386 "+checks+
-                " assertions across 100000 gesture cases + small-word Space rules");
+                " assertions across 130000 gesture cases + center-only short-word Space rules");
     }
 }
