@@ -679,6 +679,23 @@ public final class MainActivity extends Activity {
         migration391.setTextColor(0xFF303846);
         root.addView(migration391);
 
+        // Research 392: no-write, no-network on-device V4 health summary.
+        TextView backupHealth392=new TextView(this);
+        backupHealth392.setText("\nBackup health: not checked. No individual learned words are displayed.");
+        backupHealth392.setTextColor(0xFF455263);
+        backupHealth392.setTextSize(15);
+        root.addView(backupHealth392);
+        Button checkBackupHealth392=new Button(this);
+        checkBackupHealth392.setAllCaps(false);
+        checkBackupHealth392.setText("Check saved learning health (read-only)");
+        checkBackupHealth392.setOnClickListener(v->learningTransferIo.execute(()->{
+            final String summary=LearningBackupSafety392.inspect(this).display();
+            runOnUiThread(()->{
+                if(!isFinishing()&&!isDestroyed())backupHealth392.setText(summary);
+            });
+        }));
+        root.addView(checkBackupHealth392);
+
         // Build 307 research: explicit user-selected backup, never automatic.
         TextView transferNotice=new TextView(this);
         transferNotice.setText("\nPortable learning backup (experimental)\n"
@@ -958,24 +975,31 @@ public final class MainActivity extends Activity {
             final boolean includeFrequencies=requestCode==REQUEST_EXPORT_FREQUENCY;
             final boolean unifiedV4=requestCode==REQUEST_EXPORT_UNIFIED_V4;
             learningTransferIo.execute(()->{
-                boolean saved=false;
-                try{
-                    String content=unifiedV4?
-                            TypedLearningV4Transfer347.exportV4(this):
-                            includeFrequencies?LearningTransferStore.exportV3(this):
-                            portable?LearningTransferStore.exportV2(this):
-                            LearningTransferStore.exportText(this);
-                    LearningTransferDocumentIO.write(this,selected,content);
-                    saved=true;
-                }catch(Exception invalidOrWriteFailed){
-                    // No raw words, document path or correction values are logged.
+                final String message;
+                if(unifiedV4){
+                    // Strict read-back of the user-selected URI after the V4
+                    // write; never call this from the IME/input thread.
+                    LearningBackupSafety392.ExportResult result=
+                            LearningBackupSafety392.exportAndVerify(this,selected);
+                    message=result.display();
+                }else{
+                    boolean saved=false;
+                    try{
+                        String content=includeFrequencies?
+                                LearningTransferStore.exportV3(this):
+                                portable?LearningTransferStore.exportV2(this):
+                                LearningTransferStore.exportText(this);
+                        LearningTransferDocumentIO.write(this,selected,content);
+                        saved=true;
+                    }catch(Exception invalidOrWriteFailed){
+                        // No raw words or document path are logged.
+                    }
+                    message=saved?"Learning backup saved to selected document.":
+                            "Backup could not be saved.";
                 }
-                final boolean success=saved;
                 runOnUiThread(()->{
                     if(isFinishing()||isDestroyed())return;
-                    android.widget.Toast.makeText(this,
-                            success?"Learning backup saved to selected document.":
-                                    "Backup could not be saved.",
+                    android.widget.Toast.makeText(this,message,
                             android.widget.Toast.LENGTH_LONG).show();
                 });
             });
