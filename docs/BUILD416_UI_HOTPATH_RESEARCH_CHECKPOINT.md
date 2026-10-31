@@ -10,7 +10,7 @@ Based on: `candidate/build415-fast-type-preview-recovery-20261031` at `b1edc3c43
 - The legacy private Chrooma-Reborn Alpha repository is **not** the correct modern source.
 
 ## Hard measurements from *Build 414*, not Build 415
-114? No: audit elapsed **1130s**, FULL prediction, Calm ON, Idle Paint ON, Rise ON, frame updates ON.
+Audit elapsed **1130s**, FULL prediction, Calm ON, Idle Paint ON, Rise ON, frame updates ON.
 - Letter: 296 keys; mean **3.55ms**; max **204.84ms**; 8/16/32ms exceedances 11/8/2.
 - Initial key editor read: mean **1.70ms**, max **202.37ms**.
 - Space: 8; mean **31.22ms**, max **55.54ms**.
