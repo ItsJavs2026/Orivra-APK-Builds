@@ -125,4 +125,30 @@ public final class AppIconColor366AndroidTest {
                     .putBoolean(AppPalette.KEY_MANUAL_DARK,manual).commit();
         }
     }
+    @Test public void iconHueCacheDropsWhenHiddenProcessNeedsMemory() {
+        Context ctx=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        String self=ctx.getPackageName();
+        AppIconHueCache366.request(ctx,self,null);
+        long deadline=SystemClock.elapsedRealtime()+10_000;
+        while(!AppIconHueCache366.cacheContainsForTest(self) &&
+                SystemClock.elapsedRealtime()<deadline)
+            SystemClock.sleep(30);
+        assertTrue("worker cache must eventually load",
+                AppIconHueCache366.cacheContainsForTest(self));
+        assertTrue(AppIconHueCache366.cacheSizeForTest()<=40);
+        AppIconHueCache366.trimMemory();
+        assertEquals("memory trim must drop optional metadata",0,
+                AppIconHueCache366.cacheSizeForTest());
+    }
+
+    @Test public void rapidAppChangesDoNotBuildUnboundedIconQueue() {
+        Context ctx=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        for(int i=0;i<300;i++) {
+            AppIconHueCache366.request(ctx,"com.example.orivra_unused_icon"+i,null);
+            assertTrue("No unbounded optional icon tasks",
+                    AppIconHueCache366.inFlightForTest()<=8);
+            assertTrue("Bounded color cache",AppIconHueCache366.cacheSizeForTest()<=40);
+        }
+    }
+
 }
