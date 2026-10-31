@@ -737,6 +737,9 @@ public final class RebornImeService extends InputMethodService {
     // until a genuine key-free interval. OFF/WORKER ONLY stay unchanged.
     private static final String IDLE_PAINT_PREF_410="orivra_idle_paint_410";
     private boolean idlePredictionPaintEnabled410=true;
+    // Build 411: separate Rise from the normal suggestion strip in FULL mode.
+    private static final String RISE_ENABLED_PREF_411="orivra_rise_enabled_411";
+    private boolean riseEnabled411=true;
     private final IdlePredictionPaint410 idlePredictionPaint410=
             new IdlePredictionPaint410();
     private boolean idlePaintActive410() {
@@ -1960,6 +1963,7 @@ public final class RebornImeService extends InputMethodService {
                 CALM_PREDICTIONS_PREF_408,true);
         idlePredictionPaintEnabled410=visualOptions370.getBoolean(
                 IDLE_PAINT_PREF_410,true);
+        riseEnabled411=visualOptions370.getBoolean(RISE_ENABLED_PREF_411,true);
         predictionIsolationMode409=PredictionIsolationMode409.normalize(
                 visualOptions370.getInt(PredictionIsolationMode409.PREF,
                         PredictionIsolationMode409.FULL));
@@ -2012,9 +2016,11 @@ public final class RebornImeService extends InputMethodService {
                 getSharedPreferences("keyboard_feedback",MODE_PRIVATE)
                         .getInt(PredictionIsolationMode409.PREF,
                                 PredictionIsolationMode409.FULL));
-        idlePredictionPaintEnabled410=getSharedPreferences(
-                "keyboard_feedback",MODE_PRIVATE)
-                        .getBoolean(IDLE_PAINT_PREF_410,true);
+        android.content.SharedPreferences fullOptions411=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        idlePredictionPaintEnabled410=fullOptions411.getBoolean(
+                IDLE_PAINT_PREF_410,true);
+        riseEnabled411=fullOptions411.getBoolean(RISE_ENABLED_PREF_411,true);
         if(predictionIsolationMode409==PredictionIsolationMode409.FULL)
             predictionDispatcher.warmPublicDictionary410();
         predictionDispatcher.cancel();
@@ -2391,6 +2397,30 @@ public final class RebornImeService extends InputMethodService {
         final long auditStart411=OrivraPerfAudit411.begin();
         try {
         if(predictionsToggle==null || expandedSuggestions==null)return;
+        // A/B diagnostic: preserve the ordinary three-chip suggestion row,
+        // but remove Rise panel updates/animations and associated layout work.
+        // A settings long-press on the arrow remains available.
+        if(!riseEnabled411) {
+            predictionsExpanded=false;
+            panelWasVisible=false;
+            if(expandedSuggestions.getVisibility()!=View.GONE ||
+                    expandedSuggestions.getChildCount()!=0) {
+                expandedSuggestions.animate().cancel();
+                expandedSuggestions.setAlpha(1f);
+                expandedSuggestions.setTranslationY(0f);
+                expandedSuggestions.setVisibility(View.GONE);
+                expandedSuggestions.removeAllViews();
+                riseRenderedSignature="";
+            }
+            if(!TextUtils.equals(predictionsToggle.getText(),"⌃"))
+                predictionsToggle.setText("⌃");
+            String description411="Rise disabled for performance comparison. "+
+                    "Hold for keyboard settings";
+            if(!TextUtils.equals(predictionsToggle.getContentDescription(),
+                    description411))
+                predictionsToggle.setContentDescription(description411);
+            return;
+        }
         // Preserve the expanded panel throughout a held backspace gesture.
         // Deletion still updates predictions; only panel motion is deferred.
         if(freezeRiseDuringDelete || riseChipPressed)return;
