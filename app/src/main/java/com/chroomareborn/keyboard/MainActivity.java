@@ -85,7 +85,7 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 415 Faster Typing + Prediction Recovery");
+        title.setText("Orivra — Build 416 Space Latency Trial");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
@@ -388,6 +388,37 @@ public final class MainActivity extends Activity {
         });
         root.addView(sampleButton415);
 
+        TextView spaceHelp416=new TextView(this);
+        spaceHelp416.setText("\nBUILD 416 • Experimental Space cursor/shift shortcut. "+
+                "Your 415 audit showed Space 18.09ms average, with 13.19ms "+
+                "in cursor/sentence state. OFF keeps the 415 behavior. "+
+                "ON skips one post-Space editor text read only after a "+
+                "normal composed letter-ending word, successful Space "+
+                "commit, and verified same editor/session without selection, "+
+                "trailing text, or cursor editing. Punctuation, capitals-lock, "+
+                "numeric/private fields and uncertain input still use "+
+                "the original live editor read. Toggle independently, reopen "+
+                "the keyboard, and compare both performance and capitalization.");
+        spaceHelp416.setTextSize(15);
+        spaceHelp416.setTextColor(0xFF303846);
+        root.addView(spaceHelp416);
+        final android.content.SharedPreferences spacePrefs416=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        final String spacePref416="orivra_fast_space_shift_416";
+        Button spaceButton416=new Button(this);
+        spaceButton416.setAllCaps(false);
+        spaceButton416.setText("Fast Space cursor/shift (experimental): "+
+                (spacePrefs416.getBoolean(spacePref416,false)?"ON":"OFF"));
+        spaceButton416.setOnClickListener(v->{
+            boolean next=!spacePrefs416.getBoolean(spacePref416,false);
+            spacePrefs416.edit().putBoolean(spacePref416,next).apply();
+            spaceButton416.setText("Fast Space cursor/shift (experimental): "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,"Reopen keyboard to apply",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(spaceButton416);
+
         TextView auditHelp411=new TextView(this);
         auditHelp411.setText("\nBUILD 411 • Local performance audit (OFF by default). "+
                 "Measures letter, Space, Backspace, suggestion processing, "+
@@ -470,6 +501,9 @@ public final class MainActivity extends Activity {
                     " | Safe editor sample: "+
                             currentFeedback411.getBoolean(
                             "orivra_safe_sample_415",true)+
+                    " | Fast Space shift 416: "+
+                            currentFeedback411.getBoolean(
+                            "orivra_fast_space_shift_416",false)+
                     " | Haptics: "+currentFeedback411.getBoolean(
                             "orivra_haptic_enabled",true)+
                     " | Theme: "+AppPalette.modeName(theme411);
