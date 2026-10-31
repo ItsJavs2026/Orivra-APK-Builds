@@ -116,10 +116,10 @@ final class CandidateLatencyMetrics {
         long peak=Math.max(peakJavaHeap401,used);
         long nativeBytes=android.os.Debug.getNativeHeapAllocatedSize();
         return String.format(Locale.US,
-                "Java heap now: %.1f MB (max %.1f MB)\\n"+
-                "Java heap peak sampled: %.1f MB (n=%d, every 16 key events)\\n"+
-                "Native heap allocated now: %.1f MB\\n"+
-                "Heap size changes do not by themselves prove a memory leak.\\n",
+                "Java heap now: %.1f MB (max %.1f MB)\n"+
+                "Java heap peak sampled: %.1f MB (n=%d, every 16 key events)\n"+
+                "Native heap allocated now: %.1f MB\n"+
+                "Heap size changes do not by themselves prove a memory leak.\n",
                 used/(1024.0*1024.0),
                 rt.maxMemory()/(1024.0*1024.0),
                 peak/(1024.0*1024.0),
@@ -138,7 +138,7 @@ final class CandidateLatencyMetrics {
                 +"Deferred suggestion UI work: "+
                     stats(deferredUi401,deferredSamples401)+"\n"
                 +memoryStatus401()
-                +"Includes the 40 ms prediction debounce. "
+                +"Prediction timing includes the 12-28 ms debounce. "
                 +"The animation callback is before frame rendering, "
                 +"not proof that pixels reached the screen.\n"
                 +"No text, suggestions, app names, or input history is saved.";
