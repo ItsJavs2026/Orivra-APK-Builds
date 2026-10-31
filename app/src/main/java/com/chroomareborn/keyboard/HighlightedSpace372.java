@@ -26,9 +26,9 @@ final class HighlightedSpace372 {
                 !visuallyEmphasized || !sameSession || !sameEditor ||
                 !suggestionsAllowed || sensitive || editingMiddle ||
                 selected || suffixPresent || numeric || symbols ||
-                splitNextWord || expected.length()<2 ||
+                splitNextWord || expected.length()<1 ||
                 expected.length()>30 || correction.length()>38 ||
-                correction.isEmpty() || !expected.matches("[A-Za-z']{2,30}") ||
+                correction.isEmpty() || !expected.matches("[A-Za-z']{1,30}") ||
                 !correction.matches("[A-Za-z']+(?: [A-Za-z']+)?"))
             return false;
         String raw=expected.replace("'","").toLowerCase(Locale.ROOT);
@@ -36,6 +36,16 @@ final class HighlightedSpace372 {
                 .toLowerCase(Locale.ROOT);
         if(raw.equals(candidate) && !correction.contains(" "))
             return false;
+        // A settled highlighted completion is a user-visible Space choice.
+        // Previously one character was unconditionally refused, and larger
+        // prefix completions from two/three letters failed edit distance.
+        // Only a one-word, literal prefix completion gains this exception.
+        // Multiword RISE phrases must still be explicitly tapped or swiped.
+        if(raw.length()<=3 && candidate.length()>raw.length() &&
+                candidate.length()<=24 &&
+                correction.matches("[A-Za-z]{2,24}") &&
+                candidate.startsWith(raw))
+            return true;
         if(Math.abs(raw.length()-candidate.length())>3)return false;
         // Ordinary one-word typos and a tightly matching joined-space fix.
         int distance=editDistance(raw,candidate);
