@@ -2009,6 +2009,7 @@ public final class RebornImeService extends InputMethodService {
             offlineNextWordSeed=null;
             offlineNextWordSeedLoadAttempted=false;
             closeOptionalDictionary();
+            AppIconHueCache366.trimMemory();
         }
     }
     @Override public void onUpdateSelection(int oldSelStart, int oldSelEnd,
