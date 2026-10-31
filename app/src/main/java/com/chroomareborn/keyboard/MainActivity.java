@@ -89,7 +89,7 @@ public final class MainActivity extends Activity {
 
         TextView notes = new TextView(this);
         notes.setText("\nBuild 408 — Calm Predictions (based on full Candidate 401)\n"+
-                "Restored from the full Orivra codebase, NOT the old Alpha 1.0 prototype. The current baseline preserves modern settings. Full 407 performance changes still require review and Samsung testing.\n"+
+                "Uses the complete Orivra settings and learning baseline, not the old Alpha 1.0 prototype. Calm prediction paint reduces repeated UI refreshes while you type and suppresses automatic suggestion panel expansion for uncertain text. It is experimental and needs Samsung testing.\n"+
                 "Targets the real S26 Ultra freezes reported in WhatsApp "+
                 "notification replies while music plays. Rapid letters and "+
                 "Space taps now share one bounded prediction-refresh window "+
