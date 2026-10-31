@@ -1,0 +1,58 @@
+name: Orivra Research 380 - mixed letter Space two-thumb sequencing (no APK)
+on:
+  push:
+    branches:
+      - research/build380-two-thumb-letter-space-order-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research380
+  cancel-in-progress: true
+jobs:
+  isolated-mixed-input-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify pure research does not modify production IME
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='1df1e3065e7fabe939633ec75dfdd42022481304'
+          actual=set(subprocess.check_output(
+              ['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          allowed={
+              'app/src/main/java/com/chroomareborn/keyboard/MixedThumbOrder380.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/MixedThumbOrder380Research.java',
+              'docs/RESEARCH380_LETTER_SPACE_TWO_THUMB_20261030.md',
+              '.github/workflows/research380-mixed-letter-space.yml',
+          }
+          assert actual==allowed, (actual,allowed)
+          service=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'MixedThumbOrder380' not in service
+          gradle=Path('app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build378trial"' in gradle
+          assert 'versionCode = 378' in gradle
+          print('PASS: production and release identity preserved')
+          PY
+      - name: Java deterministic 20k shuffled two-thumb sequences
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mixed380"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/mixed380" \
+            app/src/main/java/com/chroomareborn/keyboard/MixedThumbOrder380.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/MixedThumbOrder380Research.java
+          java -cp "$RUNNER_TEMP/mixed380" \
+            com.chroomareborn.keyboard.MixedThumbOrder380Research
