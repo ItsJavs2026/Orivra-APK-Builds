@@ -1,0 +1,157 @@
+name: Orivra Research 390 - lossless 378 to 386 V4 capacity union (no release)
+on:
+  push:
+    branches:
+      - research/build390-safe-378-386-learning-capacity-20261031
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research390
+  cancel-in-progress: true
+jobs:
+  non-destructive-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: No release, no IME edits, live codec limits remain synchronized
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='7cf2a9d35aa7d5a4b85b02c326e1af9387236256'
+          changed=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          allowed={
+              'app/src/main/java/com/chroomareborn/keyboard/LearningCapacity390.java',
+              'app/src/main/java/com/chroomareborn/keyboard/LearningTransferCodec.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java',
+              'app/src/main/java/com/chroomareborn/keyboard/ContextBackupFormat322.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PersonalContextLearning319.java',
+              'app/src/main/java/com/chroomareborn/keyboard/FrequencyBackupFormat330.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PersonalWordFrequency328.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/LearningCapacity390AndroidTest.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/LearningCapacity390Research.java',
+              'docs/RESEARCH390_V4_CAPACITY_MERGE_20261031.md',
+              '.github/workflows/research390-learning-capacity.yml',
+          }
+          assert changed==allowed,(changed^allowed)
+          baseline=lambda path:subprocess.check_output(['git','show',base+':'+path],text=True)
+          for path in [
+              'app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
+              'app/src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+              'app/src/main/java/com/chroomareborn/keyboard/TypedLearningV4Transfer347.java',
+              'app/src/main/java/com/chroomareborn/keyboard/TypedLearningV4Codec341.java',
+              'app/src/main/java/com/chroomareborn/keyboard/TypedWordEvidenceStore341.java',
+              'app/src/main/java/com/chroomareborn/keyboard/TypedWordsConsent341.java',
+              'app/src/main/AndroidManifest.xml',
+              'app/build.gradle.kts',
+          ]:assert Path(path).read_text()==baseline(path),path
+          files=[
+              'LearningTransferCodec.java',
+              'PersonalLearning.java',
+              'ContextBackupFormat322.java',
+              'PersonalContextLearning319.java',
+              'FrequencyBackupFormat330.java',
+              'PersonalWordFrequency328.java',
+          ]
+          root=Path('app/src/main/java/com/chroomareborn/keyboard')
+          for file in files:
+              assert 'LearningCapacity390.MAX_' in (root/file).read_text(),file
+          source=(root/'LearningCapacity390.java').read_text()
+          for value in ['MAX_CORRECTIONS=384','MAX_CONTEXT_KEYS=320','MAX_FREQUENCIES=400']:
+              assert value in source,value
+          manifest=Path('app/src/main/AndroidManifest.xml').read_text()
+          assert 'android.permission.INTERNET' not in manifest
+          build=Path('app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build386trial"' in build
+          assert 'versionCode = 386' in build
+          print('PASS: only bounded capacity edits; Candidate 386 remains unchanged')
+          PY
+      - name: Stress 200000 synthetic bounded-capacity combinations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/r390"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/r390" \
+            app/src/main/java/com/chroomareborn/keyboard/LearningCapacity390.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningCapacity390Research.java
+          java -cp "$RUNNER_TEMP/r390" \
+            com.chroomareborn.keyboard.LearningCapacity390Research
+  android35-full-union:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Restore pinned offline dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile unchanged IME and 378 plus 386 full backup union instrumentation
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Require full Android suite and all six new lossless union checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,'No Android test reports'
+          tests=failures=errors=skips=0
+          for file in reports:
+              root=ET.parse(file).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  x for x in root.iter() if x.tag.endswith('testsuite')]
+              for suite in suites:
+                  tests+=int(suite.attrib.get('tests','0'))
+                  failures+=int(suite.attrib.get('failures','0'))
+                  errors+=int(suite.attrib.get('errors','0'))
+                  skips+=int(suite.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
+          assert tests>=250 and failures==0 and errors==0 and skips==0
+          PY
