@@ -158,13 +158,13 @@ public final class MainActivity extends Activity {
         isolationButton409.setAllCaps(false);
         int isolationMode409=PredictionIsolationMode409.normalize(
                 isolationPrefs409.getInt(PredictionIsolationMode409.PREF,
-                        PredictionIsolationMode409.OFF));
+                        PredictionIsolationMode409.FULL));
         isolationButton409.setText("Prediction diagnosis: "+
                 PredictionIsolationMode409.label(isolationMode409));
         isolationButton409.setOnClickListener(v->{
             int current=PredictionIsolationMode409.normalize(
                     isolationPrefs409.getInt(PredictionIsolationMode409.PREF,
-                            PredictionIsolationMode409.OFF));
+                            PredictionIsolationMode409.FULL));
             int next=PredictionIsolationMode409.next(current);
             isolationPrefs409.edit().putInt(
                     PredictionIsolationMode409.PREF,next).apply();
