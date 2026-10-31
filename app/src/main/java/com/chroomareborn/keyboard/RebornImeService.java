@@ -4681,6 +4681,37 @@ public final class RebornImeService extends InputMethodService {
     private long frameSession412=-1L;
     private int frameSelectionStart412=-1,frameSelectionEnd412=-1;
     private InputConnection frameEditor412;
+    // 414: One bounded retry after a frame was rejected because the
+    // composing word/caret changed while the frame waited. Never show the
+    // stale old batch. Retains only the current editor and session.
+    private final Runnable frameRecoveryRunnable414=this::runFrameRecovery414;
+    private InputConnection frameRecoveryEditor414;
+    private long frameRecoverySession414=-1L;
+    private long lastFrameRecoveryUptime414=-5000L;
+    private void scheduleFrameRecovery414(InputConnection editor,long session){
+        if(editor==null || editor!=getCurrentInputConnection() ||
+                session!=inputSessionGeneration || sensitive ||
+                !editorAllowsSuggestions)return;
+        long now=android.os.SystemClock.uptimeMillis();
+        if(now-lastFrameRecoveryUptime414<300L)return;
+        lastFrameRecoveryUptime414=now;
+        frameRecoveryEditor414=editor;
+        frameRecoverySession414=session;
+        suggestionHandler.removeCallbacks(frameRecoveryRunnable414);
+        suggestionHandler.postDelayed(frameRecoveryRunnable414,110L);
+    }
+    private void runFrameRecovery414(){
+        final InputConnection editor=frameRecoveryEditor414;
+        final long session=frameRecoverySession414;
+        frameRecoveryEditor414=null;
+        frameRecoverySession414=-1L;
+        if(editor==null || editor!=getCurrentInputConnection() ||
+                session!=inputSessionGeneration || sensitive ||
+                !editorAllowsSuggestions || pendingIdlePaint410() ||
+                activePredictionTouch372!=null)return;
+        OrivraPerfAudit411.recordRecoveredFrame414();
+        showSuggestions();
+    }
 
     private void clearChipActionBindings412(){
         if(candidates==null)return;
@@ -4696,6 +4727,9 @@ public final class RebornImeService extends InputMethodService {
         }
     }
     private void cancelSuggestionFrame412(){
+        suggestionHandler.removeCallbacks(frameRecoveryRunnable414);
+        frameRecoveryEditor414=null;
+        frameRecoverySession414=-1L;
         if(frameScheduled412 && candidates!=null)
             candidates.removeCallbacks(applyFrameRunnable412);
         frameScheduled412=false;
@@ -4723,11 +4757,18 @@ public final class RebornImeService extends InputMethodService {
                 session!=inputSessionGeneration ||
                 editor==null || editor!=getCurrentInputConnection() ||
                 sensitive || !editorAllowsSuggestions ||
-                pendingIdlePaint410())return;
-        if(!composing.isEmpty() && !composing.equals(input))return;
-        if(composing.isEmpty() && input.length()>0 &&
-                (lastSelectionStart!=selectionStart ||
-                 lastSelectionEnd!=selectionEnd))return;
+                pendingIdlePaint410()) {
+            OrivraPerfAudit411.recordDiscardedFrame414();
+            return;
+        }
+        if((!composing.isEmpty() && !composing.equals(input)) ||
+           (composing.isEmpty() && input.length()>0 &&
+             (lastSelectionStart!=selectionStart ||
+              lastSelectionEnd!=selectionEnd))) {
+            OrivraPerfAudit411.recordDiscardedFrame414();
+            scheduleFrameRecovery414(editor,session);
+            return;
+        }
         applySuggestionsNow412(input,options,preliminary);
     }
     private void renderSuggestions(String input,List<String> options,
