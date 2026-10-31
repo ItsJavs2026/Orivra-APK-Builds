@@ -1,0 +1,60 @@
+name: Orivra Research 384 - session-aware deferred editor queue (no APK)
+on:
+  push:
+    branches:
+      - research/build384-session-bound-editor-dispatch-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research384
+  cancel-in-progress: true
+jobs:
+  isolated-java-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enforce no release or IME integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='1500f24a0f4aa499ef83b6891bad2628c6ea6bb4'
+          changed=set(subprocess.check_output(
+              ['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          allowed={
+              'app/src/main/java/com/chroomareborn/keyboard/SessionBoundEditorOrder384.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/SessionBoundEditorOrder384Research.java',
+              'docs/RESEARCH384_SESSION_EDITOR_DISPATCH_20261030.md',
+              '.github/workflows/research384-session-editor-dispatch.yml',
+          }
+          assert changed==allowed,(changed,allowed)
+          ime=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'SessionBoundEditorOrder384' not in ime
+          gradle=Path('app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build378trial"' in gradle
+          assert 'versionCode = 378' in gradle
+          manifest=Path('app/src/main/AndroidManifest.xml').read_text()
+          assert 'android.permission.INTERNET' not in manifest
+          print('PASS isolated policy, Candidate 378 preserved')
+          PY
+      - name: Java compile and run 50k randomized release-order checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/research384"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/research384" \
+            app/src/main/java/com/chroomareborn/keyboard/SessionBoundEditorOrder384.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SessionBoundEditorOrder384Research.java
+          java -cp "$RUNNER_TEMP/research384" \
+            com.chroomareborn.keyboard.SessionBoundEditorOrder384Research
