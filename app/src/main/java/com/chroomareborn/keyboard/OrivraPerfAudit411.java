@@ -52,6 +52,8 @@ final class OrivraPerfAudit411 {
             recoveredFrame414;
     private static long predictionScheduled415,predictionPreempted415,
             predictionCompleted415;
+    // 416: aggregate Space fast/fallback decisions, no character content.
+    private static long spaceFastShift416,spaceFallbackShift416;
 
     private OrivraPerfAudit411(){}
 
@@ -94,7 +96,14 @@ final class OrivraPerfAudit411 {
     static synchronized void recordPredictionCompleted415(){
         if(enabled)predictionCompleted415++;
     }
+    static synchronized void recordFastSpaceShift416(){
+        if(enabled)spaceFastShift416++;
+    }
+    static synchronized void recordFallbackSpaceShift416(){
+        if(enabled)spaceFallbackShift416++;
+    }
     static synchronized void reset(){
+        spaceFastShift416=spaceFallbackShift416=0;
         learningQueueOverflow413=0;
         hiddenStaleChip414=discardedFrame414=recoveredFrame414=0;
         predictionScheduled415=predictionPreempted415=
@@ -113,7 +122,7 @@ final class OrivraPerfAudit411 {
     }
     static synchronized String report(String settings){
         StringBuilder b=new StringBuilder(900);
-        b.append("ORIVRA BUILD 415 KEY/PREDICTION PERFORMANCE AUDIT\n");
+        b.append("ORIVRA BUILD 416 KEY/PREDICTION PERFORMANCE AUDIT\n");
         b.append("Counts and timings only. No typing stored or transmitted.\n");
         b.append("Audit: ").append(enabled?"ON":"OFF");
         b.append(" | elapsed since reset: ")
@@ -144,6 +153,10 @@ final class OrivraPerfAudit411 {
                 .append(predictionPreempted415).append('\n');
         b.append("Prediction worker results delivered: ")
                 .append(predictionCompleted415).append('\n');
+        b.append("Space quick-shift fast path used: ")
+                .append(spaceFastShift416).append('\n');
+        b.append("Space quick-shift fallback to editor: ")
+                .append(spaceFallbackShift416).append('\n');
         b.append("Note: render/panel timings overlap with suggestion "+
                 "entry; don't add their times together.\n");
         b.append("Slow handlers do not establish physical touch-to-frame "+
