@@ -78,6 +78,16 @@ final class AppIconHueCache366 {
         }
     }
 
+    /** Test-only read: metadata bit, never an icon or package enumeration. */
+    static boolean cacheContainsForTest(String pkg) {
+        if(!valid(pkg))return false;
+        synchronized(LOCK) {
+            Entry entry=CACHE.get(pkg);
+            return entry!=null &&
+                    SystemClock.elapsedRealtime()<entry.expiry;
+        }
+    }
+
     /** At most one icon decode per package at a time; one completion callback.
      * Other concurrent setColors calls simply benefit from the cached result.
      */
