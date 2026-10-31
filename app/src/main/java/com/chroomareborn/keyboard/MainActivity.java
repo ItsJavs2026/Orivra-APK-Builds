@@ -85,7 +85,7 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 416 Space Latency Trial");
+        title.setText("Orivra — Build 416B Selection Backspace Fix");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
@@ -116,6 +116,18 @@ public final class MainActivity extends Activity {
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
+        TextView selectionFix416B=new TextView(this);
+        selectionFix416B.setText("\nBUILD 416B • Fix: Backspace should remove "+
+                "highlighted text, including long selected passages, "+
+                "in a single editor replacement without deleting text "+
+                "on either side. This is an isolated trial built on 416 "+
+                "and does not change your prediction settings. "+
+                "Performance audit counts selected-text Backspace results "+
+                "without recording selected content. Keep 415 and 416 "+
+                "installed as fallbacks.\n");
+        selectionFix416B.setTextSize(15);
+        selectionFix416B.setTextColor(0xFF303846);
+        root.addView(selectionFix416B);
 
         TextView calmHelp408=new TextView(this);
         calmHelp408.setText("\nBuild 408 performance experiment — calm prediction display. "+
