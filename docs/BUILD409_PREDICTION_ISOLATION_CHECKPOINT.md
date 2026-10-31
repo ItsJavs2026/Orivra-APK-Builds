@@ -51,3 +51,6 @@ OFF still slow: InputConnection/typing or other system-side work may contribute.
 This experiment alone is not proof; use profile samples if necessary.
 
 Current status: user device compilation and test pending.
+
+## Additional verified hypothesis
+The inherited PredictionUiBudget408.delayAfterKey() implementation returns MIN(150 ms, MAX(1 ms, 360 ms minus time since burst start)). After about 360 ms of continuous typing, each further key can re-arm the full prediction refresh with only 1 ms until the pending callback executes and resets the burst. This means Calm mode does not guarantee that heavy suggestion updates wait for an actual typing pause. This behavior is source-verified; its effect on Samsung touch responsiveness is NOT yet measured. Preserve the full mode's 408 implementation in 409 to compare against OFF and WORKER ONLY; a future follow-up should test a true idle-only paint policy (e.g. 180-250 ms after the last key with no forced 1 ms update).
