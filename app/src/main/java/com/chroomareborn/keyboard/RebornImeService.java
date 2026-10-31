@@ -1914,6 +1914,7 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onStartInput(EditorInfo info, boolean restarting) {
+        cancelSuggestionFrame412();
         cancelTypingRefresh401();
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
@@ -1963,6 +1964,8 @@ public final class RebornImeService extends InputMethodService {
                 CALM_PREDICTIONS_PREF_408,true);
         idlePredictionPaintEnabled410=visualOptions370.getBoolean(
                 IDLE_PAINT_PREF_410,true);
+        frameUpdatesEnabled412=visualOptions370.getBoolean(
+                FRAME_PREF_412,true);
         riseEnabled411=visualOptions370.getBoolean(RISE_ENABLED_PREF_411,true);
         predictionIsolationMode409=PredictionIsolationMode409.normalize(
                 visualOptions370.getInt(PredictionIsolationMode409.PREF,
@@ -2002,6 +2005,7 @@ public final class RebornImeService extends InputMethodService {
         shift = SentenceCapitalization.shouldCapitalize(ic.getTextBeforeCursor(160, 0));
     }
     @Override public void onStartInputView(EditorInfo info, boolean restarting) {
+        cancelSuggestionFrame412();
         cancelTypingRefresh401();
         invalidateEditingTicket();
         invalidateBackspaceGestureSession();
@@ -2021,6 +2025,7 @@ public final class RebornImeService extends InputMethodService {
         idlePredictionPaintEnabled410=fullOptions411.getBoolean(
                 IDLE_PAINT_PREF_410,true);
         riseEnabled411=fullOptions411.getBoolean(RISE_ENABLED_PREF_411,true);
+        frameUpdatesEnabled412=fullOptions411.getBoolean(FRAME_PREF_412,true);
         if(predictionIsolationMode409==PredictionIsolationMode409.FULL)
             predictionDispatcher.warmPublicDictionary410();
         predictionDispatcher.cancel();
@@ -2032,6 +2037,7 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onFinishInput() {
+        cancelSuggestionFrame412();
         cancelTypingRefresh401();
         clearPredictionTouch372();
         clearSpaceHighlight372();
@@ -2056,6 +2062,7 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInput();
     }
     @Override public void onFinishInputView(boolean finishingInput) {
+        cancelSuggestionFrame412();
         cancelTypingRefresh401();
         clearPredictionTouch372();
         clearSpaceHighlight372();
@@ -2076,6 +2083,7 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInputView(finishingInput);
     }
     @Override public void onDestroy() {
+        cancelSuggestionFrame412();
         cancelTypingRefresh401();
         appThemeDestroyed366=true;
         clearPredictionTouch372();
@@ -4539,7 +4547,81 @@ public final class RebornImeService extends InputMethodService {
     private void renderSuggestions(String input,List<String> options) {
         renderSuggestions(input,options,false);
     }
+    // Build 412: latest-frame-wins suggestion updates. A single main-thread
+    // animation callback paints the most recent immutable candidate list,
+    // instead of painting every preliminary and worker completion in one frame.
+    // This queue is editor/session-scoped and never persists text to storage.
+    private static final String FRAME_PREF_412="orivra_frame_updates_412";
+    private boolean frameUpdatesEnabled412=true;
+    private final Runnable applyFrameRunnable412=this::applyPendingFrame412;
+    private boolean frameScheduled412;
+    private String frameInput412;
+    private List<String> frameOptions412;
+    private boolean framePreliminary412;
+    private long frameSession412=-1L;
+    private int frameSelectionStart412=-1,frameSelectionEnd412=-1;
+    private InputConnection frameEditor412;
+
+    private void cancelSuggestionFrame412(){
+        if(candidates!=null)candidates.removeCallbacks(applyFrameRunnable412);
+        frameScheduled412=false;
+        frameInput412=null;
+        frameOptions412=null;
+        frameEditor412=null;
+        frameSession412=-1L;
+    }
+    private void applyPendingFrame412(){
+        frameScheduled412=false;
+        final String input=frameInput412;
+        final List<String> options=frameOptions412;
+        final boolean preliminary=framePreliminary412;
+        final long session=frameSession412;
+        final InputConnection editor=frameEditor412;
+        final int selectionStart=frameSelectionStart412;
+        final int selectionEnd=frameSelectionEnd412;
+        frameInput412=null;
+        frameOptions412=null;
+        frameEditor412=null;
+        frameSession412=-1L;
+        // Never paint stale text into a new app/field, or start costly layout
+        // work while a newer key burst still owns the typing-first idle gate.
+        if(input==null || options==null ||
+                session!=inputSessionGeneration ||
+                editor==null || editor!=getCurrentInputConnection() ||
+                sensitive || !editorAllowsSuggestions || pendingIdlePaint410() ||
+                frameSelectionStart412!=selectionStart ||
+                frameSelectionEnd412!=selectionEnd)return;
+        if(!composing.isEmpty() && !composing.equals(input))return;
+        if(composing.isEmpty() && input.length()>0 &&
+                (lastSelectionStart!=selectionStart ||
+                 lastSelectionEnd!=selectionEnd))return;
+        applySuggestionsNow412(input,options,preliminary);
+    }
     private void renderSuggestions(String input,List<String> options,
+            boolean preliminary345) {
+        if(!frameUpdatesEnabled412 || candidates==null ||
+                !candidates.isAttachedToWindow() || sensitive ||
+                !editorAllowsSuggestions) {
+            cancelSuggestionFrame412();
+            applySuggestionsNow412(input,options,preliminary345);
+            return;
+        }
+        // Already an active gesture? Preserve the old target until finger UP.
+        if(activePredictionTouch372!=null)return;
+        frameInput412=input;
+        frameOptions412=options==null?java.util.Collections.emptyList():
+                new java.util.ArrayList<>(options);
+        framePreliminary412=preliminary345;
+        frameSession412=inputSessionGeneration;
+        frameEditor412=getCurrentInputConnection();
+        frameSelectionStart412=lastSelectionStart;
+        frameSelectionEnd412=lastSelectionEnd;
+        if(!frameScheduled412) {
+            frameScheduled412=true;
+            candidates.postOnAnimation(applyFrameRunnable412);
+        }
+    }
+    private void applySuggestionsNow412(String input,List<String> options,
             boolean preliminary345) {
         final long auditStart411=OrivraPerfAudit411.begin();
         try {
