@@ -66,6 +66,19 @@ final class PredictionDispatcher implements AutoCloseable {
         });
         worker.setRemoveOnCancelPolicy(true);
     }
+    private boolean publicWarmScheduled410;
+    /**
+     * Initialize only bundled public prediction data on the existing
+     * background worker. Never trigger large lexicon initialization from
+     * the FULL mode's suggestion view on the Android main thread.
+     */
+    synchronized void warmPublicDictionary410() {
+        if (closed || publicWarmScheduled410) return;
+        publicWarmScheduled410=true;
+        worker.execute(()->{
+            if (!closed) PredictionLite.publicWordForContext("hello");
+        });
+    }
     synchronized long schedule(String input, Listener listener) {
         return scheduleInternal(input, listener, false);
     }
