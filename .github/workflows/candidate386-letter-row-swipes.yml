@@ -1,0 +1,224 @@
+name: Orivra Candidate 386 - actual letter-row predictions (separate APK)
+on:
+  push:
+    branches:
+      - candidate/build386-letter-row-swipes-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate386
+  cancel-in-progress: true
+jobs:
+  source-and-gestures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Isolated Candidate 386 identity and Space safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='7981d8ca803e4040a6ebc051b0f9cbed514b7f24'
+          changed=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          allowed={
+              'app/build.gradle.kts',
+              'app/src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+              'app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java',
+              'docs/CANDIDATE386_LETTER_ROW_SWIPES_20261030.md',
+              '.github/workflows/candidate386-letter-row-swipes.yml',
+          }
+          assert changed==allowed,(changed^allowed)
+          old=lambda p:subprocess.check_output(['git','show',base+':'+p],text=True)
+          for path in [
+              'app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
+              'app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java',
+              'app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java',
+              'app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java',
+              'app/src/main/java/com/chroomareborn/keyboard/SuggestionContinuity353.java',
+              'app/src/main/java/com/chroomareborn/keyboard/ThumbTapGuard377.java',
+              'app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386AndroidTest.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386Research.java',
+          ]:
+              assert old(path)==Path(path).read_text(),f'Unexpected keyboard change: {path}'
+          build=Path('app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build386trial"' in build
+          assert 'versionCode = 386' in build
+          assert '"Orivra Candidate 386"' in build
+          main=Path('app/src/main/java/com/chroomareborn/keyboard/MainActivity.java').read_text()
+          assert 'Orivra — Candidate 386 Test' in main
+          assert 'getInt(LetterRowPredictionSwipe386.PREF,0)' in main
+          assert 'TypedLearningV4Transfer347.exportV4(this)' in main
+          assert 'TypedLearningV4Transfer347.importConfirmed(' in main
+          metrics=Path('app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java').read_text()
+          assert 'com.chroomareborn.keyboard.build386trial' in metrics
+          pack=Path('app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java').read_text()
+          assert 'com.chroomareborn.keyboard.build386trial' in pack
+          service=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'LetterRowPredictionSwipe386.OFF' in service
+          assert 'acceptSuggestion(key,expected386,selectedRow386)' in service
+          assert 'SentenceSuggestionCommit.insert(' in service
+          assert 'tryHighlightedSpace372()' in service
+          manifest=Path('app/src/main/AndroidManifest.xml').read_text()
+          assert 'android:allowBackup="false"' in manifest
+          assert 'android:usesCleartextTraffic="false"' in manifest
+          assert 'android.permission.INTERNET' not in manifest
+          assert 'android.permission.QUERY_ALL_PACKAGES' not in manifest
+          assert 'android.permission.BIND_ACCESSIBILITY_SERVICE' not in manifest
+          print('PASS: isolated Candidate 386, one-space gesture and prior typing preserved')
+          PY
+      - name: Replay 100k real-letter-row gestures and tiny-word Space policies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/row386"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/row386" \
+            app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionContinuity353.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java \
+            app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386Research.java
+          java -cp "$RUNNER_TEMP/row386" \
+            com.chroomareborn.keyboard.LetterRowPredictionSwipe386Research
+  android35-qualify-and-release:
+    needs: source-and-gestures
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Restore pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile signed Candidate 386 and instrumentation
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Verify full emulator suite, signature, package, permissions and dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,'Missing emulator test reports'
+          tests=failures=errors=skips=0
+          for file in reports:
+              root=ET.parse(file).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [s for s in root.iter() if s.tag.endswith('testsuite')]
+              for suite in suites:
+                  tests+=int(suite.attrib.get('tests','0'))
+                  failures+=int(suite.attrib.get('failures','0'))
+                  errors+=int(suite.attrib.get('errors','0'))
+                  skips+=int(suite.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
+          assert tests>=244 and failures==0 and errors==0 and skips==0
+          PY
+          mkdir -p dist
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n1 |
+            grep -Fq "package: name='com.chroomareborn.keyboard.build386trial' versionCode='386'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > dist/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" > dist/permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/permissions.txt
+          cp "$apk" dist/Orivra-Candidate-386.apk
+          (cd dist && sha256sum Orivra-Candidate-386.apk > Orivra-Candidate-386.apk.sha256)
+          cat > dist/Release_Notes.txt <<'TXT'
+          Orivra Candidate 386 — Real Letter-Row Prediction Swipe Phone Trial
+
+          Package: com.chroomareborn.keyboard.build386trial
+          - NEW: independent OFF-by-default "Swipe predictions from letter rows".
+            Modes: OFF / ASDF middle only / QWERTY top only / BOTH.
+          - Swipe LEFT/RIGHT starting on actual enabled letter keys to choose
+            a visible side prediction. Swipe DOWN to choose the CENTER chip.
+          - DOWN inserts center prediction plus exactly one appropriate trailing
+            Space through the existing one-commit suggestion path. This also
+            handles one-, two-, three-letter and phrase completions. No double
+            space before existing separators or punctuation, no Send action.
+          - Short taps still type letters; deliberate swipes do not type the
+            starting letter. Multi-touch and long-press symbol safety preserved.
+          - This is NOT character swipe-to-spell and NOT Candidate 385's
+            prediction-strip resize feature.
+          - Existing Space key's highlighted eligibility, legacy swipe strip,
+            predictor rankings, V4 learning and no-INTERNET protections retained.
+          - Candidate 378 stays installed separately. V4 data does not
+            migrate automatically to Candidate 386.
+          - Emulator qualification is NOT Samsung Galaxy S26 Ultra Android 17
+            real-phone proof. Compare ASDF first, then QWERTY on a safe note.
+          TXT
+      - name: Upload qualified APK with SHA-256 audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate386-Android35-Qualified
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Publish prerelease only after full success
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view candidate-386-20261030 >/dev/null 2>&1; then
+            echo "Release already exists; refusing overwrite"
+            exit 1
+          fi
+          gh release create candidate-386-20261030 \
+            dist/Orivra-Candidate-386.apk \
+            dist/Orivra-Candidate-386.apk.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 386 - Letter-Row Swipe Predictions and Space" \
+            --notes-file dist/Release_Notes.txt \
+            --prerelease
