@@ -268,6 +268,45 @@ public final class MainActivity extends Activity {
         });
         root.addView(symbolHold370);
 
+        TextView swipeInfo372=new TextView(this);
+        swipeInfo372.setText("\nPrediction gestures (experimental)\n"+
+                "On the suggestion strip, slide toward the next chip to "+
+                "select it. Swipe up to choose a RISE alternative when "+
+                "the expanded panel is visible. Normal taps still work.");
+        swipeInfo372.setTextSize(15);
+        swipeInfo372.setTextColor(0xFF303846);
+        root.addView(swipeInfo372);
+        Button swipePredictions372=new Button(this);
+        swipePredictions372.setAllCaps(false);
+        swipePredictions372.setText("Swipe prediction selection: "+
+                (feedback.getBoolean(PredictionSwipe372.PREF,true)?"ON":"OFF"));
+        swipePredictions372.setOnClickListener(v->{
+            boolean next=!feedback.getBoolean(PredictionSwipe372.PREF,true);
+            feedback.edit().putBoolean(PredictionSwipe372.PREF,next).apply();
+            swipePredictions372.setText("Swipe prediction selection: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen keyboard to apply swipe option",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(swipePredictions372);
+
+        Button spaceCorrection372=new Button(this);
+        spaceCorrection372.setAllCaps(false);
+        spaceCorrection372.setText("Space accepts highlighted correction: "+
+                (feedback.getBoolean(HighlightedSpace372.PREF,true)?
+                        "ON":"OFF"));
+        spaceCorrection372.setOnClickListener(v->{
+            boolean next=!feedback.getBoolean(HighlightedSpace372.PREF,true);
+            feedback.edit().putBoolean(HighlightedSpace372.PREF,next).apply();
+            spaceCorrection372.setText("Space accepts highlighted correction: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen keyboard to apply Space correction option",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(spaceCorrection372);
+
         boolean follow=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
                 .getBoolean(AppPalette.KEY_FOLLOW_SYSTEM,true);
         Button system=new Button(this);
