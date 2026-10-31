@@ -35,7 +35,11 @@ jobs:
               'app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
               'app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
               'app/src/main/java/com/chroomareborn/keyboard/TypingRefreshGate401.java',
+              'app/src/main/java/com/chroomareborn/keyboard/AppIconHueCache366.java',
+              'app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java',
               'app/src/androidTest/java/com/chroomareborn/keyboard/TypingRefreshGate401AndroidTest.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/AppIconColor366AndroidTest.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/TypedWordLearningWorker346AndroidTest.java',
               'app/src/testsupport/java/com/chroomareborn/keyboard/TypingRefreshGate401Research.java',
               'docs/RESEARCH401_NOTIFICATION_REPLY_UI_BUDGET_20261031.md',
               '.github/workflows/research401-notification-ui-budget.yml',
@@ -68,9 +72,22 @@ jobs:
           metrics=Path('app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java').read_text()
           assert 'recordDeferredUi401' in metrics
           assert 'Deferred suggestion UI work:' in metrics
+          assert 'Java heap peak sampled:' in metrics
+          assert 'Native heap allocated now:' in metrics
+          assert 'releaseInactiveSuggestionMemory401();' in ime
+          assert 'AppIconHueCache366.trimMemory();' in ime
+          assert 'offlineNextWordSeed=null;' in ime
+          assert 'closeOptionalDictionary();' in ime
+          hue=Path('app/src/main/java/com/chroomareborn/keyboard/AppIconHueCache366.java').read_text()
+          assert 'MAX_IN_FLIGHT=8' in hue
+          assert 'static void trimMemory()' in hue
+          worker=Path('app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java').read_text()
+          assert 'MAX_PENDING_SPACE_UPDATES=128' in worker
+          assert 'overloadedSession=editorSession;' in worker
+          assert 'pendingSpaceUpdates.decrementAndGet();' in worker
           assert 'com.chroomareborn.keyboard.build400trial' in Path('app/build.gradle.kts').read_text()
           assert 'android.permission.INTERNET' not in Path('app/src/main/AndroidManifest.xml').read_text()
-          print('PASS: Candidate400 unchanged, no APK, learning, prediction engine, gesture and V4 protected')
+          print('PASS: Candidate400 unchanged; bounded session, icon, learning caches and no APK/V4 changes')
           PY
       - name: Stress privacy, editor switch and 60k coalesced typing bursts
         shell: bash
@@ -134,7 +151,7 @@ jobs:
             echo "---- Same-run original vs optimized p95; synthetic learning only ----"
             adb logcat -d -v brief -s OrivraPerf395:I | grep 'R395 .*SAME-RUN p95'
             echo "---- End of aggregate profile ----"
-      - name: Require 304+ Android tests including DOWN, long typing and latency parity
+      - name: Require 310+ Android tests including DOWN, long typing and latency parity
         shell: bash
         run: |
           set -euo pipefail
@@ -154,5 +171,5 @@ jobs:
                   errors+=int(s.attrib.get('errors','0'))
                   skips+=int(s.attrib.get('skipped','0'))
           print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
-          assert tests>=304 and failures==0 and errors==0 and skips==0
+          assert tests>=310 and failures==0 and errors==0 and skips==0
           PY
