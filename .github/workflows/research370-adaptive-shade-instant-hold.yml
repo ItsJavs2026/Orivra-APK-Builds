@@ -1,0 +1,188 @@
+name: Orivra Research 370 - shaded app accents + instant keys + fast symbol hold (NO APK)
+on:
+  push:
+    branches:
+      - research/build370-adaptive-shade-instant-hold-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research370
+  cancel-in-progress: true
+
+jobs:
+  source-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify strictly scoped research and preserve Candidate 365 input
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="7d82655a2d16573d12ac23d3178ba4be0d0fa6fd"
+          changed=set(subprocess.check_output(["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          allowed={
+              "app/src/main/java/com/chroomareborn/keyboard/SymbolHoldTiming367.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/SymbolHoldTiming367Research.java",
+              "app/src/main/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369Research.java",
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/main/java/com/chroomareborn/keyboard/MainActivity.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppPalette.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/AdaptiveShadedSurface370AndroidTest.java",
+              ".github/workflows/research370-adaptive-shade-instant-hold.yml",
+          }
+          assert changed==allowed,f"Unreviewed or missing research files: {changed ^ allowed}"
+          old=lambda path:subprocess.check_output(["git","show",base+":"+path],text=True)
+          unchanged=[
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java",
+              "app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java",
+              "app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java",
+              "app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppIconHueCache366.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppIconColorSignature366.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppSurfaceAccent368.java",
+          ]
+          for path in unchanged:
+              assert old(path)==Path(path).read_text(),f"Protected code changed: {path}"
+          path="app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java"
+          former=old(path)
+          new=Path(path).read_text()
+          assert former.count("hintPressOrder353")==new.count("hintPressOrder353")
+          assert former.count("PredictionDispatcher")==new.count("PredictionDispatcher")
+          assert former.count("keyHaptic(")==new.count("keyHaptic(")
+          assert "if(instantKeyFeedback369)return;" in new
+          assert "SymbolHoldTiming367.delayMs(" in new
+          assert "fastSymbolHold367=visualOptions370.getBoolean(" in new
+          assert "instantKeyFeedback369=visualOptions370.getBoolean(" in new
+          assert "requestAppIconHue366(editor);" in new
+          assert "hintPressOrder353.hasOpenPresses()" in new
+          assert "PredictionTapCaret364.arm(" in new
+          assert "ShortJoinedContext362.suggestions(" in Path(
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java").read_text()
+          title=Path("app/src/main/java/com/chroomareborn/keyboard/MainActivity.java").read_text()
+          assert "Instant key visual feedback:" in title
+          assert "Special character hold:" in title
+          assert "Shaded Surface trial" in title
+          palette=Path("app/src/main/java/com/chroomareborn/keyboard/AppPalette.java").read_text()
+          assert 'default: return "Shaded Surface • App Hint";' in palette
+          assert "shadedSurface368(hue,dark" in palette
+          assert "AppSurfaceAccent368.colors(hue,dark)" in palette
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          for forbidden in ["android.permission.INTERNET",
+                  "android.permission.QUERY_ALL_PACKAGES",
+                  "android.permission.BIND_ACCESSIBILITY_SERVICE",
+                  "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"]:
+              assert forbidden not in manifest
+          assert 'android:allowBackup="false"' in manifest
+          gradle=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build365trial"' in gradle
+          assert "versionCode = 365" in gradle
+          print("PASS research scope: no changes to Candidate 365 package, learned data, touch order or private editor handling")
+          PY
+      - name: Run deterministic color, touch feedback and symbol timing tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/AppSurfaceAccent368.java \
+            app/src/main/java/com/chroomareborn/keyboard/AppIconColorSignature366.java \
+            app/src/main/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369.java \
+            app/src/main/java/com/chroomareborn/keyboard/SymbolHoldTiming367.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/AppSurfaceAccent368Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/AppIconColorSignature366Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SymbolHoldTiming367Research.java
+          for class in AppSurfaceAccent368Research AppIconColorSignature366Research KeyPressVisualPolicy369Research SymbolHoldTiming367Research; do
+            java -cp "$RUNNER_TEMP/classes" "com.chroomareborn.keyboard.$class"
+          done
+
+  android35-emulator:
+    needs: source-and-synthetic
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Rebuild pinned dictionary with exact SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile Android app and instrumentation APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Allow emulator acceleration where available
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Verify all 211+ Android tests passed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,"No Android emulator test results"
+          total=fail=errors=skipped=0
+          for file in reports:
+              node=ET.parse(file).getroot()
+              suites=[node] if node.tag.endswith('testsuite') else [
+                  x for x in node.iter() if x.tag.endswith('testsuite')]
+              for suite in suites:
+                  total+=int(suite.attrib.get('tests',0))
+                  fail+=int(suite.attrib.get('failures',0))
+                  errors+=int(suite.attrib.get('errors',0))
+                  skipped+=int(suite.attrib.get('skipped',0))
+          print(f'Android 35 emulator: {total} tests, {fail} failures, {errors} errors, {skipped} skipped')
+          assert total>=211 and fail==0 and errors==0 and skipped==0
+          assert Path('app/src/androidTest/java/com/chroomareborn/keyboard/AdaptiveShadedSurface370AndroidTest.java').read_text().count('@Test')==4
+          PY
+          echo "PASS Android 35 emulator; Samsung Android 17 typing, animations, app icons remain phone-test pending. NO APK RELEASE."
