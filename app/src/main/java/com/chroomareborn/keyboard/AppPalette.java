@@ -103,10 +103,31 @@ final class AppPalette {
                 hue=presetHue(packageName);
                 if(hue!=null)source="app preset estimate";
             }
+            // A missing or untrustworthy icon must never recolor the
+            // keyboard's neutral background. A subtle app hint is optional.
+            if(mode==APP_SHADED)
+                return shadedSurface368(hue,dark,hue==null?
+                        "App Match — Shaded • neutral (unknown app)":
+                        "App Match — Shaded • subtle "+source);
             if(hue==null)return material(ctx,dark,modeName(mode)+" • Material fallback");
         }
         boolean shaded=mode!=APP_MATCH;
         return tones(hue,dark,shaded,modeName(mode)+" • "+source);
+    }
+    private static Result shadedSurface368(Float hue,boolean dark,String source) {
+        int[] colors=AppSurfaceAccent368.colors(hue,dark);
+        int background=colors[AppSurfaceAccent368.BG];
+        int key=colors[AppSurfaceAccent368.KEY];
+        int special=colors[AppSurfaceAccent368.SPECIAL];
+        int accent=colors[AppSurfaceAccent368.ACCENT];
+        int suggestion=colors[AppSurfaceAccent368.SUGGESTION];
+        int text=contrastText(background),keyText=contrastText(key);
+        int subtle=mix(text,background,.34f);
+        int border=mix(key,background,dark?.35f:.12f);
+        int ripple=(0x60<<24)|(accent&0x00FFFFFF);
+        return new Result(background,key,accent,text,keyText,subtle,
+                border,special,suggestion,contrastText(suggestion),
+                ripple,dark,source);
     }
     private static Float presetHue(String packageName) {
         String pkg=packageName==null?"":packageName.toLowerCase(Locale.ROOT);
