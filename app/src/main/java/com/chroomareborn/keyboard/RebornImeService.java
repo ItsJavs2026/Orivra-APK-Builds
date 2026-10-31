@@ -4142,10 +4142,11 @@ public final class RebornImeService extends InputMethodService {
             }
             return;
         }
-        // Any synchronous selection callback or Shift-label refresh during
-        // a burst must not bypass the bounded budget. The queued callback
-        // consumes the token before executing this full refresh. Secure
-        // fields bypass the budget and clear the strip immediately.
+        // Full prediction work is not allowed inside a typing burst,
+        // including re-entrant selection callbacks and Shift-label refreshes.
+        // The editor-scoped delayed callback will run after the quiet gap.
+        // Secure fields still clear suggestions immediately.
+        if(pendingIdlePaint410())return;
         if(!sensitive && typingRefresh401.isPendingFor(
                 inputSessionGeneration,getCurrentInputConnection()))return;
         final String snapshot=composing;
