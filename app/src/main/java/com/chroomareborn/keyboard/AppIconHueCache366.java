@@ -31,15 +31,15 @@ final class AppIconHueCache366 {
     private static final long SUCCESS_TTL_MS=6*60*60*1000L;
     private static final long FAILURE_TTL_MS=5*60*1000L;
     private static final Object LOCK=new Object();
-    private static final class Entry {
+    private static final class HueEntry {
         final Float hue;
         final long expiry;
-        Entry(Float value,long expire){hue=value;expiry=expire;}
+        HueEntry(Float value,long expire){hue=value;expiry=expire;}
     }
-    private static final LinkedHashMap<String,Entry> CACHE=
-            new LinkedHashMap<String,Entry>(MAX+1,.75f,true) {
+    private static final LinkedHashMap<String,HueEntry> CACHE=
+            new LinkedHashMap<String,HueEntry>(MAX+1,.75f,true) {
                 @Override protected boolean removeEldestEntry(
-                        Map.Entry<String,Entry> eldest) {
+                        Map.Entry<String,HueEntry> eldest) {
                     return size()>MAX;
                 }
             };
@@ -68,7 +68,7 @@ final class AppIconHueCache366 {
     static Float cachedHue(String pkg) {
         if(!valid(pkg))return null;
         synchronized(LOCK) {
-            Entry entry=CACHE.get(pkg);
+            HueEntry entry=CACHE.get(pkg);
             if(entry==null)return null;
             if(SystemClock.elapsedRealtime()>=entry.expiry) {
                 CACHE.remove(pkg);
@@ -82,7 +82,7 @@ final class AppIconHueCache366 {
     static boolean cacheContainsForTest(String pkg) {
         if(!valid(pkg))return false;
         synchronized(LOCK) {
-            Entry entry=CACHE.get(pkg);
+            HueEntry entry=CACHE.get(pkg);
             return entry!=null &&
                     SystemClock.elapsedRealtime()<entry.expiry;
         }
@@ -96,7 +96,7 @@ final class AppIconHueCache366 {
         final Context app=context.getApplicationContext()!=null?
                 context.getApplicationContext():context;
         synchronized(LOCK) {
-            Entry entry=CACHE.get(pkg);
+            HueEntry entry=CACHE.get(pkg);
             if(entry!=null && SystemClock.elapsedRealtime()<entry.expiry)return;
             if(IN_FLIGHT.containsKey(pkg))return;
             IN_FLIGHT.put(pkg,Boolean.TRUE);
@@ -112,7 +112,7 @@ final class AppIconHueCache366 {
                 final Float result=hue;
                 synchronized(LOCK) {
                     long ttl=result!=null?SUCCESS_TTL_MS:FAILURE_TTL_MS;
-                    CACHE.put(pkg,new Entry(result,
+                    CACHE.put(pkg,new HueEntry(result,
                             SystemClock.elapsedRealtime()+ttl));
                     IN_FLIGHT.remove(pkg);
                 }
