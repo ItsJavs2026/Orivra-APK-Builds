@@ -41,6 +41,7 @@ jobs:
               "app/src/main/java/com/chroomareborn/keyboard/MainActivity.java",
               "app/src/main/java/com/chroomareborn/keyboard/AppPalette.java",
               "app/src/androidTest/java/com/chroomareborn/keyboard/AdaptiveShadedSurface370AndroidTest.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/AppIconColor366AndroidTest.java",
               ".github/workflows/research370-adaptive-shade-instant-hold.yml",
           }
           assert changed==allowed,f"Unreviewed or missing research files: {changed ^ allowed}"
