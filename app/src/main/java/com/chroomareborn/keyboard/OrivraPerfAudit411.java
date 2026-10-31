@@ -22,8 +22,9 @@ final class OrivraPerfAudit411 {
             IDLE_WORD_OBSERVATION_413=16, SPACE_APPROVED_LEARNING_413=17,
             SPACE_EDITOR_COMMIT_413=18, LEARNING_WORKER_413=19,
             SPACE_PRECOMMIT_CHECKS_413=20, SPACE_POSTCOMMIT_413=21,
-            IDLE_WORD_VERIFICATION_414=22, HAPTIC_TOUCH_415=23;
-    static final int SIZE=24;
+            IDLE_WORD_VERIFICATION_414=22, HAPTIC_TOUCH_415=23,
+            SPACE_SHIFT_415=24, SPACE_REFRESH_415=25;
+    static final int SIZE=26;
     private static final String[] NAMES={
         "Letter key handler", "Space handler", "Backspace handler",
         "Suggestion scheduling", "Suggestion rendering", "Rise panel UI",
@@ -35,7 +36,8 @@ final class OrivraPerfAudit411 {
         "Idle word observation", "Space learning dispatch",
         "Space finish/commit IPC", "Approved learning background worker",
         "Space boundary checks before commit", "Space processing after commit",
-        "Idle word verification after typing stops", "Key haptic feedback"
+        "Idle word verification after typing stops", "Key haptic feedback",
+        "Space cursor/sentence state", "Space suggestion refresh schedule"
     };
     private static volatile boolean enabled;
     private static final long[] count=new long[SIZE];
