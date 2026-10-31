@@ -82,13 +82,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 407 Full Settings Test");
+        title.setText("Orivra — Build 408 Calm Prediction Test");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nBuild 407 full-settings recovery (based on Candidate 401)\n"+
+        notes.setText("\nBuild 408 — Calm Predictions (based on full Candidate 401)\n"+
                 "Restored from the full Orivra codebase, NOT the old Alpha 1.0 prototype. The current baseline preserves modern settings. Full 407 performance changes still require review and Samsung testing.\n"+
                 "Targets the real S26 Ultra freezes reported in WhatsApp "+
                 "notification replies while music plays. Rapid letters and "+
@@ -111,6 +111,33 @@ public final class MainActivity extends Activity {
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
+
+        TextView calmHelp408=new TextView(this);
+        calmHelp408.setText("\nBuild 408 performance experiment — calm prediction display. "+
+                "Keep the normal keyboard, learning and SentenceFlow. "+
+                "Reduce repeated suggestion redraws during rapid typing, "+
+                "and stop automatically expanding the prediction panel "+
+                "for uncertain guesses. Tap the arrow to expand manually. "+
+                "Reopen the keyboard after changing this setting.");
+        calmHelp408.setTextColor(0xFF303846);
+        calmHelp408.setTextSize(15);
+        root.addView(calmHelp408);
+        final String calmPref408="orivra_calm_predictions_408";
+        final android.content.SharedPreferences calmPrefs408=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        Button calmButton408=new Button(this);
+        calmButton408.setAllCaps(false);
+        calmButton408.setText("Calm prediction display: "+
+                (calmPrefs408.getBoolean(calmPref408,true)?"ON":"OFF"));
+        calmButton408.setOnClickListener(v->{
+            boolean next=!calmPrefs408.getBoolean(calmPref408,true);
+            calmPrefs408.edit().putBoolean(calmPref408,next).apply();
+            calmButton408.setText("Calm prediction display: "+(next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen the keyboard to apply this test setting",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(calmButton408);
 
         // Build 303 research, default OFF. Explicit opt-in and app-local only.
         // Never reads notes or keyboard input; changing this preference takes
@@ -149,7 +176,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra 407 Full Test keyboard");
+        picker.setText("2. Choose Orivra 408 Calm Test keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
