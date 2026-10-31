@@ -1597,6 +1597,8 @@ public final class RebornImeService extends InputMethodService {
         paletteLabel.setContentDescription(themeDetails()+". Tap for full theme information.");
     }
     private void setColors(EditorInfo editor) {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         AppPalette.Result result=AppPalette.resolve(this,editor==null?null:editor.packageName);
         background=result.background;
         keyBackground=result.keyBackground;
@@ -1615,6 +1617,10 @@ public final class RebornImeService extends InputMethodService {
         // Icon loading is dispatched to one low-priority background worker.
         // The first focus uses an immediate, legible preset/Material fallback.
         requestAppIconHue366(editor);
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.THEME,auditStart411);
+        }
     }
     private void syncNavigationBar() {
         Window window=getWindow()==null?null:getWindow().getWindow();
@@ -1943,6 +1949,10 @@ public final class RebornImeService extends InputMethodService {
         numericAlphabeticOverride=false;
         symbols=false;
         extraSymbols=false;
+        // Audit is opt-in, aggregate-only and kept in app process memory.
+        OrivraPerfAudit411.setEnabled(getSharedPreferences(
+                OrivraPerfAudit411.PREFS,MODE_PRIVATE)
+                        .getBoolean(OrivraPerfAudit411.ENABLED,false));
         // One preferences read per editor activation, never every letter.
         android.content.SharedPreferences visualOptions370=
                 getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
@@ -1993,6 +2003,9 @@ public final class RebornImeService extends InputMethodService {
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
         super.onStartInputView(info, restarting);
+        OrivraPerfAudit411.setEnabled(getSharedPreferences(
+                OrivraPerfAudit411.PREFS,MODE_PRIVATE)
+                        .getBoolean(OrivraPerfAudit411.ENABLED,false));
         // An already-running IME may reopen its view without a new input
         // session. Apply the diagnostic toggle on every view activation.
         predictionIsolationMode409=PredictionIsolationMode409.normalize(
@@ -2213,6 +2226,8 @@ public final class RebornImeService extends InputMethodService {
                 lastSelectionStart!=lastSelectionEnd;
     }
     private void prepareCursorEdit(InputConnection ic) {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         final boolean highlighted351=hasSelection();
         final boolean trailingText351=cursorHasTextAfter();
         if(!composing.isEmpty() && (trailingText351 || highlighted351)) {
@@ -2225,6 +2240,10 @@ public final class RebornImeService extends InputMethodService {
             predictionDispatcher.cancel();
         }
         editingInMiddle=trailingText351 || highlighted351;
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.EDIT_PREPARE,auditStart411);
+        }
     }
     // Exposed to package-scoped Android instrumentation, no editor text access.
     static EditorSuggestionPrivacyPolicy.Decision editorPrivacyDecision(EditorInfo info) {
@@ -2369,6 +2388,8 @@ public final class RebornImeService extends InputMethodService {
         showSuggestions();
     }
     private void updatePredictionPanel() {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         if(predictionsToggle==null || expandedSuggestions==null)return;
         // Preserve the expanded panel throughout a held backspace gesture.
         // Deletion still updates predictions; only panel motion is deferred.
@@ -2515,6 +2536,10 @@ public final class RebornImeService extends InputMethodService {
         // on every rapid new result or held-backspace transition.
         expandedSuggestions.setAlpha(1f);
         expandedSuggestions.setTranslationY(0f);
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.RISE_PANEL,auditStart411);
+        }
     }
     /**
      * Research 398: Shift-only changes must not detach the entire QWERTY
@@ -2538,6 +2563,8 @@ public final class RebornImeService extends InputMethodService {
         showSuggestions();
     }
     private void refreshView() {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         if (base == null || keys == null || spacebarTouchActive ||
                 enterTouchActive ||
                 !BackspaceRepeatGuard.mayRebuildKeys(backspaceTouchActive,deleteHeld))
@@ -2648,6 +2675,10 @@ public final class RebornImeService extends InputMethodService {
         attachSafeEnterKey(enterKey);
         keys.addView(bottom);
         showSuggestions();
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.KEY_LAYOUT,auditStart411);
+        }
     }
     /**
      * Numeric/financial input: actual digits, decimal and deletion, with a
@@ -3124,6 +3155,8 @@ public final class RebornImeService extends InputMethodService {
         return b;
     }
     private void type(String value) {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         clearSpaceHighlight372();
         final long keyStart340=CandidateLatencyMetrics.start(getPackageName());
         cancelStableWord329();
@@ -3282,6 +3315,10 @@ public final class RebornImeService extends InputMethodService {
             suggestionHandler.post(this::refreshShiftCase398);
         CandidateLatencyMetrics.recordKeyHandler340(
                 keyStart340,System.nanoTime());
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.KEY,auditStart411);
+        }
     }
     private void deleteSwipeWords(int words,InputConnection ic,
             BackspaceSwipeSnapshotGuard.Ticket ticket,long downSession) {
@@ -3347,6 +3384,8 @@ public final class RebornImeService extends InputMethodService {
     // the final composing letter and briefly show an empty suggestion hint.
     private boolean singleBackspaceMutation338;
     private void backspace() {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         clearSpaceHighlight372();
         clearPendingCaretInsert364();
         clearTapSequence340();
@@ -3432,6 +3471,10 @@ public final class RebornImeService extends InputMethodService {
         // The previous per-repeat refresh recreated every key ~15 times/sec.
         // Preserve the live backspace touch target until release.
         if(!deleteHeld && oldShift!=shift)refreshView();
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.BACKSPACE,auditStart411);
+        }
     }
     private boolean tryHighlightedSpace372() {
         if(!spaceAcceptEnabled372 || activePredictionTouch372!=null)
@@ -3469,6 +3512,8 @@ public final class RebornImeService extends InputMethodService {
         return true;
     }
     private void space() {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         // A settled, visibly highlighted word correction may be accepted by
         // Space as one checked replacement WITH its trailing word boundary.
         // Do not add a second literal Space after successful acceptance.
@@ -3576,6 +3621,10 @@ public final class RebornImeService extends InputMethodService {
         }
         if(previousShift!=shift && !capsLock && !symbols)
             suggestionHandler.post(this::refreshShiftCase398);
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.SPACE,auditStart411);
+        }
     }
     private void insertNewlineSafely() {
         InputConnection ic = getCurrentInputConnection();
@@ -4070,6 +4119,8 @@ public final class RebornImeService extends InputMethodService {
     }
     // Read the whole word straddling the insertion point without moving the cursor.
     private String wordAtCursor() {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         if(hasSelection())return "";
         InputConnection ic=getCurrentInputConnection();
         if(ic==null)return "";
@@ -4082,6 +4133,10 @@ public final class RebornImeService extends InputMethodService {
                 EnglishApostrophePolicy.isTokenChar(after.charAt(right)))right++;
         if(left==before.length() && right==0)return "";
         return before.subSequence(left,before.length()).toString()+after.subSequence(0,right).toString();
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.CURSOR_READ,auditStart411);
+        }
     }
     private void clearPredictionDisplay409() {
         if(candidates==null || PredictionIsolationMode409.renders(
@@ -4103,6 +4158,8 @@ public final class RebornImeService extends InputMethodService {
         }
     }
     private void showSuggestions() {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         if(candidates==null)return;
         if(!PredictionIsolationMode409.renders(predictionIsolationMode409)) {
             clearPredictionDisplay409();
@@ -4415,6 +4472,10 @@ public final class RebornImeService extends InputMethodService {
                     recordNextCandidateFrame(id,startedAt);
             });
         });
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.SUGGESTION_ENTRY,auditStart411);
+        }
     }
     /**
      * The callback runs at the beginning of the next animation time step,
@@ -4437,6 +4498,8 @@ public final class RebornImeService extends InputMethodService {
     }
     private void renderSuggestions(String input,List<String> options,
             boolean preliminary345) {
+        final long auditStart411=OrivraPerfAudit411.begin();
+        try {
         // An async result may arrive after the next key was committed.
         // Never let it spend UI-frame time repainting the strip mid-typing.
         if(pendingIdlePaint410())return;
@@ -4796,6 +4859,10 @@ public final class RebornImeService extends InputMethodService {
                 divider.setMargins(dp(3),0,dp(3),0);
                 candidates.addView(separator,divider);
             }
+        }
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.SUGGESTION_RENDER,auditStart411);
         }
     }
 }
