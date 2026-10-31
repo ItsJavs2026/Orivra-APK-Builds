@@ -2620,6 +2620,7 @@ public final class RebornImeService extends InputMethodService {
                         hintPressOrder353.cancel(token386);
                         final InputConnection editor386=pressEditor[0];
                         final long session386=pressSession[0];
+                        final long startedSerial386=rowDownSerial386[0];
                         final String expected386=rowExpected386[0];
                         final int start386=rowSelectionStart386[0];
                         final int end386=rowSelectionEnd386[0];
@@ -2630,7 +2631,7 @@ public final class RebornImeService extends InputMethodService {
                         suggestionHandler.post(()->{
                             if(editor386!=getCurrentInputConnection() ||
                                     session386!=inputSessionGeneration ||
-                                    rowDownSerial386[0]!=alphabetDownSerial386)
+                                    startedSerial386!=alphabetDownSerial386)
                                 return;
                             String live386=composing.isEmpty()?wordAtCursor():composing;
                             boolean valid386=PredictionSwipe372.safeRelease(
