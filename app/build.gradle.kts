@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build411audittrial"
+        applicationId = "com.chroomareborn.keyboard.build412striptrial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 411
-        versionName = "1.0.65-build411-performance-audit"
-        manifestPlaceholders["appLabel"] = "Orivra 411 Audit Test"
+        versionCode = 412
+        versionName = "1.0.66-build412-stable-strip"
+        manifestPlaceholders["appLabel"] = "Orivra 412 Stable Strip"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra 411 Audit Test"
+            manifestPlaceholders["appLabel"] = "Orivra 412 Stable Strip"
         }
     }
     compileOptions {
