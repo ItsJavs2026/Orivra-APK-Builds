@@ -58,3 +58,6 @@ Expected local APK `/storage/emulated/0/AndroidIDEProjects/Orivra413Keypath/app/
 
 ## Privacy/safety
 No network permissions, no words in timing report, app state separate from other keyboards. Keep Gboard installed. Fast ACK and asynchronous learning both have OFF switches to restore old algorithm for comparison. This is experimental code only until device testing.
+
+## Backspace key layout optimization (same branch)
+One frequent full-layout rebuild was identified in the Backspace gesture ACTION_UP posted callback. For an ordinary alphabet layout (non-symbol, non-numeric), the callback now uses `refreshShiftCase398()` to relabel the already mounted keys in place instead of calling `refreshView()` and tearing down/recreating every key. Symbol and numeric modes retain the original full refresh. This reduces avoidable 14.61ms-average layout operations but is untested on Samsung until APK compilation. Verify no lost touch/Shift/backspace-hold regressions. The new measurement will determine whether layout refresh count drops meaningfully.
