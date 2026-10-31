@@ -22,8 +22,8 @@ final class OrivraPerfAudit411 {
             IDLE_WORD_OBSERVATION_413=16, SPACE_APPROVED_LEARNING_413=17,
             SPACE_EDITOR_COMMIT_413=18, LEARNING_WORKER_413=19,
             SPACE_PRECOMMIT_CHECKS_413=20, SPACE_POSTCOMMIT_413=21,
-            IDLE_WORD_VERIFICATION_414=22;
-    static final int SIZE=23;
+            IDLE_WORD_VERIFICATION_414=22, HAPTIC_TOUCH_415=23;
+    static final int SIZE=24;
     private static final String[] NAMES={
         "Letter key handler", "Space handler", "Backspace handler",
         "Suggestion scheduling", "Suggestion rendering", "Rise panel UI",
@@ -35,7 +35,7 @@ final class OrivraPerfAudit411 {
         "Idle word observation", "Space learning dispatch",
         "Space finish/commit IPC", "Approved learning background worker",
         "Space boundary checks before commit", "Space processing after commit",
-        "Idle word verification after typing stops"
+        "Idle word verification after typing stops", "Key haptic feedback"
     };
     private static volatile boolean enabled;
     private static final long[] count=new long[SIZE];
@@ -48,6 +48,8 @@ final class OrivraPerfAudit411 {
     private static long learningQueueOverflow413;
     private static long hiddenStaleChip414,discardedFrame414,
             recoveredFrame414;
+    private static long predictionScheduled415,predictionPreempted415,
+            predictionCompleted415;
 
     private OrivraPerfAudit411(){}
 
@@ -81,9 +83,20 @@ final class OrivraPerfAudit411 {
     static synchronized void recordRecoveredFrame414(){
         if(enabled)recoveredFrame414++;
     }
+    static synchronized void recordPredictionScheduled415(){
+        if(enabled)predictionScheduled415++;
+    }
+    static synchronized void recordPredictionPreempted415(){
+        if(enabled)predictionPreempted415++;
+    }
+    static synchronized void recordPredictionCompleted415(){
+        if(enabled)predictionCompleted415++;
+    }
     static synchronized void reset(){
         learningQueueOverflow413=0;
         hiddenStaleChip414=discardedFrame414=recoveredFrame414=0;
+        predictionScheduled415=predictionPreempted415=
+                predictionCompleted415=0;
         for(int i=0;i<SIZE;i++){
             count[i]=0;nanos[i]=0;maximumNanos[i]=0;
             over8ms[i]=0;over16ms[i]=0;over32ms[i]=0;
@@ -98,7 +111,7 @@ final class OrivraPerfAudit411 {
     }
     static synchronized String report(String settings){
         StringBuilder b=new StringBuilder(900);
-        b.append("ORIVRA BUILD 414 KEY/PREDICTION PERFORMANCE AUDIT\n");
+        b.append("ORIVRA BUILD 415 KEY/PREDICTION PERFORMANCE AUDIT\n");
         b.append("Counts and timings only. No typing stored or transmitted.\n");
         b.append("Audit: ").append(enabled?"ON":"OFF");
         b.append(" | elapsed since reset: ")
@@ -123,6 +136,12 @@ final class OrivraPerfAudit411 {
                 .append(discardedFrame414).append('\n');
         b.append("Prediction frame refresh retries: ")
                 .append(recoveredFrame414).append('\n');
+        b.append("Prediction worker jobs scheduled: ")
+                .append(predictionScheduled415).append('\n');
+        b.append("Prediction pending jobs preempted: ")
+                .append(predictionPreempted415).append('\n');
+        b.append("Prediction worker results delivered: ")
+                .append(predictionCompleted415).append('\n');
         b.append("Note: render/panel timings overlap with suggestion "+
                 "entry; don't add their times together.\n");
         b.append("Slow handlers do not establish physical touch-to-frame "+
