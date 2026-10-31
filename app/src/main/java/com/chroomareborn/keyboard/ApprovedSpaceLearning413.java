@@ -26,7 +26,7 @@ final class ApprovedSpaceLearning413 implements AutoCloseable {
                 t.setDaemon(true);
                 t.setPriority(Thread.NORM_PRIORITY-1);
                 return t;
-            },new ThreadPoolExecutor.DiscardPolicy());
+            },new ThreadPoolExecutor.AbortPolicy());
 
     /**
      * The caller has already checked the editor, session, consent and Space
@@ -57,8 +57,9 @@ final class ApprovedSpaceLearning413 implements AutoCloseable {
                 }
             });
         } catch(RejectedExecutionException shuttingDown) {
-            // No UI-thread fallback. A failed/overloaded diagnostic worker
-            // must never stall typing or re-queue an old learning action.
+            // No UI-thread fallback or silently lost observation. Count only
+            // an aggregate overflow, never the word or editor contents.
+            OrivraPerfAudit411.recordLearningQueueOverflow413();
         }
     }
     @Override public void close(){
