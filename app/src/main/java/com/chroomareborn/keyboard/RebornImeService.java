@@ -1536,8 +1536,14 @@ public final class RebornImeService extends InputMethodService {
                                 editor,getCurrentInputConnection()))return;
                         if(swipe)deleteSwipeWords(words,editor,ticket,sessionAtDown);
                         else if(tap)backspace();
-                        // refreshView already updates the suggestion strip.
-                        refreshView();
+                        // A normal Backspace gesture should not detach and
+                        // recreate the entire alphabet (~14.61ms per layout
+                        // refresh on the Samsung audit). In-place relabeling
+                        // retains all touch targets and refreshes suggestions.
+                        if(!symbols && !numericEditor)
+                            refreshShiftCase398();
+                        else
+                            refreshView();
                     });
                     return true;
                 }
