@@ -13,6 +13,7 @@ import java.util.List;
  */
 final class PredictionSwipe372 {
     private PredictionSwipe372() {}
+    static final String PREF="prediction_slide_select_372";
     enum Direction { NONE, LEFT, RIGHT, UP }
 
     static Direction direction(float dx,float dy,float slop,boolean riseVisible) {
