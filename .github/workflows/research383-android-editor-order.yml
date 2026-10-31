@@ -1,0 +1,105 @@
+name: Orivra Research 383 - real Android editor action order (no APK)
+on:
+  push:
+    branches:
+      - research/build383-android-editor-action-order-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research383
+  cancel-in-progress: true
+jobs:
+  real-editor-on-main-looper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Confirm no IME integration or new APK release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='2c1b65ca254d3bdf2ee8dbbf79e2258a78c7daee'
+          changed=set(subprocess.check_output(
+              ['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          expected={
+              'app/src/androidTest/java/com/chroomareborn/keyboard/DeferredEditorAction383AndroidTest.java',
+              'docs/RESEARCH383_ANDROID_EDITOR_ACTION_ORDER_20261030.md',
+              '.github/workflows/research383-android-editor-order.yml',
+          }
+          assert changed==expected,(changed,expected)
+          code=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'MixedThumbOrder380' not in code
+          build=Path('app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build378trial"' in build
+          assert 'versionCode = 378' in build
+          manifest=Path('app/src/main/AndroidManifest.xml').read_text()
+          assert 'android.permission.INTERNET' not in manifest
+          print('PASS: only test changes, installed Candidate 378 remains unchanged')
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Restore pinned offline dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile unchanged candidate and new instrumentation
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Require at least 242 passing Android emulator tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,'Missing Android instrumentation reports'
+          tests=failures=errors=skipped=0
+          for f in reports:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  x for x in root.iter() if x.tag.endswith('testsuite')]
+              for s in suites:
+                  tests+=int(s.attrib.get('tests','0'))
+                  failures+=int(s.attrib.get('failures','0'))
+                  errors+=int(s.attrib.get('errors','0'))
+                  skipped+=int(s.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skipped} skipped')
+          assert tests>=242 and failures==0 and errors==0 and skipped==0
+          PY
