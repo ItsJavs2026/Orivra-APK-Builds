@@ -396,47 +396,66 @@ public final class RebornImeService extends InputMethodService {
     private void scheduleStableWord329() {
         final long substageStart413=OrivraPerfAudit411.begin();
         try {
-        cancelStableWord329();
-        // Some editors (including custom chat/search controls) commit each
-        // keystroke instead of keeping an Android composing span. The live
-        // word-under-caret supplies the same bounded, snapshot-verified input.
-        String visible=composing.isEmpty()?wordAtCursor():composing;
-        String expected=StableWordUsagePolicy329.candidate(
-                visible,PersonalLearning.enabled(this),
-                editorAllowsPersonalLearning,sensitive,editingInMiddle,
-                hasSelection(),cursorHasTextAfter(),symbols,numericEditor);
-        if(expected==null || (expected.equals(stableWordCounted329) &&
-                stableWordSession329==inputSessionGeneration))return;
-        final InputConnection editor=getCurrentInputConnection();
-        final long session=inputSessionGeneration;
-        if(editor==null)return;
-        final Runnable candidate=()->{
-            pendingStableWord329=null;
-            if(!PersonalLearning.enabled(this) || !editorAllowsPersonalLearning ||
-                    sensitive || editingInMiddle || hasSelection() ||
-                    cursorHasTextAfter() || symbols || numericEditor)return;
-            try {
-                String stillVisible=composing.isEmpty()?wordAtCursor():composing;
-                if(StableWordUsagePolicy329.sameVisibleWord(expected,
-                        stillVisible,editor.getTextBeforeCursor(64,0),
-                        editor==getCurrentInputConnection(),
-                        session==inputSessionGeneration)) {
-                    PersonalWordFrequency328.recordCommitted(this,expected);
+            cancelStableWord329();
+            // 414: do not perform any wordAtCursor()/getTextAfterCursor()
+            // IPC on the typing hot path. A locally composed or tapped word
+            // is only a candidate for a delayed, fully verified observation.
+            if(!editorAllowsPersonalLearning || sensitive ||
+                    editingInMiddle || hasSelection() || symbols ||
+                    numericEditor || !PersonalLearning.enabled(this))return;
+            final long session=inputSessionGeneration;
+            final String localWord=composing.isEmpty()?
+                    (lastTappedSession340==session?lastTappedWord340:""):
+                    composing;
+            if(localWord.isEmpty())return;
+            final long delay=StableWordTiming334.milliseconds(localWord);
+            if(delay<=0)return;
+            final InputConnection editor=getCurrentInputConnection();
+            if(editor==null)return;
+            final Runnable observer=()->{
+                pendingStableWord329=null;
+                // The editor may have switched, typing resumed, or consent
+                // changed during the idle interval. No stale persistence.
+                if(editor!=getCurrentInputConnection() ||
+                        session!=inputSessionGeneration ||
+                        !PersonalLearning.enabled(this) ||
+                        !editorAllowsPersonalLearning || sensitive ||
+                        editingInMiddle || hasSelection() || symbols ||
+                        numericEditor || cursorHasTextAfter())return;
+                try {
+                    final String liveWord=composing.isEmpty()?
+                            wordAtCursor():composing;
+                    final String expected=StableWordUsagePolicy329.candidate(
+                            localWord,true,editorAllowsPersonalLearning,
+                            sensitive,editingInMiddle,hasSelection(),false,
+                            symbols,numericEditor);
+                    if(expected==null ||
+                            (expected.equals(stableWordCounted329) &&
+                             session==stableWordSession329) ||
+                            !StableWordUsagePolicy329.sameVisibleWord(
+                                    expected,liveWord,
+                                    editor.getTextBeforeCursor(64,0),
+                                    editor==getCurrentInputConnection(),
+                                    session==inputSessionGeneration))
+                        return;
+                    // Persist only this already-verified approved word. The
+                    // same opt-in checks run on the bounded background worker.
+                    if(backgroundSpaceLearning413)
+                        approvedLearning413.record(this,null,null,expected);
+                    else
+                        PersonalWordFrequency328.recordCommitted(this,expected);
                     personalPrefixCache340.clear();
                     stableWordCounted329=expected;
                     stableWordSession329=session;
+                } catch(RuntimeException detached) {
+                    // Aborted/changed editor: do not retry an ambiguous read.
                 }
-            } catch(RuntimeException detached){/* ignore stale input editor */}
-        };
-        pendingStableWord329=candidate;
-        // Idle observation is weaker than an explicit tap. Combined with
-        // minimum repeat thresholds, a pause mid-word won't auto-replace it.
-        long stableDelayMs=StableWordTiming334.milliseconds(expected);
-        if(stableDelayMs>0)
-            suggestionHandler.postDelayed(candidate,stableDelayMs);
-    
+            };
+            pendingStableWord329=observer;
+            suggestionHandler.postDelayed(observer,delay);
         } finally {
-            OrivraPerfAudit411.end(OrivraPerfAudit411.IDLE_WORD_OBSERVATION_413,
+            OrivraPerfAudit411.end(
+                    OrivraPerfAudit411.IDLE_WORD_OBSERVATION_413,
                     substageStart413);
         }
     }
