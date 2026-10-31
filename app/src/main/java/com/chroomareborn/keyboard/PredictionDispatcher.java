@@ -37,16 +37,20 @@ final class PredictionDispatcher implements AutoCloseable {
     private ScheduledFuture<?> scheduled;
     private volatile boolean closed;
     PredictionDispatcher() {
+        this(true);
+    }
+    // 409 diagnostic: disable eager model warming when comparing typing
+    // without predictions. Normal callers retain the original behavior.
+    PredictionDispatcher(boolean warmOnStartup) {
         this((input, editing) -> editing
                 ? PredictionLite.editingSuggestions(input)
                 : PredictionLite.suggestions(input));
-        // Only a known PUBLIC, non-user word is used. Prepare the offline
-        // lexicon on the background worker when the keyboard service starts,
-        // not on the first letter's UI thread. No suggestions are displayed
-        // and no user data is retained or sent anywhere.
-        worker.execute(()->{
-            if(!closed)PredictionLite.publicWordForContext("hello");
-        });
+        if(warmOnStartup) {
+            // Only a known PUBLIC, non-user word is used for warming.
+            worker.execute(()->{
+                if(!closed)PredictionLite.publicWordForContext("hello");
+            });
+        }
     }
     PredictionDispatcher(Predictor predictor) {
         if (predictor == null) throw new IllegalArgumentException("Predictor required");
