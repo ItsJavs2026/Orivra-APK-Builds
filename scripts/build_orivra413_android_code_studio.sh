@@ -24,6 +24,7 @@ if [ "$BRANCH" != "$EXPECTED_BRANCH" ]; then
 fi
 echo "Branch: $BRANCH"
 echo "Commit: $(git -C "$SOURCE" rev-parse --short HEAD)"
+bash "$SOURCE/scripts/run_orivra413_core_tests.sh"
 
 if [ ! -f "$WRAPPER_SOURCE/gradlew" ] ||
    [ ! -f "$WRAPPER_SOURCE/gradle/wrapper/gradle-wrapper.jar" ] ||
