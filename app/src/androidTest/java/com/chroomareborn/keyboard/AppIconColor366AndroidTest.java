@@ -146,9 +146,18 @@ public final class AppIconColor366AndroidTest {
         for(int i=0;i<300;i++) {
             AppIconHueCache366.request(ctx,"com.example.orivra_unused_icon"+i,null);
             assertTrue("No unbounded optional icon tasks",
-                    AppIconHueCache366.inFlightForTest()<=8);
+                    AppIconHueCache366.inFlightForTest()<=2);
             assertTrue("Bounded color cache",AppIconHueCache366.cacheSizeForTest()<=40);
         }
+        // Prefer the actual foreground app after 300 transient requests.
+        String self=ctx.getPackageName();
+        AppIconHueCache366.request(ctx,self,null);
+        long deadline=SystemClock.elapsedRealtime()+10_000;
+        while(!AppIconHueCache366.cacheContainsForTest(self) &&
+                SystemClock.elapsedRealtime()<deadline)
+            SystemClock.sleep(30);
+        assertTrue("Foreground icon request must not starve",
+                AppIconHueCache366.cacheContainsForTest(self));
     }
 
 }
