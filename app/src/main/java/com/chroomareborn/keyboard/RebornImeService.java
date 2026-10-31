@@ -4058,10 +4058,29 @@ public final class RebornImeService extends InputMethodService {
                 return;
             // WORKER_ONLY isolates offline computation from all suggestion
             // rendering and UI merge callbacks. The result is discarded.
+            // Sample committed-word editors too: a chat composer may commit
+            // individual characters and leave "composing" empty. Restrict
+            // extra editor queries to the already-deferred prediction pass.
             if(predictionIsolationMode409==PredictionIsolationMode409.WORKER_ONLY &&
                     !sensitive && editorAllowsSuggestions && !numericEditor &&
-                    !symbols && !composing.isEmpty()) {
-                predictionDispatcher.schedule(composing,(id,input,options)->{});
+                    !symbols) {
+                String word409=composing;
+                boolean editing409=false;
+                if(word409.isEmpty() && !editingInMiddle &&
+                        !hasSelection() && !cursorHasTextAfter()) {
+                    word409=wordAtCursor();
+                    editing409=!word409.isEmpty();
+                }
+                if(!word409.isEmpty()) {
+                    if(editing409)
+                        predictionDispatcher.scheduleEditing(word409,
+                                (id,input,options)->{});
+                    else
+                        predictionDispatcher.schedule(word409,
+                                (id,input,options)->{});
+                } else {
+                    predictionDispatcher.cancel();
+                }
             } else {
                 predictionDispatcher.cancel();
             }
