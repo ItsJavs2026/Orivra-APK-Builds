@@ -99,7 +99,9 @@ final class PersonalContextLearning319 {
             int count=(Integer)entry.getValue();
             if(count<1 || count>1000)continue;
             String target=key.substring((accepted?acceptedPrefix:usedPrefix).length());
-            if(!target.equals(AcceptedContextPolicy319.acceptedWord(target)))
+            // The stored-key check is equivalent to acceptedWord(target)
+            // equality, but avoids regex allocation for every context key.
+            if(!FastStoredLearningPolicy395.canonicalContextTarget(target))
                 continue;
             int[] values=evidence.computeIfAbsent(target,k->new int[2]);
             values[accepted?0:1]=count;

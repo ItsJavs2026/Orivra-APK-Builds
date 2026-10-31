@@ -98,7 +98,11 @@ final class PersonalWordFrequency328 {
                 continue;
             String word=e.getKey().substring(PREFIX.length());
             int score=(Integer)e.getValue();
+            // A canonical lowercase stored word that cannot start with this
+            // prefix must never reach the costly per-word regex/case path.
+            // Noncanonical/legacy keys fall back to the original validator.
             if(score<1 || score>1000 ||
+                    FastStoredLearningPolicy395.definitelyNotPrefix(raw,word) ||
                     !AdaptivePrefixPolicy328.eligible(raw,word,score))
                 continue;
             // Still validate manually saved words on every refresh, but
