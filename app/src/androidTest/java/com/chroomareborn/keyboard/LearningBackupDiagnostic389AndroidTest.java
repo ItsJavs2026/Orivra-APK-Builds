@@ -61,6 +61,11 @@ public final class LearningBackupDiagnostic389AndroidTest {
         assertEquals(LearningBackupDiagnostic389.Status.CHECKSUM,
                 LearningBackupDiagnostic389.checkText(context,changed).status);
     }
+    @Test public void bomPrefixedOrivraFileIsRecognizedAsAlteredNotWrongFile(){
+        String changed=String.valueOf((char)0xFEFF)+validV4();
+        assertEquals(LearningBackupDiagnostic389.Status.CHECKSUM,
+                LearningBackupDiagnostic389.checkText(context,changed).status);
+    }
     @Test public void badDocumentSizeAndUtf8GetSeparatePrivateMessages(){
         assertEquals(LearningBackupDiagnostic389.Status.FILE_TOO_LARGE,
                 LearningBackupDiagnostic389.readFailure(

@@ -91,7 +91,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
-      - name: Require at least 250 passing Android tests and zero skips
+      - name: Require at least 251 passing Android tests and zero skips
         shell: bash
         run: |
           set -euo pipefail
@@ -110,5 +110,5 @@ jobs:
                   errors+=int(suite.attrib.get('errors','0'))
                   skips+=int(suite.attrib.get('skipped','0'))
           print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
-          assert tests>=250 and failures==0 and errors==0 and skips==0
+          assert tests>=251 and failures==0 and errors==0 and skips==0
           PY
