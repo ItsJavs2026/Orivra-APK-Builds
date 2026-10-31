@@ -1951,6 +1951,8 @@ public final class RebornImeService extends InputMethodService {
         predictionIsolationMode409=PredictionIsolationMode409.normalize(
                 visualOptions370.getInt(PredictionIsolationMode409.PREF,
                         PredictionIsolationMode409.OFF));
+        if(predictionIsolationMode409==PredictionIsolationMode409.FULL)
+            predictionDispatcher.warmPublicDictionary410();
         instantKeyFeedback369=visualOptions370.getBoolean(
                 KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true);
         fastSymbolHold367=visualOptions370.getBoolean(
@@ -1998,6 +2000,8 @@ public final class RebornImeService extends InputMethodService {
         idlePredictionPaintEnabled410=getSharedPreferences(
                 "keyboard_feedback",MODE_PRIVATE)
                         .getBoolean(IDLE_PAINT_PREF_410,true);
+        if(predictionIsolationMode409==PredictionIsolationMode409.FULL)
+            predictionDispatcher.warmPublicDictionary410();
         predictionDispatcher.cancel();
         setColors(info);
         // AFTER the session-generation bump. Explicit permission is OFF
