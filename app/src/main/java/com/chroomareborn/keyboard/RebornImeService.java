@@ -2213,6 +2213,11 @@ public final class RebornImeService extends InputMethodService {
                 SAFE_SAMPLE_PREF_415,true);
         fastSpaceShift416=fullOptions411.getBoolean(
                 FAST_SPACE_SHIFT_PREF_416,false);
+        // 416C: some apps hide/show the keyboard without onStartInput().
+        // Apply prediction-swipe setting when the view returns too; this
+        // makes gesture-vs-normal-tap A/B settings actually take effect.
+        predictionSwipeEnabled372=fullOptions411.getBoolean(
+                PredictionSwipe372.PREF,true);
         applyFastQuietPolicy415();
         reloadHaptics415(fullOptions411);
         riseEnabled411=fullOptions411.getBoolean(RISE_ENABLED_PREF_411,true);
