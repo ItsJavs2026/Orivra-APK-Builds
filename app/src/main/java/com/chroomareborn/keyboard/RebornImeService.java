@@ -394,6 +394,11 @@ public final class RebornImeService extends InputMethodService {
         pendingStableWord329=null;
     }
     private void scheduleStableWord329() {
+        if(!deferredStableWord414) {
+            // Per-editor reversible baseline for regression comparisons.
+            scheduleStableWordLegacy413();
+            return;
+        }
         final long substageStart413=OrivraPerfAudit411.begin();
         try {
             cancelStableWord329();
@@ -463,6 +468,53 @@ public final class RebornImeService extends InputMethodService {
         } finally {
             OrivraPerfAudit411.end(
                     OrivraPerfAudit411.IDLE_WORD_OBSERVATION_413,
+                    substageStart413);
+        }
+    }
+    private void scheduleStableWordLegacy413() {
+        final long substageStart413=OrivraPerfAudit411.begin();
+        try {
+        cancelStableWord329();
+        // Some editors (including custom chat/search controls) commit each
+        // keystroke instead of keeping an Android composing span. The live
+        // word-under-caret supplies the same bounded, snapshot-verified input.
+        String visible=composing.isEmpty()?wordAtCursor():composing;
+        String expected=StableWordUsagePolicy329.candidate(
+                visible,PersonalLearning.enabled(this),
+                editorAllowsPersonalLearning,sensitive,editingInMiddle,
+                hasSelection(),cursorHasTextAfter(),symbols,numericEditor);
+        if(expected==null || (expected.equals(stableWordCounted329) &&
+                stableWordSession329==inputSessionGeneration))return;
+        final InputConnection editor=getCurrentInputConnection();
+        final long session=inputSessionGeneration;
+        if(editor==null)return;
+        final Runnable candidate=()->{
+            pendingStableWord329=null;
+            if(!PersonalLearning.enabled(this) || !editorAllowsPersonalLearning ||
+                    sensitive || editingInMiddle || hasSelection() ||
+                    cursorHasTextAfter() || symbols || numericEditor)return;
+            try {
+                String stillVisible=composing.isEmpty()?wordAtCursor():composing;
+                if(StableWordUsagePolicy329.sameVisibleWord(expected,
+                        stillVisible,editor.getTextBeforeCursor(64,0),
+                        editor==getCurrentInputConnection(),
+                        session==inputSessionGeneration)) {
+                    PersonalWordFrequency328.recordCommitted(this,expected);
+                    personalPrefixCache340.clear();
+                    stableWordCounted329=expected;
+                    stableWordSession329=session;
+                }
+            } catch(RuntimeException detached){/* ignore stale input editor */}
+        };
+        pendingStableWord329=candidate;
+        // Idle observation is weaker than an explicit tap. Combined with
+        // minimum repeat thresholds, a pause mid-word won't auto-replace it.
+        long stableDelayMs=StableWordTiming334.milliseconds(expected);
+        if(stableDelayMs>0)
+            suggestionHandler.postDelayed(candidate,stableDelayMs);
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.IDLE_WORD_OBSERVATION_413,
                     substageStart413);
         }
     }
@@ -772,6 +824,10 @@ public final class RebornImeService extends InputMethodService {
     // This small gate retains only a temporary editor reference/session,
     // never typed text. Direct touches still use existing InputConnection.
     private final TypingRefreshGate401 typingRefresh401=new TypingRefreshGate401();
+    // A/B gate for 414's low-IPC stable-word observer (default ON).
+    private static final String DEFER_STABLE_WORD_PREF_414=
+            "orivra_deferred_stable_word_414";
+    private boolean deferredStableWord414=true;
     // 413: reversible, read once at editor activation.
     private static final String FAST_COMPOSE_PREF_413="orivra_fast_compose_ack_413";
     private static final String BACKGROUND_LEARNING_PREF_413=
@@ -2023,6 +2079,8 @@ public final class RebornImeService extends InputMethodService {
                 IDLE_PAINT_PREF_410,true);
         frameUpdatesEnabled412=visualOptions370.getBoolean(
                 FRAME_PREF_412,true);
+        deferredStableWord414=visualOptions370.getBoolean(
+                DEFER_STABLE_WORD_PREF_414,true);
         fastComposingAck413=visualOptions370.getBoolean(
                 FAST_COMPOSE_PREF_413,true);
         backgroundSpaceLearning413=visualOptions370.getBoolean(
@@ -2087,6 +2145,8 @@ public final class RebornImeService extends InputMethodService {
                 IDLE_PAINT_PREF_410,true);
         riseEnabled411=fullOptions411.getBoolean(RISE_ENABLED_PREF_411,true);
         frameUpdatesEnabled412=fullOptions411.getBoolean(FRAME_PREF_412,true);
+        deferredStableWord414=fullOptions411.getBoolean(
+                DEFER_STABLE_WORD_PREF_414,true);
         fastComposingAck413=fullOptions411.getBoolean(
                 FAST_COMPOSE_PREF_413,true);
         backgroundSpaceLearning413=fullOptions411.getBoolean(
