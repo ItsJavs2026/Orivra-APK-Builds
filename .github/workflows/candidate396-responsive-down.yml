@@ -1,0 +1,316 @@
+name: Orivra Candidate 396 - responsive typing and reliable DOWN
+on:
+  push:
+    branches:
+      - candidate/build396-down-latency-recovery-20261031
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-candidate396
+  cancel-in-progress: true
+jobs:
+  source-and-gestures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Ensure Candidate 396 only changes app identity and recovery guidance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='a8802b51806f960de5d89d49759cc33002cbc965'
+          changed=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          expected={
+              'app/build.gradle.kts',
+              'app/src/main/java/com/chroomareborn/keyboard/MainActivity.java',
+              'app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java',
+              'docs/CANDIDATE396_RESPONSIVE_DOWN_20261031.md',
+              '.github/workflows/candidate396-responsive-down.yml',
+          }
+          assert changed==expected,(changed^expected)
+          old=lambda p:subprocess.check_output(['git','show',base+':'+p],text=True)
+          source=[
+              'RebornImeService.java','LetterRowPredictionSwipe386.java',
+              'LetterRowIdleMode388.java','PredictionSwipe372.java',
+              'HighlightedSpace372.java','SentenceSuggestionCommit.java',
+              'HintKeyPressOrder353.java','ThumbTapGuard377.java',
+              'ChatComposerReset393.java','LearningCapacity390.java',
+              'LearningTransferCodec.java','PersonalLearning.java',
+              'ContextBackupFormat322.java','PersonalContextLearning319.java',
+              'FrequencyBackupFormat330.java','PersonalWordFrequency328.java',
+              'FastStoredLearningPolicy395.java',
+              'TypedLearningV4Transfer347.java','TypedLearningV4Codec341.java',
+              'TypedWordEvidenceStore341.java','PredictionDispatcher.java',
+          ]
+          root=Path('app/src/main/java/com/chroomareborn/keyboard')
+          for name in source:
+              path=str(root/name)
+              assert Path(path).read_text()==old(path),path
+          for name in [
+              'LearningCapacity390AndroidTest.java',
+              'LetterRowIdle388AndroidTest.java',
+              'LetterRowPredictionSwipe386AndroidTest.java',
+              'LetterRowDown396AndroidTest.java',
+              'ChatComposerStress393AndroidTest.java',
+              'FastStoredLearning395AndroidTest.java',
+              'LoadedLearningLatency394AndroidTest.java'
+          ]:
+              path='app/src/androidTest/java/com/chroomareborn/keyboard/'+name
+              assert Path(path).read_text()==old(path),path
+          build=Path('app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build396trial"' in build
+          assert 'versionCode = 396' in build
+          assert '"Orivra Candidate 396"' in build
+          main=(root/'MainActivity.java').read_text()
+          assert 'Orivra — Candidate 396 Test' in main
+          assert 'SAFE CANDIDATE 391' in main
+          assert 'TypedLearningV4Transfer347.importConfirmed(' in main
+          assert 'TypedLearningV4Transfer347.exportV4(this)' in main
+          for path in [
+              'app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/OfflineLanguagePackAndroidTest.java'
+          ]:assert 'com.chroomareborn.keyboard.build396trial' in Path(path).read_text()
+          ime=(root/'RebornImeService.java').read_text()
+          assert 'LetterRowIdleMode388.start(' in ime
+          assert 'ChatComposerReset393.shouldRecover(' in ime
+          assert 'committedDirection386,now386,chosenIdle388' in ime
+          recognizer=(root/'LetterRowPredictionSwipe386.java').read_text()
+          assert 'if(centeredIdle && visible.size()==1)' in recognizer
+          assert 'if(dy>=32f*density' in recognizer
+          caps=(root/'LearningCapacity390.java').read_text()
+          for item in ['MAX_CORRECTIONS=384','MAX_CONTEXT_KEYS=320','MAX_FREQUENCIES=400']:
+              assert item in caps,item
+          manifest=Path('app/src/main/AndroidManifest.xml').read_text()
+          assert 'android:allowBackup="false"' in manifest
+          assert 'android:usesCleartextTraffic="false"' in manifest
+          assert 'android.permission.INTERNET' not in manifest
+          print('PASS: independent 396 package; 391 and all V4 learning source unchanged')
+          PY
+      - name: Replay 130k letter-row gestures and tiny-word Space policies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/row386"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/row386" \
+            app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java \
+            app/src/main/java/com/chroomareborn/keyboard/SuggestionContinuity353.java \
+            app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java \
+            app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386Research.java
+          java -cp "$RUNNER_TEMP/row386" \
+            com.chroomareborn.keyboard.LetterRowPredictionSwipe386Research
+      - name: Replay 80000 next-word idle gesture and stale-caret checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -cp "$RUNNER_TEMP/row386" \
+            -d "$RUNNER_TEMP/row386" \
+            app/src/main/java/com/chroomareborn/keyboard/LetterRowIdleMode388.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowIdleMode388Research.java
+          java -cp "$RUNNER_TEMP/row386" \
+            com.chroomareborn.keyboard.LetterRowIdleMode388Research
+      - name: Replay 200000 learning-capacity combinations
+        shell: bash
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/row386" \
+            app/src/main/java/com/chroomareborn/keyboard/LearningCapacity390.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LearningCapacity390Research.java
+          java -cp "$RUNNER_TEMP/row386" \
+            com.chroomareborn.keyboard.LearningCapacity390Research
+
+      - name: Stress 120k reliable DOWN and short-tap cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -cp "$RUNNER_TEMP/row386" \
+            -d "$RUNNER_TEMP/row386" \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowDown396Research.java
+          java -cp "$RUNNER_TEMP/row386" com.chroomareborn.keyboard.LetterRowDown396Research
+      - name: Stress 150k chat-send reset boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/row386" \
+            app/src/main/java/com/chroomareborn/keyboard/ChatComposerReset393.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ChatComposerReset393Research.java
+          java -cp "$RUNNER_TEMP/row386" com.chroomareborn.keyboard.ChatComposerReset393Research
+      - name: Stress 210k loaded-learning eligibility parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/row386" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/AcceptedContextPolicy319.java \
+            app/src/main/java/com/chroomareborn/keyboard/AdaptivePrefixPolicy328.java \
+            app/src/main/java/com/chroomareborn/keyboard/FastStoredLearningPolicy395.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/FastStoredLearning395Research.java
+          java -cp "$RUNNER_TEMP/row386" com.chroomareborn.keyboard.FastStoredLearning395Research
+
+  android35-qualify-and-release:
+    needs: source-and-gestures
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Restore pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile signed Candidate 396 and all 287+ deep typing DOWN performance tests
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -e
+            adb logcat -c
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+            echo "---- Candidate396 same-emulator loaded-learning timing ----"
+            adb logcat -d -v brief -s OrivraPerf395:I | grep 'R395 .*SAME-RUN p95'
+      - name: Verify full emulator suite, signature, package, permissions and dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,'Missing emulator test reports'
+          tests=failures=errors=skips=0
+          for file in reports:
+              root=ET.parse(file).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [s for s in root.iter() if s.tag.endswith('testsuite')]
+              for suite in suites:
+                  tests+=int(suite.attrib.get('tests','0'))
+                  failures+=int(suite.attrib.get('failures','0'))
+                  errors+=int(suite.attrib.get('errors','0'))
+                  skips+=int(suite.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
+          assert tests>=287 and failures==0 and errors==0 and skips==0
+          PY
+          mkdir -p dist
+          apk=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -type f -print -quit)
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n1 |
+            grep -Fq "package: name='com.chroomareborn.keyboard.build396trial' versionCode='396'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" list "$apk" |
+            grep -Fxq 'assets/dictionaries/esdb-en-US-60.esdbpack'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > dist/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$apk" > dist/permissions.txt
+          ! grep -Fq 'android.permission.INTERNET' dist/permissions.txt
+          cp "$apk" dist/Orivra-Candidate-396.apk
+          (cd dist && sha256sum Orivra-Candidate-396.apk > Orivra-Candidate-396.apk.sha256)
+          cat > dist/Release_Notes.txt <<'TXT'
+          Orivra Candidate 396 — Responsive Typing + Reliable Swipe DOWN
+
+          Package: com.chroomareborn.keyboard.build396trial
+          Independent experimental keyboard; keep Candidate 391 installed.
+          
+          DOWN SWIPE FIX
+          - Actual letter-row ASDF/QWERTY swipes now recognize deliberate
+            DOWN after 32dp instead of 42dp, while taps under 32dp are safe.
+          - A single visibly CENTERED idle prediction can now be selected
+            with DOWN, despite Android storing its lone TextView at index 0.
+          - Three-chip active-word center remains index 1; blank center never
+            chooses an adjacent suggestion.
+          - Editor, session, caret and matching live suggestion must remain
+            valid at release. No automatic Send or double Space.
+          - 1200 simulated host Send clears, 120k DOWN cases and full Android
+            instrumentation cover intermittent post-reply behavior.
+
+          RESPONSIVENESS
+          - Skip redundant per-record regex for frequency/context entries
+            that cannot match the current prefix, without caching personal
+            words or changing prediction ranks.
+          - Research 395 same-emulator loaded p95: frequency old 68.564 ms,
+            optimized 2.063 ms; context old 58.848 ms, optimized 2.838 ms.
+            These results are synthetic emulator timings, not Samsung timings.
+          - Research 393/394 long-typing stress: 36000 key commits, 240
+            chat-reset cycles, 2500 rapidly superseded predictor generations.
+          - Research396 plus independent candidate gating require 287+
+            Android 35 tests, zero skipped, failures or errors.
+
+          SAFE PERSONAL LEARNING
+          - No Internet/analytics permission. Original unified V4 grammar,
+            import checks and learning caps 384/320/400 remain unchanged.
+          - Candidate 396 is a SEPARATE app, with EMPTY initial local memory.
+          - Export a fresh V4 from Candidate 391, preserve original files,
+            import it into 396, then export/check a new 396 V4 before switching.
+          - Letter-row gestures are OFF by default in a new app; reenable
+            ASDF middle row in Settings and reopen a text field.
+          - Do not uninstall Candidate 391 or clear its data until you have
+            verified the replacement APK and its imported learning.
+
+          Android 35 emulator success is NOT Samsung Galaxy S26 Ultra
+          Android 17 validation. Try short/long typing in a disposable note.
+          TXT
+      - name: Upload qualified APK with SHA-256 audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orivra-Candidate396-Android35-Qualified
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Publish prerelease only after full success
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view candidate-396-20261031 >/dev/null 2>&1; then
+            echo "Release already exists; refusing overwrite"
+            exit 1
+          fi
+          gh release create candidate-396-20261031 \
+            dist/Orivra-Candidate-396.apk \
+            dist/Orivra-Candidate-396.apk.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Orivra Candidate 396 - Responsive Typing and Reliable DOWN" \
+            --notes-file dist/Release_Notes.txt \
+            --prerelease
