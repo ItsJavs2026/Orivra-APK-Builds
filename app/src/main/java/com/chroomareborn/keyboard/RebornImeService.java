@@ -871,10 +871,16 @@ public final class RebornImeService extends InputMethodService {
 
     // Reuse a single interpolator. Do not allocate extra Animators per key,
     // mutate layout bounds, or animate suggestion panels during fast typing.
+    // Research 369 A/B: no scale animator by default; keep platform ripple,
+    // pressed state, and system haptics. Read only at editor focus.
+    private boolean instantKeyFeedback369=true;
     private static final android.view.animation.Interpolator KEY_MOTION_EASE=
             new android.view.animation.DecelerateInterpolator(1.35f);
     private void animateKeyPress(View view, boolean pressed) {
         if(view==null)return;
+        // No ViewPropertyAnimator calls on touch in the instant variant.
+        // Input handling and HintKeyPressOrder353 are completely unchanged.
+        if(instantKeyFeedback369)return;
         view.animate().cancel();
         // Respect OS animation disable/reduced-motion settings.
         boolean enabled=android.animation.ValueAnimator.areAnimatorsEnabled();
@@ -1503,6 +1509,9 @@ public final class RebornImeService extends InputMethodService {
         numericAlphabeticOverride=false;
         symbols=false;
         extraSymbols=false;
+        instantKeyFeedback369=getSharedPreferences(KeyPressVisualPolicy369.PREFS,
+                MODE_PRIVATE).getBoolean(
+                        KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true);
         lastTypingTime=0L;
         averageTypingInterval=0;
         predictionsExpanded=false;
