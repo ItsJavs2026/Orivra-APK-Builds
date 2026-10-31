@@ -1896,6 +1896,42 @@ public final class RebornImeService extends InputMethodService {
         if(singleBackspaceMutation338 || composingTransaction340)return;
         // Suppress per-character prediction work while the finger is moving.
         if(cursorSwipeNavigating || cursorReleaseSuggestionsPending)return;
+        // Research 393: some chat hosts empty their draft on Send without an
+        // input-session restart or a meaningful composing-span transition.
+        // At selection 0 ONLY, inspect two bounded editor characters before
+        // recovering the local prediction state. Never mutate the host text.
+        if(newSelStart==0 && newSelEnd==0 && !sensitive &&
+                editorAllowsSuggestions && !numericEditor && !symbols) {
+            final InputConnection live393=getCurrentInputConnection();
+            final boolean maybeStale393=!composing.isEmpty() ||
+                    !latestSnapshot.isEmpty() || editingInMiddle ||
+                    latestOptions.isEmpty() || idleWordTicket340==null;
+            if(live393!=null && maybeStale393) {
+                try{
+                    final CharSequence before393=live393.getTextBeforeCursor(1,0);
+                    final CharSequence after393=live393.getTextAfterCursor(1,0);
+                    final boolean ticketCurrent393=nextWordTicketCurrent340(live393);
+                    if(ChatComposerReset393.shouldRecover(newSelStart,newSelEnd,
+                            before393,after393,composing,latestSnapshot,
+                            editingInMiddle,latestOptions.size(),
+                            ticketCurrent393,false)) {
+                        predictionDispatcher.cancel();
+                        invalidateEditingTicket();
+                        clearPredictionTouch372();
+                        clearSpaceHighlight372();
+                        resetKeyEcho342();
+                        composing="";
+                        editingInMiddle=false;
+                        idleWordTicket340=null;
+                        showSuggestions();
+                        return;
+                    }
+                }catch(RuntimeException detached393) {
+                    // A host may detach its editor during Send. Ignore it;
+                    // never infer or mutate a missing InputConnection.
+                }
+            }
+        }
         if(composing.isEmpty()) {
             // Some editors echo the exact +1 selection produced by the key
             // after type() already refreshed the strip. Do not synchronously
