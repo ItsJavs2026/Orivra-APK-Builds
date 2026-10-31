@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build416spacetrial"
+        applicationId = "com.chroomareborn.keyboard.build416bselectiontrial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 416
-        versionName = "1.0.70-build416-space-fastpath"
-        manifestPlaceholders["appLabel"] = "Orivra 416 Space Test"
+        versionCode = 4161
+        versionName = "1.0.71-build416b-selected-delete"
+        manifestPlaceholders["appLabel"] = "Orivra 416B Selection Fix"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra 416 Space Test"
+            manifestPlaceholders["appLabel"] = "Orivra 416B Selection Fix"
         }
     }
     compileOptions {
