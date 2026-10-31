@@ -60,7 +60,7 @@ final class AppPalette {
             case ORANGE: return "Orange";
             case CLASSIC: return "Classic";
             case CLEAN_NEUTRAL: return "Clean Neutral";
-            default: return "App Match — Shaded";
+            default: return "Shaded Surface • App Hint";
         }
     }
 
