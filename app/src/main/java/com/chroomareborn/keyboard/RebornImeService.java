@@ -2554,11 +2554,17 @@ public final class RebornImeService extends InputMethodService {
                     boolean rejected=index<0;
                     if(!rejected) {
                         float x=event.getX(index),y=event.getY(index);
-                        if(rowSwipe386[0]!=null &&
-                                (triggered[0] ||
-                                rowDownSerial386[0]!=alphabetDownSerial386 ||
-                                !rowSwipe386[0].move(primaryPointer[0],x,y)))
-                            rowSwipe386[0].cancel();
+                        if(rowSwipe386[0]!=null) {
+                            if(triggered[0] ||
+                                    rowDownSerial386[0]!=alphabetDownSerial386 ||
+                                    !rowSwipe386[0].move(primaryPointer[0],x,y))
+                                rowSwipe386[0].cancel();
+                            else if(rowSwipe386[0].preview()!=
+                                    LetterRowPredictionSwipe386.Direction.NONE)
+                                // A deliberate gesture must not accidentally
+                                // become a 320ms secondary-symbol hold.
+                                suggestionHandler.removeCallbacks(hold);
+                        }
                         if(fatThumbDrift378)
                             rejected=touchGuard378[0]==null ||
                                     !touchGuard378[0].move(primaryPointer[0],x,y);
@@ -2601,6 +2607,11 @@ public final class RebornImeService extends InputMethodService {
                     if(selectedRow386!=null && pressEditor[0]!=null) {
                         // A deliberate letter-row swipe consumes the starting
                         // letter; never type both the letter and correction.
+                        // The DOWN gesture also uses acceptSuggestion, exactly
+                        // ONCE: SentenceSuggestionCommit.insert applies the
+                        // same single-space boundary rule as the Space-key
+                        // completion path, including 1-3 letter prefixes.
+                        // Never call space() afterwards (double space risk).
                         suggestionHandler.removeCallbacks(hold);
                         key.setPressed(false);
                         animateKeyPress(key,false);

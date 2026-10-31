@@ -293,11 +293,12 @@ public final class MainActivity extends Activity {
 
         TextView actualLetterSwipe386=new TextView(this);
         actualLetterSwipe386.setText("\nPrediction swipes on LETTER KEYS (experimental)\n"+
-                "Swipe left/right directly over QWERTY or ASDF keys to "+
-                "select a visible prediction. A deliberate swipe replaces "+
-                "the starting letter; quick taps still type normally. "+
-                "Independent of the prediction-strip gesture setting. "+
-                "This is not glide-to-spell typing.");
+                "Swipe left/right directly on QWERTY or ASDF keys for a side "+
+                "prediction; swipe DOWN to insert the CENTER prediction "+
+                "using the normal single-Space completion rules, including "+
+                "one-letter and short-word prefixes. No Send action or "+
+                "extra Space. Choose ASDF, QWERTY or both, independently "+
+                "of prediction-strip swipes. Ordinary taps still type.");
         actualLetterSwipe386.setTextSize(15);
         actualLetterSwipe386.setTextColor(0xFF303846);
         root.addView(actualLetterSwipe386);
