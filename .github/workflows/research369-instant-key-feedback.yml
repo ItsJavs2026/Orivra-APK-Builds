@@ -1,0 +1,65 @@
+name: Orivra Research 369 - instant key feedback A/B (NO APK)
+on:
+  push:
+    branches:
+      - research/build369-instant-key-feedback-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  instant-feedback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify only visual motion gate changed, not typing or hold handlers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="313342af2faf0034b433b32c3fd45a0a01e74cbe"
+          changed=set(subprocess.check_output(["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          allowed={
+              "app/src/main/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369.java",
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369Research.java",
+              ".github/workflows/research369-instant-key-feedback.yml",
+          }
+          assert changed==allowed, f"Research scope changed: {changed ^ allowed}"
+          src="app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java"
+          base_service=subprocess.check_output(["git","show",base+":"+src],text=True)
+          service=Path(src).read_text()
+          assert "if(instantKeyFeedback369)return;" in service
+          assert "KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true" in service
+          assert service.count("hintPressOrder353") == base_service.count("hintPressOrder353")
+          assert service.count("PredictionTapCaret364") == base_service.count("PredictionTapCaret364")
+          assert service.count("keyHaptic(")==base_service.count("keyHaptic(")
+          assert service.count("feedbackBackground(")==base_service.count("feedbackBackground(")
+          assert "view.setPressed(true)" in service
+          assert "view.setPressed(false)" in service
+          assert "view.animate().cancel()" in service # baseline option preserved
+          assert "ViewConfiguration.getLongPressTimeout()" in service
+          assert "android.permission.INTERNET" not in Path("app/src/main/AndroidManifest.xml").read_text()
+          gradle=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build365trial"' in gradle
+          print("PASS: Candidate 365 release preserved, touch order, haptics, long-press and typed text unchanged")
+          PY
+      - name: Run pure A/B visual feedback policy tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369Research.java
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.KeyPressVisualPolicy369Research
