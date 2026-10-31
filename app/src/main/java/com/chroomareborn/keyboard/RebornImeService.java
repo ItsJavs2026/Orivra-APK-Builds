@@ -290,6 +290,8 @@ public final class RebornImeService extends InputMethodService {
                                 !spacebarTouchActive && !backspaceTouchActive);
                 boolean previewed=touch.longPreview;
                 clearPredictionTouch372();
+                if(!allowed && !previewed)
+                    OrivraPerfAudit411.recordSwipeTapRejected416C();
                 if(allowed && !previewed) {
                     if(dir!=PredictionSwipe372.Direction.NONE) {
                         if(choice!=null)acceptSuggestion(view,touch.expected,choice);
@@ -714,6 +716,29 @@ public final class RebornImeService extends InputMethodService {
     private void invalidateEditingTicket() {
         cursorEditingRevision++;
         visibleEditingTicket=null;
+    }
+    /**
+     * 416C: a valid committed cursor-word ticket must survive the frame paint
+     * that displays its option, including after keyboard hide/reopen. Old
+     * 416 unconditionally nulled it inside applySuggestionsNow412, turning
+     * freshly rendered cursor corrections into dead, untappable chips.
+     *
+     * No live editor read on paint; a tap STILL verifies bounded actual
+     * editor text in isEditingTicketCurrent() and replaceCursorWord().
+     */
+    private void reconcileEditingTicketForFrame416C(String frameWord) {
+        final CursorEditSnapshotGuard.Ticket ticket=visibleEditingTicket;
+        if(ticket==null)return;
+        if(CursorWordChipTicket416C.preserve(
+                ticket.word,frameWord,ticket.sessionVersion,cursorEditingRevision,
+                ticket.selectionStart,ticket.selectionEnd,
+                lastSelectionStart,lastSelectionEnd,
+                !composing.isEmpty(),hasSelection(),sensitive)) {
+            OrivraPerfAudit411.recordCursorTicketRetained416C();
+        } else {
+            visibleEditingTicket=null;
+            OrivraPerfAudit411.recordCursorTicketCleared416C();
+        }
     }
     private CursorEditSnapshotGuard.Ticket captureEditingTicket(String word) {
         if(sensitive || hasSelection() || !composing.isEmpty())return null;
@@ -4328,6 +4353,7 @@ public final class RebornImeService extends InputMethodService {
             // A reused word at another cursor location is not the same chip.
             // Verify the ticket before the existing live whole-word edit plan.
             if(!isEditingTicketCurrent(visibleEditingTicket)) {
+                OrivraPerfAudit411.recordCursorTapRejected416C();
                 predictionDispatcher.cancel();
                 showSuggestions();
                 return;
@@ -4335,8 +4361,10 @@ public final class RebornImeService extends InputMethodService {
             // Use the tap's captured expected word, then verify it again
             // against live editor text. Do not inherit stale auto-Shift
             // or trust the display strip's changing snapshot.
-            replaceCursorWord(source,expected,
+            boolean applied416C=replaceCursorWord(source,expected,
                     CursorWordCorrectionPolicy.matchCase(expected,suggestion));
+            if(applied416C)OrivraPerfAudit411.recordCursorTapApplied416C();
+            else OrivraPerfAudit411.recordCursorTapRejected416C();
             return;
         }
         suggestion=suggestionCase(suggestion);
@@ -5010,7 +5038,10 @@ public final class RebornImeService extends InputMethodService {
         // Preserve the previous visual word only within this editor. The
         // intermediate (fast) row is not a final prediction result.
         final String priorVisualInput345=latestSnapshot;
-        visibleEditingTicket=null;
+        // 416C: retain this frame's *current* cursor-word edit ticket.
+        // A blanket reset made all freshly drawn committed-word correction
+        // chips appear valid but reject every tap after view reopen.
+        reconcileEditingTicketForFrame416C(input);
         idleWordTicket340=null;
         if(candidates==null)return;
         if(input.isEmpty() && options!=null && !options.isEmpty() &&
