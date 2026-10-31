@@ -16,7 +16,7 @@ Source review: Candidate 401 schedules a UI suggestion refresh at WAIT_MS=96 aft
 3. With calm predictions ON, suppress *automatic* expansion of the supplementary Rise suggestions for ambiguous inputs; manual arrow expansion remains. The stable normal suggestion row is retained. SentenceFlow and learning are not removed.
 4. PredictionDispatcher drops its completed ScheduledFuture reference after processing so it does not retain the finished captured input/listener; generation checks/cancellation remain intact.
 5. MainActivity retains the full advanced settings and adds a reversible 'Calm prediction display: ON/OFF' switch at top.
-6. New deterministic pure-Java PredictionUiBudget408Test.java (9 checks) — test source added, **not yet executed**.
+6. New deterministic pure-Java PredictionUiBudget408Test.java (9 checks) — test source added; a matching pure-Java local JDK 21 copy compiled and passed 9 checks (not Android compilation and not Samsung testing).
 7. Independent Android appId `com.chroomareborn.keyboard.build408calmtrial`, versionCode 408, versionName `1.0.62-build408-calm-prediction`, label `Orivra 408 Calm Test`, to preserve installed 400/407 and user learning data. No automatic preferences migration.
 
 ## Current verification
@@ -45,3 +45,7 @@ Expected metadata packageId com.chroomareborn.keyboard.build408calmtrial, code 4
 - Toggle Calm OFF in Orivra 408 settings; reopen text field; repeat same typing (A/B comparing Candidate 401 pacing, but without changing installed app).
 - Test split words, learning backup/export, symbol keyboard, secure and numeric fields, caret edits. Do not type sensitive information in this experimental IME.
 - The exact setting is reversible and defaults ON. Continue tuning only using measured device evidence.
+
+## Source check
+- GitHub branch source inspected after commits: MainActivity has calm switch and full 65 KB settings UI; RebornImeService has refresh budget and preference; build file uses distinct 408 appId; predictor futures now clear completed captures.
+- No 408 Android APK has been built, installed or performance-tested as of this checkpoint. The next evidence gate is the user's real phone build.
