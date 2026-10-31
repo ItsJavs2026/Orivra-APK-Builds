@@ -52,3 +52,11 @@ If actual local output checks pass, APK is `/storage/emulated/0/AndroidIDEProjec
 - This is **tap interaction** recovery, not an offline dictionary extension nor proof of learned word persistence. Continue 417 large dictionary only after UI bugs are isolated.
 - After this source hotfix is qualified, add safe aggregate count for cursor correction render with missing ticket and stale async callback suppression if live complaints persist.
 - No physical-touch-to-frame latency evidence can be inferred from timing-only audits.
+
+## 2026-10-31 — UX preference: prediction-bar swipe defaults OFF
+User said prediction-bar swipes are no longer used; they prefer the independent prediction swipes on actual QWERTY/ASDF letter keys.
+- Updated the **416C source before phone installation**: default for `PredictionSwipe372.PREF` is now **false** in `RebornImeService` initial field, `onStartInput`, `onStartInputView`, and the settings toggle text/click handler.
+- The gesture remains available if explicitly switched ON; no preference overwrite/migration. An existing saved ON setting still wins. **Normal prediction-bar taps remain ON** and continue to verify live editor state. `LetterRowPredictionSwipe386.PREF` behavior and mode defaults are not modified.
+- **Separate app package = separate preferences.** The user may need to enable their preferred letter-row swipe mode in 416C Settings after install; settings from the old 416 package do not automatically transfer.
+- Current branch includes this change. If user already cloned the branch before this commit, they must update the clone before running the build; the build script exports exactly local HEAD and does not automatically fetch remote commits.
+- This change is small and statically verified in GitHub, but no compiled 416C APK / Samsung test yet.
