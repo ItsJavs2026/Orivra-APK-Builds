@@ -1,0 +1,29 @@
+# Orivra Build 417 — broad offline dictionary activation (research checkpoint)
+Date: 2026-10-31.
+Status: **research design only**. No new APK or on-device dictionary was created by this checkpoint. This branch starts from `candidate/build416-space-shift-fastpath-20261031`. Preserve Build 415 and Build 416 APKs and their settings/tests.
+
+## User request and critical source discovery
+The user reports that many ordinary words must be manually entered in the personal dictionary; they want the keyboard to have a comprehensive dictionary without the lags that were just reduced in Builds 414–416.
+- The active English predictor boot lexicon had approximately **2,298** words in earlier research, plus curated enrichment; current exact count should be recomputed before making claims about the latest build.
+- The active source **already contains** a Build 303 `Experimental offline English dictionary` toggle, `OfflineLanguagePackWorker`, `CompressedLanguagePack`, `ExactOnlyLanguagePack`, and `PredictionLite.setResearchExactOnlyPack()` activation. Its switch defaults OFF.
+- The exact expected asset `app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack` is **NOT TRACKED IN BUILD 416'S GIT TREE**. The only dictionary asset in the public tree is `ESDB_COPYRIGHT.txt`. The 416 on-phone build script exports tracked files and does not generate the missing binary. Consequently, activating the experimental switch in that exported APK cannot actually provide 78,942 words; the loader fails quietly and baseline is retained. This is a release packaging / status feedback defect, not evidence that the dataset itself is inadequate.
+- Personal Dictionary UI currently imposes a 250-word manual limit. Do not silently raise this without verifying persistence, backup, and migration behavior.
+- SpanishPredictionLite remains research-only; a Spanish-capable general offline pack needs a Unicode/diacritic-aware tokenizer and locale routing rather than treating accented Spanish words as invalid ASCII.
+
+## Already verified ESDB research (not current APK!)
+The earlier controlled 301–303 chain generated the exact-only US English list from `en-wl/wordlist` commit `1e5b7d3a72f47a71da5d28686c1dd4b397178485`:
+- generator: `scripts/build-esdb-wordpack.sh` using `./scowl word-list 60 A 1 --categories=`, strict source SHA-256 `a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600`, original size 1,022,018 bytes;
+- 78,942 exact lowercase ASCII words (2–24 chars) after filtering; compressed .esdbpack 280 KiB; gzip SHA-256 `c7ae38d8c2d3e83652ecacc947067e823ab6daec9993baaf7e2dc24501794098`;
+- approximately 5.2–5.4 MiB extra Java heap in earlier Linux tests; Android 35 emulator cold load 478 ms in one research test, warm load 45 ms. These are not current S26 Ultra measurements;
+- source-specific license/attribution in `app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt`.
+- prior synthetic A/B for exact recognition yielded improved recognition of correctly spelled uncommon words with constrained segmentation, **not** general typo correction or Gboard-quality next-word ranking. This synthetic performance cannot be claimed as typical real-life prediction accuracy.
+
+## Practical development order — do not conflate recognition with prediction
+1. **Make 417 asset real and observable.** Source an exact pinned/verified 78,942-word pack using appropriate licenses. Include it in the debug APK assets; verify compressed SHA, expanded SHA, byte count, word count and full copyright; check the built APK archive contains `assets/dictionaries/esdb-en-US-60.esdbpack`. Fail the build rather than expose a misleading ON toggle with missing asset. Show a local status like Available / Loading / Ready / Missing-or-invalid, never include typed text in diagnostics.
+2. **Keep the 417 pack safe to load.** Background worker only, one bounded retained immutable index, opt-in initially OFF, fallback to original model if invalid/missing, no network/typing upload, no access in private numeric/email/password fields, stale-callback protection and per-session A/B diagnostics. Never decode or scan 79k words on each ACTION_DOWN or every cursor frame. Preserve the pre-existing offline seed/learner/private dictionary and Gboard fallback.
+3. **Quality gates.** Frozen independent sets of common English, unfamiliar exact words, names, compounds, contractions, URLs, malformed/unspaced/typo text, bilingual switching and editor privacy; compare correct-to-wrong, top-1/top-3, protected fields, latency p95, live long drafts and *real Samsung* RAM. Test normal typing and notification quick reply with music playing; compare Build 416 baseline using same settings and elapsed samples.
+4. **Then broaden for fluent suggestions.** Investigate a frequency-ranked AOSP LatinIME English wordlist, a potentially much larger 150k+ word tier, subject to proper repository provenance and Apache-2.0 license verification. Do not equate dictionary size with candidate quality. The 79k ESDB exact tier is a safe first step; a big frequency tier must remain off the main thread, constrained, and proven against false corrections. A wider/Spanish Unicode vocabulary and accurate context model are separate experiments after English stability.
+5. **Improve local A/B measurement.** Keep aggregate switch-state and acceptance/error status metrics. Optional side-by-side report of 416 vs 417: no code should silently observe phone settings outside Orivra or transmit typed content. User supplies reports manually from the device. No remote live settings access exists in this conversation.
+
+## Release boundary
+Build 417 is a goal for the **next dictionary-focused candidate**, not a completed update or promised date. Source+license integrity, Android compile and physical handset verification must succeed before describing it as working on the user’s phone. Until then, current 416 APK does not have the 79k asset, even if its settings toggle reads ON.
