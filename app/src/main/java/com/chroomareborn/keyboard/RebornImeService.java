@@ -86,6 +86,218 @@ public final class RebornImeService extends InputMethodService {
     private String riseRenderedSignature="";
     private boolean manuallyCollapsedPredictions=false;
     private List<String> latestOptions=java.util.Collections.emptyList();
+    private static final String SWIPE_SELECTION_PREF372="prediction_slide_select_372";
+    private static final String SPACE_CORRECTION_PREF372="space_accept_highlight_372";
+    private boolean predictionSwipeEnabled372=true;
+    private boolean spaceAcceptEnabled372=true;
+    // Transient, current-editor-only highlighted correction and gesture.
+    private String highlightedExpected372;
+    private String highlightedCandidate372;
+    private InputConnection highlightedEditor372;
+    private long highlightedSession372=-1L;
+    private boolean spaceAcceptInProgress372=false;
+    private boolean spaceAcceptSucceeded372=false;
+    private PredictionTouch372 activePredictionTouch372;
+    private static final class PredictionTouch372 {
+        final View origin;
+        final InputConnection editor;
+        final String expected;
+        final long session;
+        final int selectionStart,selectionEnd;
+        final float downX,downY;
+        final int index;
+        final boolean fromRise;
+        final java.util.List<String> strip,rise;
+        Runnable hold;
+        boolean longPreview;
+        View preview;
+        PredictionTouch372(View view,InputConnection connection,
+                String input,long generation,int start,int end,
+                float x,float y,int from,boolean riseStart,
+                java.util.List<String> row,java.util.List<String> riseRow) {
+            origin=view;editor=connection;expected=input;
+            session=generation;selectionStart=start;selectionEnd=end;
+            downX=x;downY=y;index=from;fromRise=riseStart;
+            strip=row;rise=riseRow;
+        }
+    }
+    private void clearPredictionTouch372() {
+        PredictionTouch372 touch=activePredictionTouch372;
+        activePredictionTouch372=null;
+        if(touch!=null) {
+            if(touch.hold!=null)suggestionHandler.removeCallbacks(touch.hold);
+            touch.origin.setPressed(false);
+            if(touch.preview!=null)touch.preview.setPressed(false);
+        }
+        riseChipPressed=false;
+    }
+    private void clearSpaceHighlight372() {
+        highlightedExpected372=null;
+        highlightedCandidate372=null;
+        highlightedEditor372=null;
+        highlightedSession372=-1L;
+    }
+    private java.util.List<String> visiblePredictionOptions372(boolean rise) {
+        java.util.ArrayList<String> choices=new java.util.ArrayList<>();
+        LinearLayout row=candidates;
+        if(rise) {
+            if(!predictionsExpanded || expandedSuggestions==null ||
+                    expandedSuggestions.getVisibility()!=View.VISIBLE ||
+                    expandedSuggestions.getChildCount()!=1 ||
+                    !(expandedSuggestions.getChildAt(0) instanceof LinearLayout))
+                return choices;
+            row=(LinearLayout)expandedSuggestions.getChildAt(0);
+        }
+        if(row==null)return choices;
+        for(int i=0;i<row.getChildCount();i++) {
+            View child=row.getChildAt(i);
+            if(!(child instanceof TextView))continue;
+            TextView cell=(TextView)child;
+            choices.add(cell.getVisibility()==View.VISIBLE?
+                    cell.getText().toString():"");
+        }
+        return choices;
+    }
+    private int predictionChipIndex372(View v,boolean rise) {
+        LinearLayout row=candidates;
+        if(rise) {
+            if(expandedSuggestions==null ||
+                    expandedSuggestions.getChildCount()!=1 ||
+                    !(expandedSuggestions.getChildAt(0) instanceof LinearLayout))
+                return -1;
+            row=(LinearLayout)expandedSuggestions.getChildAt(0);
+        }
+        if(row==null)return -1;
+        int index=0;
+        for(int i=0;i<row.getChildCount();i++) {
+            View child=row.getChildAt(i);
+            if(!(child instanceof TextView))continue;
+            if(child==v)return index;
+            index++;
+        }
+        return -1;
+    }
+    private View predictionChipFor372(String chosen,boolean rise) {
+        if(chosen==null)return null;
+        LinearLayout row=candidates;
+        if(rise && expandedSuggestions!=null &&
+                expandedSuggestions.getChildCount()==1 &&
+                expandedSuggestions.getChildAt(0) instanceof LinearLayout)
+            row=(LinearLayout)expandedSuggestions.getChildAt(0);
+        if(row==null)return null;
+        for(int i=0;i<row.getChildCount();i++) {
+            View child=row.getChildAt(i);
+            if(child instanceof TextView && child.getVisibility()==View.VISIBLE &&
+                    chosen.contentEquals(((TextView)child).getText()))
+                return child;
+        }
+        return null;
+    }
+    private boolean onPredictionChipTouch372(View view,MotionEvent event,
+            boolean fromRise) {
+        // With the option OFF, existing Click/long-press and horizontal
+        // scrolling retain their original Android dispatch behavior.
+        if(!predictionSwipeEnabled372 || sensitive ||
+                numericEditor || !editorAllowsSuggestions)return false;
+        int action=event.getActionMasked();
+        switch(action) {
+            case MotionEvent.ACTION_DOWN: {
+                clearPredictionTouch372();
+                if(hintPressOrder353.hasOpenPresses() || spacebarTouchActive ||
+                        backspaceTouchActive || hasSelection())return false;
+                InputConnection ic=getCurrentInputConnection();
+                int index=predictionChipIndex372(view,fromRise);
+                java.util.List<String> row=visiblePredictionOptions372(fromRise);
+                if(ic==null || index<0 || index>=row.size() ||
+                        !PredictionSwipe372.valid(row.get(index)))return false;
+                activePredictionTouch372=new PredictionTouch372(
+                        view,ic,latestSnapshot,inputSessionGeneration,
+                        lastSelectionStart,lastSelectionEnd,
+                        event.getX(),event.getY(),index,fromRise,
+                        visiblePredictionOptions372(false),
+                        visiblePredictionOptions372(true));
+                riseChipPressed=true; // lock RISE row during gesture
+                view.setPressed(true);
+                if(view.getParent()!=null)
+                    view.getParent().requestDisallowInterceptTouchEvent(true);
+                // Restore existing full-sentence long-press preview.
+                PredictionTouch372 touch=activePredictionTouch372;
+                if(!fromRise && view.isLongClickable()) {
+                    touch.hold=()->{
+                        if(activePredictionTouch372!=touch)return;
+                        touch.longPreview=view.performLongClick();
+                    };
+                    suggestionHandler.postDelayed(touch.hold,
+                            ViewConfiguration.getLongPressTimeout());
+                }
+                return true;
+            }
+            case MotionEvent.ACTION_MOVE: {
+                PredictionTouch372 touch=activePredictionTouch372;
+                if(touch==null || touch.origin!=view)return true;
+                PredictionSwipe372.Direction dir=PredictionSwipe372.direction(
+                        event.getX()-touch.downX,event.getY()-touch.downY,
+                        dp(12),!touch.rise.isEmpty());
+                if(dir!=PredictionSwipe372.Direction.NONE) {
+                    if(touch.hold!=null) {
+                        suggestionHandler.removeCallbacks(touch.hold);
+                        touch.hold=null;
+                    }
+                    String choice=PredictionSwipe372.choose(dir,touch.index,
+                            touch.strip,touch.rise,touch.fromRise);
+                    View preview=predictionChipFor372(choice,
+                            dir==PredictionSwipe372.Direction.UP || touch.fromRise);
+                    if(touch.preview!=preview) {
+                        if(touch.preview!=null)touch.preview.setPressed(false);
+                        touch.preview=preview;
+                        view.setPressed(preview==view);
+                        if(preview!=null)preview.setPressed(true);
+                    }
+                }
+                return true;
+            }
+            case MotionEvent.ACTION_POINTER_DOWN:
+            case MotionEvent.ACTION_POINTER_UP:
+            case MotionEvent.ACTION_CANCEL:
+                clearPredictionTouch372();
+                suggestionHandler.post(this::updatePredictionPanel);
+                return true;
+            case MotionEvent.ACTION_UP: {
+                PredictionTouch372 touch=activePredictionTouch372;
+                if(touch==null || touch.origin!=view)return true;
+                float dx=event.getX()-touch.downX;
+                float dy=event.getY()-touch.downY;
+                PredictionSwipe372.Direction dir=PredictionSwipe372.direction(
+                        dx,dy,dp(12),!touch.rise.isEmpty());
+                String choice=PredictionSwipe372.choose(dir,touch.index,
+                        touch.strip,touch.rise,touch.fromRise);
+                boolean allowed=PredictionSwipe372.safeRelease(
+                        touch.expected,latestSnapshot,
+                        touch.editor==getCurrentInputConnection(),
+                        touch.session==inputSessionGeneration,
+                        touch.selectionStart==lastSelectionStart &&
+                                touch.selectionEnd==lastSelectionEnd,
+                        sensitive,editorAllowsSuggestions,numericEditor,
+                        hasSelection(),symbols,
+                        !hintPressOrder353.hasOpenPresses() &&
+                                !spacebarTouchActive && !backspaceTouchActive);
+                boolean previewed=touch.longPreview;
+                clearPredictionTouch372();
+                if(allowed && !previewed) {
+                    if(dir!=PredictionSwipe372.Direction.NONE) {
+                        if(choice!=null)acceptSuggestion(view,touch.expected,choice);
+                    } else if(Math.abs(dx)<dp(14) && Math.abs(dy)<dp(14)) {
+                        // performClick preserves existing accessibility and
+                        // original tap semantics: never commit on ACTION_DOWN.
+                        view.performClick();
+                    }
+                }
+                suggestionHandler.post(this::updatePredictionPanel);
+                return true;
+            }
+            default:return true;
+        }
+    }
     private NextWordTapTicket340 idleWordTicket340;
     // One narrow Android selection echo after a physical typed character.
     // Captured without another InputConnection read.
@@ -1524,6 +1736,8 @@ public final class RebornImeService extends InputMethodService {
     @Override public void onStartInput(EditorInfo info, boolean restarting) {
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
+        clearPredictionTouch372();
+        clearSpaceHighlight372();
         clearPendingCaretInsert364();
         endTypedWords347();
         cancelStableWord329();
@@ -1563,6 +1777,10 @@ public final class RebornImeService extends InputMethodService {
                 KeyPressVisualPolicy369.KEY_INSTANT_FEEDBACK,true);
         fastSymbolHold367=visualOptions370.getBoolean(
                 SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,true);
+        predictionSwipeEnabled372=visualOptions370.getBoolean(
+                SWIPE_SELECTION_PREF372,true);
+        spaceAcceptEnabled372=visualOptions370.getBoolean(
+                SPACE_CORRECTION_PREF372,true);
         lastTypingTime=0L;
         averageTypingInterval=0;
         predictionsExpanded=false;
@@ -1988,6 +2206,8 @@ public final class RebornImeService extends InputMethodService {
             params.setMargins(dp(2),dp(1),dp(2),dp(1));
             if(!reuseRiseRow)row.addView(item,params);
             item.setOnTouchListener((v,event)->{
+                if(predictionSwipeEnabled372)
+                    return onPredictionChipTouch372(v,event,true);
                 int action=event.getActionMasked();
                 if(action==MotionEvent.ACTION_DOWN)riseChipPressed=true;
                 else if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL) {
@@ -2716,6 +2936,10 @@ public final class RebornImeService extends InputMethodService {
         if(!deleteHeld && oldShift!=shift)refreshView();
     }
     private void space() {
+        // A settled, visibly highlighted word correction may be accepted by
+        // Space as one checked replacement WITH its trailing word boundary.
+        // Do not add a second literal Space after successful acceptance.
+        if(tryHighlightedSpace372())return;
         clearPendingCaretInsert364();
         cancelStableWord329();
         invalidateEditingTicket();
@@ -3261,6 +3485,8 @@ public final class RebornImeService extends InputMethodService {
             return;
         }
         if(outcome==SentenceSuggestionCommit.Result.APPLIED) {
+            if(spaceAcceptInProgress372)spaceAcceptSucceeded372=true;
+            clearSpaceHighlight372();
             composing="";
             if(shift && !capsLock)shift=false;
             confirmSuggestionTap(source);
@@ -3604,6 +3830,11 @@ public final class RebornImeService extends InputMethodService {
     }
     private void renderSuggestions(String input,List<String> options,
             boolean preliminary345) {
+        // Hold immutable on-screen chip labels throughout one finger swipe.
+        // An async predictor result may arrive during a gesture, but must not
+        // change the text/target under that finger before release.
+        if(activePredictionTouch372!=null)return;
+        clearSpaceHighlight372();
         // Preserve the previous visual word only within this editor. The
         // intermediate (fast) row is not a final prediction result.
         final String priorVisualInput345=latestSnapshot;
@@ -3895,6 +4126,18 @@ public final class RebornImeService extends InputMethodService {
             // Never mark unchanged typed text as a confident correction.
             final boolean emphasize=SuggestionVisualStyle.highlight(
                     input,suggestion,i,shownCount==1?0:emphasizedIndex);
+            // Only the final displayed highlight (not a fleeting preliminary
+            // frame) can be accepted with Space. The live editor is verified
+            // again on Space, and missing/outdated highlights fail closed.
+            if(emphasize && !preliminary345 && !cursorWordRow353 &&
+                    !splitNextWords.contains(suggestion) &&
+                    !sensitive && composing.equals(input) &&
+                    editorAllowsSuggestions) {
+                highlightedExpected372=input;
+                highlightedCandidate372=suggestion;
+                highlightedSession372=inputSessionGeneration;
+                highlightedEditor372=getCurrentInputConnection();
+            }
             int tileColor=SuggestionVisualStyle.chipColor(
                     suggestionBackground,keyBackground,themeDark,emphasize);
             int readable344=SuggestionVisualStyle.readableText(
@@ -3926,6 +4169,8 @@ public final class RebornImeService extends InputMethodService {
             } else candidates.addView(option,params);
             final String expected=input;
             option.setOnClickListener(v->acceptSuggestion(v,expected,suggestion));
+            option.setOnTouchListener((v,event)->
+                    onPredictionChipTouch372(v,event,false));
             if(!reuseCells && SuggestionStripLayoutPolicy.dividerAfter(
                     i,shownCount,emptyInput)) {
                 View separator=new View(this);
