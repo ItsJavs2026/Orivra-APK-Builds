@@ -80,8 +80,8 @@ public final class LetterRowPredictionSwipe386Research {
         ok(down.release(2,31,68)==LetterRowPredictionSwipe386.Direction.DOWN,
                 "42dp+ vertical down");
         LetterRowPredictionSwipe386 borderline=new LetterRowPredictionSwipe386(3,30,20,1);
-        ok(borderline.release(3,30,60)==LetterRowPredictionSwipe386.Direction.NONE,
-                "40dp down is normal not triggered");
+        ok(borderline.release(3,30,49)==LetterRowPredictionSwipe386.Direction.NONE,
+                "29dp down is a tap, not a deliberate gesture");
         LetterRowPredictionSwipe386 right=new LetterRowPredictionSwipe386(1,40,20,1);
         ok(right.release(1,100,20)==LetterRowPredictionSwipe386.Direction.RIGHT,
                 "horizontal right");

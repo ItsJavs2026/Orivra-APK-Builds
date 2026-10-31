@@ -101,7 +101,7 @@ public final class LetterRowPredictionSwipe386AndroidTest {
         LetterRowPredictionSwipe386 shortMove=
                 new LetterRowPredictionSwipe386(1,60f,20f,1f);
         assertEquals(LetterRowPredictionSwipe386.Direction.NONE,
-                shortMove.release(1,60f,55f));
+                shortMove.release(1,60f,48f));
         LetterRowPredictionSwipe386 wrongPointer=
                 new LetterRowPredictionSwipe386(1,60f,20f,1f);
         assertEquals(LetterRowPredictionSwipe386.Direction.CANCEL,
