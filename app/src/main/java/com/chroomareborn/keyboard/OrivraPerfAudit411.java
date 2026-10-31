@@ -43,6 +43,7 @@ final class OrivraPerfAudit411 {
     private static final long[] over16ms=new long[SIZE];
     private static final long[] over32ms=new long[SIZE];
     private static long lastResetMillis=System.currentTimeMillis();
+    private static long learningQueueOverflow413;
 
     private OrivraPerfAudit411(){}
 
@@ -64,7 +65,11 @@ final class OrivraPerfAudit411 {
         if(dt>=16_000_000L)over16ms[stage]++;
         if(dt>=32_000_000L)over32ms[stage]++;
     }
+    static synchronized void recordLearningQueueOverflow413(){
+        if(enabled)learningQueueOverflow413++;
+    }
     static synchronized void reset(){
+        learningQueueOverflow413=0;
         for(int i=0;i<SIZE;i++){
             count[i]=0;nanos[i]=0;maximumNanos[i]=0;
             over8ms[i]=0;over16ms[i]=0;over32ms[i]=0;
@@ -96,6 +101,8 @@ final class OrivraPerfAudit411 {
                     .append(over16ms[i]).append("/")
                     .append(over32ms[i]).append('\n');
         }
+        b.append("Background learning queue overflow drops: ")
+                .append(learningQueueOverflow413).append('\n');
         b.append("Note: render/panel timings overlap with suggestion "+
                 "entry; don't add their times together.\n");
         b.append("Slow handlers do not establish physical touch-to-frame "+
