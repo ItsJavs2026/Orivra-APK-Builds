@@ -85,7 +85,7 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 416B Selection Backspace Fix");
+        title.setText("Orivra — Build 416C Cursor Prediction Tap Fix");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
@@ -128,6 +128,19 @@ public final class MainActivity extends Activity {
         selectionFix416B.setTextSize(15);
         selectionFix416B.setTextColor(0xFF303846);
         root.addView(selectionFix416B);
+        TextView cursorFix416C=new TextView(this);
+        cursorFix416C.setText("\nBUILD 416C • Cursor-word correction taps on "+
+                "an unchanged word should work after dismissing and reopening "+
+                "the keyboard. A current edit-validation ticket now survives "+
+                "a prediction-frame repaint; each tap still rechecks real "+
+                "editor text/caret before changing a word. Swipe prediction "+
+                "selection also reloads on every keyboard view reopen. "+
+                "The audit reports ticket retention and cursor-tap outcomes "+
+                "without collecting words. Includes Build 416B selected "+
+                "Backspace fix.\n");
+        cursorFix416C.setTextSize(15);
+        cursorFix416C.setTextColor(0xFF303846);
+        root.addView(cursorFix416C);
 
         TextView calmHelp408=new TextView(this);
         calmHelp408.setText("\nBuild 408 performance experiment — calm prediction display. "+
