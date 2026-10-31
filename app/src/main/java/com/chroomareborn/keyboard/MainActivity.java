@@ -75,6 +75,9 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        OrivraPerfAudit411.setEnabled(getSharedPreferences(
+                OrivraPerfAudit411.PREFS,MODE_PRIVATE)
+                .getBoolean(OrivraPerfAudit411.ENABLED,false));
         if(openDebugImeCapture())return;
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -82,13 +85,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 410 Idle Prediction Paint");
+        title.setText("Orivra — Build 411 Performance Audit");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nBuild 410 — Typing-first prediction display (full settings preserved)\n"+
+        notes.setText("\nBuild 411 — Find remaining prediction display delays (full settings preserved)\n"+
                 "Uses the complete Orivra settings and learning baseline, not the old Alpha 1.0 prototype. Calm prediction paint reduces repeated UI refreshes while you type and suppresses automatic suggestion panel expansion for uncertain text. It is experimental and needs Samsung testing.\n"+
                 "Targets the real S26 Ultra freezes reported in WhatsApp "+
                 "notification replies while music plays. Rapid letters and "+
@@ -205,6 +208,108 @@ public final class MainActivity extends Activity {
         });
         root.addView(idlePaintButton410);
 
+        TextView auditHelp411=new TextView(this);
+        auditHelp411.setText("\nBUILD 411 • Local performance audit (OFF by default). "+
+                "Measures letter, Space, Backspace, suggestion processing, "+
+                "candidate-chip UI, Rise panel, layout refresh, theme and "+
+                "background prediction in milliseconds. No typed text, "+
+                "suggestions or app identities are recorded. "+
+                "Briefly enable it, type in ChatGPT, then return here "+
+                "to view/copy the report. Auditing itself adds a little overhead.");
+        auditHelp411.setTextSize(15);
+        auditHelp411.setTextColor(0xFF303846);
+        root.addView(auditHelp411);
+
+        final android.content.SharedPreferences auditPrefs411=
+                getSharedPreferences(OrivraPerfAudit411.PREFS,MODE_PRIVATE);
+        Button auditToggle411=new Button(this);
+        auditToggle411.setAllCaps(false);
+        auditToggle411.setText("Performance audit: "+
+                (auditPrefs411.getBoolean(OrivraPerfAudit411.ENABLED,false)?
+                        "ON":"OFF"));
+        auditToggle411.setOnClickListener(v->{
+            boolean next=!auditPrefs411.getBoolean(
+                    OrivraPerfAudit411.ENABLED,false);
+            auditPrefs411.edit().putBoolean(OrivraPerfAudit411.ENABLED,next).apply();
+            OrivraPerfAudit411.setEnabled(next);
+            auditToggle411.setText("Performance audit: "+(next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen the keyboard to record the new setting",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(auditToggle411);
+
+        Button auditReset411=new Button(this);
+        auditReset411.setAllCaps(false);
+        auditReset411.setText("Reset performance measurements");
+        auditReset411.setOnClickListener(v->{
+            OrivraPerfAudit411.reset();
+            android.widget.Toast.makeText(this,
+                    "Aggregate timing counters reset",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(auditReset411);
+
+        TextView auditReport411=new TextView(this);
+        auditReport411.setTextSize(12);
+        auditReport411.setTextColor(0xFF253245);
+        auditReport411.setTextIsSelectable(true);
+        auditReport411.setPadding(dp(8),dp(6),dp(8),dp(6));
+        auditReport411.setText("Tap Show performance report after typing.");
+        root.addView(auditReport411);
+
+        // Report only app settings and aggregate timing counters.
+        // NEVER include editor strings, suggestion text or usernames.
+        final java.util.concurrent.Callable<String> report411=()->{
+            android.content.SharedPreferences currentFeedback411=
+                    getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+            int theme411=getSharedPreferences(AppPalette.PREFS,MODE_PRIVATE)
+                    .getInt(AppPalette.KEY_MODE,AppPalette.DEFAULT);
+            String settings411="Prediction: "+PredictionIsolationMode409.label(
+                    currentFeedback411.getInt(PredictionIsolationMode409.PREF,
+                            PredictionIsolationMode409.FULL))+
+                    " | Idle paint: "+currentFeedback411.getBoolean(
+                            "orivra_idle_paint_410",true)+
+                    " | Calm: "+currentFeedback411.getBoolean(
+                            "orivra_calm_predictions_408",true)+
+                    " | Theme: "+AppPalette.modeName(theme411);
+            return OrivraPerfAudit411.report(settings411);
+        };
+        Button auditShow411=new Button(this);
+        auditShow411.setAllCaps(false);
+        auditShow411.setText("Show performance report");
+        auditShow411.setOnClickListener(v->{
+            try {auditReport411.setText(report411.call());}
+            catch(Exception e) {
+                auditReport411.setText("Report unavailable; retry.");
+            }
+        });
+        root.addView(auditShow411);
+
+        Button auditCopy411=new Button(this);
+        auditCopy411.setAllCaps(false);
+        auditCopy411.setText("Copy report to share in ChatGPT");
+        auditCopy411.setOnClickListener(v->{
+            try {
+                String reportText411=report411.call();
+                auditReport411.setText(reportText411);
+                android.content.ClipboardManager clip411=
+                        (android.content.ClipboardManager)getSystemService(
+                                Context.CLIPBOARD_SERVICE);
+                if(clip411!=null)clip411.setPrimaryClip(
+                        android.content.ClipData.newPlainText(
+                                "Orivra timing diagnostics",reportText411));
+                android.widget.Toast.makeText(this,
+                        "Timing report copied. No typed text included.",
+                        android.widget.Toast.LENGTH_SHORT).show();
+            }catch(Exception e) {
+                android.widget.Toast.makeText(this,
+                        "Unable to copy diagnostics",
+                        android.widget.Toast.LENGTH_SHORT).show();
+            }
+        });
+        root.addView(auditCopy411);
+
         // Build 303 research, default OFF. Explicit opt-in and app-local only.
         // Never reads notes or keyboard input; changing this preference takes
         // effect when a text field is reopened and onStartInput runs again.
@@ -242,7 +347,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra 410 Idle Test keyboard");
+        picker.setText("2. Choose Orivra 411 Audit keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
