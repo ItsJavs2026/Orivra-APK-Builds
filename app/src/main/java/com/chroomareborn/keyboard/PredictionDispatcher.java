@@ -76,11 +76,20 @@ final class PredictionDispatcher implements AutoCloseable {
         if (scheduled != null) scheduled.cancel(true);
         final String snapshot = input;
         scheduled = worker.schedule(() -> {
-            if (!isCurrent(id)) return;
-            List<String> choices = predictor.predict(snapshot, editing);
-            if (isCurrent(id)) listener.onResult(id, snapshot, choices);
+            try {
+                if (!isCurrent(id)) return;
+                List<String> choices = predictor.predict(snapshot, editing);
+                if (isCurrent(id)) listener.onResult(id, snapshot, choices);
+            } finally {
+                // Release references to finished input/listener captures instead
+                // of retaining them inside the last ScheduledFuture.
+                clearCompleted(id);
+            }
         }, debounceMillisFor(snapshot,editing), TimeUnit.MILLISECONDS);
         return id;
+    }
+    private synchronized void clearCompleted(long id) {
+        if (generation.get() == id) scheduled = null;
     }
     boolean isCurrent(long id) {
         return !closed && generation.get() == id;
