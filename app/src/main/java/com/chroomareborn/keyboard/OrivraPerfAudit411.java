@@ -16,13 +16,15 @@ final class OrivraPerfAudit411 {
     static final int KEY=0, SPACE=1, BACKSPACE=2,
             SUGGESTION_ENTRY=3, SUGGESTION_RENDER=4, RISE_PANEL=5,
             KEY_LAYOUT=6, THEME=7, PREDICT_WORKER=8,
-            CURSOR_READ=9, EDIT_PREPARE=10;
-    static final int SIZE=11;
+            CURSOR_READ=9, EDIT_PREPARE=10,
+            SPLIT_ON_UI=11, CHIP_BIND=12;
+    static final int SIZE=13;
     private static final String[] NAMES={
         "Letter key handler", "Space handler", "Backspace handler",
         "Suggestion scheduling", "Suggestion rendering", "Rise panel UI",
         "Keyboard layout refresh", "Theme/color update", "Predictor worker",
-        "Word-at-cursor read", "Cursor/edit preparation"
+        "Word-at-cursor read", "Cursor/edit preparation",
+        "Split-phrase calculations on UI", "Suggestion-chip binding"
     };
     private static volatile boolean enabled;
     private static final long[] count=new long[SIZE];
