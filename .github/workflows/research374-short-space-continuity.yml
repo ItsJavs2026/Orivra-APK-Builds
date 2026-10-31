@@ -1,0 +1,156 @@
+name: Orivra Research 374 - short Space completions and long-draft audit (NO APK)
+on:
+  push:
+    branches:
+      - research/build374-short-space-continuity-investigation-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research374
+  cancel-in-progress: true
+
+jobs:
+  scope-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Confirm Candidate 373 unchanged and no top-row gestures included
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          baseline="a9c68c39fb0bf91f02fbae25ea5e7d1f1d121c4c"
+          changed=set(subprocess.check_output(["git","diff","--name-only",baseline,"HEAD"],text=True).splitlines())
+          expected={
+              "app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/HighlightedSpace372Research.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/ShortHighlightedSpace374AndroidTest.java",
+              "docs/RESEARCH374_SHORT_SPACE_AND_LONG_DRAFT_20261030.md",
+              ".github/workflows/research374-short-space-continuity.yml",
+          }
+          assert changed==expected,f"Unreviewed or missing changes: {changed ^ expected}"
+          for path in [
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/main/java/com/chroomareborn/keyboard/MainActivity.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java",
+              "app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppPalette.java",
+              "app/src/main/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369.java",
+              "app/src/main/java/com/chroomareborn/keyboard/SymbolHoldTiming367.java",
+              "app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java",
+              "app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java",
+          ]:
+              old=subprocess.check_output(["git","show",baseline+":"+path],text=True)
+              assert old==Path(path).read_text(),f"Protected Candidate 373 code changed: {path}"
+          app=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build373trial"' in app
+          assert "versionCode = 373" in app
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert "android.permission.INTERNET" not in manifest
+          assert "android.permission.QUERY_ALL_PACKAGES" not in manifest
+          assert 'android:allowBackup="false"' in manifest
+          assert "onUpdateSelection" in Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          policy=Path("app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java").read_text()
+          assert 'correction.matches("[A-Za-z]{2,24}")' in policy
+          assert "candidate.startsWith(raw)" in policy
+          assert "spaceAcceptInProgress372" in Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          assert "getSharedPreferences" not in policy and "commitText(" not in policy
+          print("PASS: Candidate 373 remains untouched; only pure eligibility and test cases changed")
+          PY
+      - name: Test 60k+ visible short-prefix Space acceptance and safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/HighlightedSpace372Research.java
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.HighlightedSpace372Research
+
+  android35-emulator:
+    needs: scope-and-synthetic
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Build pinned verified offline dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile research app and full Android instrumented test APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Require 222 or more passing Android tests and no skips
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path("app/build/outputs/androidTest-results/connected").rglob("*.xml"))
+          assert reports,"Missing Android emulator test reports"
+          total=failed=errors=skipped=0
+          for file in reports:
+              node=ET.parse(file).getroot()
+              suites=[node] if node.tag.endswith("testsuite") else [
+                  child for child in node.iter() if child.tag.endswith("testsuite")]
+              for suite in suites:
+                  total+=int(suite.attrib.get("tests","0"))
+                  failed+=int(suite.attrib.get("failures","0"))
+                  errors+=int(suite.attrib.get("errors","0"))
+                  skipped+=int(suite.attrib.get("skipped","0"))
+          print(f"Android 35: {total} tests, {failed} failures, {errors} errors, {skipped} skipped")
+          assert total>=222 and failed==0 and errors==0 and skipped==0
+          src=Path("app/src/androidTest/java/com/chroomareborn/keyboard/ShortHighlightedSpace374AndroidTest.java").read_text()
+          assert src.count("@Test")==5
+          PY
+          echo "PASS research only. No APK released and no Samsung phone verification."
