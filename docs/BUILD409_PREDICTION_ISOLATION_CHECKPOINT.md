@@ -57,3 +57,9 @@ The inherited PredictionUiBudget408.delayAfterKey() implementation returns MIN(1
 
 ## Additional direct user observation (2026-10-31)
 The same noticeable typing delay also occurs **in the ChatGPT Android app's ordinary chat composer** while the user is messaging the assistant. It is not limited to SystemUI notification quick replies or music playback. Add the **ChatGPT conversation field** to the first and highest-priority Samsung test: same harmless phrase in OFF, WORKER ONLY, and FULL modes, reopening the field after each toggle. Notification replies while music plays are the second test. Avoid blaming SystemUI or audio alone; cross-editor IME behavior is now more plausible.
+
+## Verification and 2026-10-31 audit follow-up
+- Independently compiled PredictionIsolationMode409.java and PredictionIsolationMode409Test.java using local `javac --release 17`; the run reported **14/14 checks passed**. This checks only the pure Java mode policy, NOT the complete Android IME or its on-device behavior.
+- GitHub commit `80cb02c073fdfa945b512ded6e86040fdbfce009`: WORKER ONLY also samples committed-character editors when `composing` is empty by reading a current word at the cursor during the deferred refresh pass (not during a key touch), scheduling `scheduleEditing` and dropping its result. Before this patch, such an editor could falsely look fast because the background worker did no prediction work.
+- The selection callback and direct editor operations can still do Android InputConnection IPC in all modes, so OFF is not a zero-overhead bare IME. OFF vs WORKER ONLY vs FULL remains diagnostic rather than proof of cause.
+- Changes are committed to the branch; the Android 409 APK still **has not been built or tested**. Do not use a stale exported project snapshot after new commits: cloning now will capture this patch, but existing phone clones must `git pull --ff-only` then re-export before building.
