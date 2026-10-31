@@ -463,7 +463,9 @@ public final class RebornImeService extends InputMethodService {
                 @Override public boolean commit(String text) {
                     return ic.commitText(text,1);
                 }
-            },previous,addition);
+            },previous,addition,
+                    fastComposingAck413 && !sensitive && !editingInMiddle &&
+                            editorAllowsSuggestions && !symbols && !numericEditor);
         } finally {
             composingTransaction340=false;
         }
@@ -730,6 +732,14 @@ public final class RebornImeService extends InputMethodService {
     // This small gate retains only a temporary editor reference/session,
     // never typed text. Direct touches still use existing InputConnection.
     private final TypingRefreshGate401 typingRefresh401=new TypingRefreshGate401();
+    // 413: reversible, read once at editor activation.
+    private static final String FAST_COMPOSE_PREF_413="orivra_fast_compose_ack_413";
+    private static final String BACKGROUND_LEARNING_PREF_413=
+            "orivra_background_space_learning_413";
+    private boolean fastComposingAck413=true;
+    private boolean backgroundSpaceLearning413=true;
+    private final ApprovedSpaceLearning413 approvedLearning413=
+            new ApprovedSpaceLearning413();
     // 408: no typed text/editor stored here; only the uptime of this burst.
     private final PredictionUiBudget408 predictionUiBudget408=new PredictionUiBudget408();
     private static final String CALM_PREDICTIONS_PREF_408="orivra_calm_predictions_408";
@@ -1967,6 +1977,10 @@ public final class RebornImeService extends InputMethodService {
                 IDLE_PAINT_PREF_410,true);
         frameUpdatesEnabled412=visualOptions370.getBoolean(
                 FRAME_PREF_412,true);
+        fastComposingAck413=visualOptions370.getBoolean(
+                FAST_COMPOSE_PREF_413,true);
+        backgroundSpaceLearning413=visualOptions370.getBoolean(
+                BACKGROUND_LEARNING_PREF_413,true);
         riseEnabled411=visualOptions370.getBoolean(RISE_ENABLED_PREF_411,true);
         predictionIsolationMode409=PredictionIsolationMode409.normalize(
                 visualOptions370.getInt(PredictionIsolationMode409.PREF,
@@ -2027,6 +2041,10 @@ public final class RebornImeService extends InputMethodService {
                 IDLE_PAINT_PREF_410,true);
         riseEnabled411=fullOptions411.getBoolean(RISE_ENABLED_PREF_411,true);
         frameUpdatesEnabled412=fullOptions411.getBoolean(FRAME_PREF_412,true);
+        fastComposingAck413=fullOptions411.getBoolean(
+                FAST_COMPOSE_PREF_413,true);
+        backgroundSpaceLearning413=fullOptions411.getBoolean(
+                BACKGROUND_LEARNING_PREF_413,true);
         if(predictionIsolationMode409==PredictionIsolationMode409.FULL)
             predictionDispatcher.warmPublicDictionary410();
         predictionDispatcher.cancel();
@@ -2098,6 +2116,7 @@ public final class RebornImeService extends InputMethodService {
         cancelStableWord329();
         invalidateEditingTicket();
         predictionDispatcher.close();
+        approvedLearning413.close();
         closeOptionalDictionary();
         invalidateBackspaceGestureSession();
         stopSpacebarCursorGesture();
