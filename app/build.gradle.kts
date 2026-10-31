@@ -3,17 +3,17 @@ android {
     namespace = "com.chroomareborn.keyboard"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.chroomareborn.keyboard.build413fasttrial"
+        applicationId = "com.chroomareborn.keyboard.build414livetrial"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 413
-        versionName = "1.0.67-build413-fast-keypress"
-        manifestPlaceholders["appLabel"] = "Orivra 413 Fast Key Test"
+        versionCode = 414
+        versionName = "1.0.68-build414-live-suggestions"
+        manifestPlaceholders["appLabel"] = "Orivra 414 Live Test"
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["appLabel"] = "Orivra 413 Fast Key Test"
+            manifestPlaceholders["appLabel"] = "Orivra 414 Live Test"
         }
     }
     compileOptions {
