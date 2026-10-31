@@ -45,3 +45,30 @@ Script runs **actual-checkout** pure Java regression tests first, refuses overwr
 
 ## Validation boundary
 Source is checked in and reviewed for guarded one-shot selection commit and separate package identity. The included pure Java runner and Android instrumentation tests execute on the user's build/test environment. No verified Android APK or Samsung test results exist in this chat at checkpoint. Do NOT claim this already fixes the user's device until they confirm successful compilation and deletion behavior.
+
+
+## Follow-up Samsung A/B: Build 416 Fast Space Shift OFF, haptics OFF (2026-10-31)
+User sent another REAL Samsung Build 416 performance audit, **717 seconds**, same FULL/Idle/Calm/Rise/Frame/Fast compose/Background Space learning/Deferred idle/145ms quick wake/Safe editor sample/Shaded Surface settings as prior report; **Fast Space shift OFF, haptics OFF**. Prior ON report was 870s and also haptics OFF.
+
+| Metric | ON report | OFF report |
+|---|---:|---:|
+| Letter handler | n=212 avg3.31ms max35.32ms | n=121 avg2.86ms max34.54ms |
+| Space handler | n=9 avg25.46ms max49.47ms | n=6 avg33.12ms max44.07ms |
+| Space cursor/sentence stage | n=8 avg14.89ms max19.97ms | n=4 avg24.17ms max29.42ms |
+| Space scheduling substage | n=8 avg0.03ms | n=4 avg0.03ms |
+| Space before-commit checks | n=8 avg2.29ms | n=4 avg1.32ms |
+| Space after-commit handling | n=8 avg5.13ms | n=4 avg3.37ms |
+| Suggestion scheduling | n=410 avg6.61ms max126.20ms | n=290 avg6.73ms max129.18ms |
+| Suggestion render | n=446 avg2.11ms max38.17ms | n=288 avg1.96ms max45.61ms |
+| Keyboard layout refresh | n=47 avg16.55ms max67.17ms | n=39 avg15.10ms max107.65ms |
+| Predictor worker | n=189 avg5.44ms max40.32ms | n=112 avg2.67ms max24.36ms |
+| Word-at-cursor | n=195 avg1.82ms max20.90ms | n=175 avg1.36ms max15.91ms |
+| Key initial editor read | n=60 avg0.73ms max1.19ms | n=39 avg0.88ms max8.32ms |
+
+Additional OFF report: backspace n20 avg3.18ms max31.82ms; idle word observation n121 avg0.06ms max0.19ms; 35 stale chips hidden; 0 discarded frames/retries/learning overflow; prediction worker 113 scheduled / 1 preempted / 112 delivered. **Fast Space path ON 8 hits/0 fallbacks; OFF 0 hits/4 fallbacks**. ON-vs-OFF comparison controls haptics OFF but is **not same input, not paired/randomized and extremely small n** (Space stage 8 vs 4) and elapsed durations are unequal. The average whole Space handler is 7.66ms (~23.1%) faster ON; its cursor/sentence stage 9.28ms (~38.4%) faster ON; meanwhile the worst full Space handler maximum is higher ON. This is preliminary support that bypassing the extra editor read is useful, but not proof of consistent touch latency or all-host correctness.
+
+### Correct action
+- Mark previous interpretation "fast path has not demonstrated improvement" as **superseded by the first matched-haptics ON/OFF comparison**. Do not rewrite original audit numbers.
+- Continue ON only if there are no capitalization, selection or long-draft editing errors. Repeat multiple A/B samples with at least 30 Space presses per arm and similar harmless content. Reset audits each arm; reopen editor after changing toggle.
+- Investigate the remaining 14.89ms ON cursor/sentence stage via separate aggregate timing around `cursorHasTextAfter() / getTextAfterCursor(1,0)` before attempting to eliminate that live-editor safety check.
+- The user's **long selected text fails to delete with Orivra Backspace** on Build 416. A separate `hotfix/build416b-selected-backspace-20261031` source branch has a single guarded `commitText("",1)` selected-range deletion path. This report is clearly **Build 416**, not a 416B fix verification. Continue testing 416B on disposable text. Dictionary Build 417 remains independent.
