@@ -1,19 +1,18 @@
 package com.chroomareborn.keyboard;
 
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.os.Build;
 import java.util.Locale;
 
 /**
  * Android Material-inspired keyboard colors. An IME cannot read other apps'
  * background pixels. App color is a best-effort icon/preset hue; dynamic colors
- * come from Android 12+ wallpaper palettes, respecting the system night mode.
+ * come from Android 12+ system wallpaper palettes, respecting night mode.
+ * Candidate 366 extracts icon hues only on the dedicated background worker;
+ * resolve() performs NO PackageManager, icon raster or bitmap work on the UI
+ * thread. A slow/hidden/ambiguous icon safely uses the old fallback.
  */
 final class AppPalette {
     private AppPalette() {}
@@ -98,8 +97,8 @@ final class AppPalette {
         else if(mode==ORANGE) { hue=22f;source="Orange"; }
         else if(mode==CLASSIC) { hue=225f;source="Classic"; }
         else {
-            hue=iconHue(ctx,packageName);
-            if(hue!=null)source="app icon estimate";
+            hue=AppIconHueCache366.cachedHue(packageName);
+            if(hue!=null)source="app icon • confidence screened";
             else {
                 hue=presetHue(packageName);
                 if(hue!=null)source="app preset estimate";
@@ -181,29 +180,5 @@ final class AppPalette {
         int ripple=(0x68<<24)|(accent & 0x00FFFFFF);
         return new Result(bg,key,accent,text,keyText,subtle,border,special,
                 suggestion,contrastText(suggestion),ripple,dark,label);
-    }
-    private static Float iconHue(Context ctx,String pkg) {
-        if(pkg==null||pkg.isEmpty())return null;
-        final Drawable icon;
-        try { icon=ctx.getPackageManager().getApplicationIcon(pkg); }
-        catch (PackageManager.NameNotFoundException|RuntimeException e) { return null; }
-        Bitmap bitmap=Bitmap.createBitmap(48,48,Bitmap.Config.ARGB_8888);
-        Canvas canvas=new Canvas(bitmap);
-        icon.setBounds(0,0,48,48);icon.draw(canvas);
-        float[] weights=new float[24],hsv=new float[3];
-        for(int y=1;y<47;y+=2)for(int x=1;x<47;x+=2) {
-            int pixel=bitmap.getPixel(x,y);
-            if(Color.alpha(pixel)<210)continue;
-            Color.colorToHSV(pixel,hsv);
-            if(hsv[1]<.30f||hsv[2]<.16f||hsv[2]>.96f)continue;
-            int index=Math.min(23,(int)(hsv[0]/15f));
-            weights[index]+=hsv[1]*hsv[1]*(0.3f+hsv[2]);
-        }
-        bitmap.recycle();
-        int best=-1;float highest=0;
-        for(int i=0;i<24;i++)if(weights[i]>highest) {
-            best=i;highest=weights[i];
-        }
-        return best<0||highest<1f?null:(best+.5f)*15f;
     }
 }
