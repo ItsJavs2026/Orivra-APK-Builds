@@ -3502,7 +3502,8 @@ public final class RebornImeService extends InputMethodService {
             // A next-word tap commits a trailing boundary at the cursor.
             // Selection callbacks from the previous composing span may have
             // marked this as mid-word editing. Re-evaluate after the commit.
-            editingInMiddle=cursorHasTextAfter() || !wordAtCursor().isEmpty();
+            editingInMiddle=LongDraftCaretState375
+                    .editingWithoutComposition(hasSelection(),cursorHasTextAfter());
             updateSentenceShift();
             showSuggestions();
             // Some editors publish their final selection asynchronously.
