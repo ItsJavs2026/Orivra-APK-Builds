@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Independent keyed View tag; preserve the existing color tag. -->
+    <item name="orivra_chip_binding_412" type="id" />
+</resources>
