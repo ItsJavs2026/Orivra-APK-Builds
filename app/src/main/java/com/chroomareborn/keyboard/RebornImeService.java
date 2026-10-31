@@ -3237,7 +3237,15 @@ public final class RebornImeService extends InputMethodService {
         clearPendingCaretInsert364();
         // Reuse this existing punctuation sample for cursor recovery; do
         // NOT add an editor IPC or dictionary read to the key's hot path.
-        final CharSequence beforeKey360=ic.getTextBeforeCursor(1,0);
+        final long readStart413=OrivraPerfAudit411.begin();
+        final CharSequence beforeKey360;
+        try {
+            beforeKey360=ic.getTextBeforeCursor(1,0);
+        } finally {
+            OrivraPerfAudit411.end(
+                    OrivraPerfAudit411.KEY_INITIAL_EDITOR_READ_413,
+                    readStart413);
+        }
         prepareCursorEdit(ic);
         boolean insertLeftBoundary364=false;
         if(insertion364!=null && sameEditor364 && sameSession364 &&
@@ -3625,8 +3633,17 @@ public final class RebornImeService extends InputMethodService {
         boolean alreadyCounted329=completedWord328!=null &&
                 completedWord328.equals(stableWordCounted329) &&
                 session==stableWordSession329;
-        currentFinish();
-        if(!ic.commitText(" ", 1)) {
+        final long spaceCommitStart413=OrivraPerfAudit411.begin();
+        final boolean committed413;
+        try {
+            currentFinish();
+            committed413=ic.commitText(" ",1);
+        } finally {
+            OrivraPerfAudit411.end(
+                    OrivraPerfAudit411.SPACE_EDITOR_COMMIT_413,
+                    spaceCommitStart413);
+        }
+        if(!committed413) {
             clearTapSequence340();
             return;
         }
@@ -3656,11 +3673,31 @@ public final class RebornImeService extends InputMethodService {
         if(ic==getCurrentInputConnection() && session==inputSessionGeneration &&
                 !sensitive && editorAllowsPersonalLearning &&
                 PersonalLearning.enabled(this)) {
-            if(used!=null)
-                PersonalContextLearning319.recordUsed(this,used.prior,used.word);
-            if(completedWord328!=null && !alreadyCounted329) {
-                PersonalWordFrequency328.recordCommitted(this,completedWord328);
-                personalPrefixCache340.clear();
+            final long learnStart413=OrivraPerfAudit411.begin();
+            try {
+                final String standalone413=completedWord328!=null &&
+                        !alreadyCounted329?completedWord328:null;
+                if(backgroundSpaceLearning413) {
+                    // Approved words only. Never queue arbitrary draft text.
+                    // No Android editor calls or preference writes here.
+                    approvedLearning413.record(this,
+                            used==null?null:used.prior,
+                            used==null?null:used.word,standalone413);
+                } else {
+                    // Keep the exact old synchronous path for A/B tests.
+                    if(used!=null)
+                        PersonalContextLearning319.recordUsed(
+                                this,used.prior,used.word);
+                    if(standalone413!=null)
+                        PersonalWordFrequency328.recordCommitted(
+                                this,standalone413);
+                }
+                if(standalone413!=null)
+                    personalPrefixCache340.clear();
+            } finally {
+                OrivraPerfAudit411.end(
+                        OrivraPerfAudit411.SPACE_APPROVED_LEARNING_413,
+                        learnStart413);
             }
         }
         stableWordCounted329="";
