@@ -38,7 +38,7 @@ public final class AppIconColor366AndroidTest {
         }
     }
 
-    @Test public void monochromeIconsFailToMaterialInsteadOfImaginaryHue() {
+    @Test public void monochromeIconsUseNeutralShadedSurfaceWithoutImaginaryHue() {
         int[] pixels=new int[SIZE*SIZE];
         java.util.Arrays.fill(pixels,Color.GRAY);
         assertNull(AppIconColorSignature366.detect(pixels,SIZE,SIZE));
@@ -52,7 +52,12 @@ public final class AppIconColor366AndroidTest {
                     .commit();
             AppPalette.Result result=AppPalette.resolve(
                     ctx,"com.example.orivra_unlisted_greyscale_fixture");
-            assertTrue(result.label,result.label.contains("Material fallback"));
+            // Research 368 intentionally changed the shaded-mode fallback:
+            // monochrome/hidden icons now preserve a neutral surface instead
+            // of taking the unrelated wallpaper Material You palette.
+            assertTrue(result.label,result.label.contains("neutral"));
+            assertEquals(result.dark?0xFF202328:0xFFF3F5F7,
+                    result.background);
             assertNotEquals(0,result.background);
             assertNotEquals(result.background,result.keyBackground);
         } finally {
