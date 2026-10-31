@@ -3629,6 +3629,48 @@ public final class RebornImeService extends InputMethodService {
         cancelCursorReleaseSuggestions();
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
+        // 416B: normal Backspace on a highlighted selection must REPLACE
+        // the selected range, not delete a code point beside the caret.
+        // Handle it before preparing/finishing composition, since some host
+        // editors collapse selection during finishComposingText().
+        // Do not suppress onUpdateSelection for this branch: the host may
+        // deliver the new collapsed caret synchronously during commitText.
+        if(hasSelection()) {
+            final long selectionSession416B=inputSessionGeneration;
+            final long selectedDeleteStart416B=OrivraPerfAudit411.begin();
+            final SelectedBackspace416B.Outcome outcome416B;
+            try {
+                outcome416B=SelectedBackspace416B.apply(
+                        new SelectedBackspace416B.Editor() {
+                            @Override public boolean sameSession() {
+                                return selectionSession416B==inputSessionGeneration &&
+                                        ic==getCurrentInputConnection();
+                            }
+                            @Override public boolean selectionKnown() {
+                                return hasSelection();
+                            }
+                            @Override public boolean replaceSelectionOnce() {
+                                return ic.commitText("",1);
+                            }
+                        });
+            } finally {
+                OrivraPerfAudit411.end(
+                        OrivraPerfAudit411.SELECTED_BACKSPACE_416B,
+                        selectedDeleteStart416B);
+            }
+            OrivraPerfAudit411.recordSelectedBackspace416B(outcome416B);
+            // Even a false return may have already deleted the selection.
+            // Never try character deletion or synthetic KEYCODE_DEL afterward.
+            if(outcome416B==SelectedBackspace416B.Outcome.APPLIED &&
+                    selectionSession416B==inputSessionGeneration &&
+                    ic==getCurrentInputConnection()) {
+                composing="";
+                editingInMiddle=cursorHasTextAfter() || hasSelection();
+                updateSentenceShift();
+                showSuggestions();
+            }
+            return;
+        }
         singleBackspaceMutation338=true;
         try {
             prepareCursorEdit(ic);
