@@ -39,6 +39,16 @@ final class ComposingMutation340 {
     }
 
     static Result append(Editor editor,String prior,String addition) {
+        return append(editor,prior,addition,false);
+    }
+    /**
+     * Experimental 413 fast path for Android's positive composing ACK only.
+     * Keep precondition verification and all false/ambiguous ACK recovery
+     * unchanged. When a host returns true, trust the API's success contract
+     * and defer the next redundant before-cursor read until the next key.
+     */
+    static Result append(Editor editor,String prior,String addition,
+            boolean trustPositiveAck) {
         if(editor==null || prior==null || addition==null ||
                 addition.isEmpty() || addition.length()>2 ||
                 prior.length()>READ_WINDOW || !editor.sameSession())
@@ -49,6 +59,10 @@ final class ComposingMutation340 {
                 return Result.PRECONDITION; // no editor mutation attempted
             boolean accepted=editor.setComposing(prior+addition);
             if(!editor.sameSession())return Result.STALE;
+            // Positive ACK is an explicit successful mutation. On the next
+            // keystroke, the regular preflight endsWith(prior) still verifies
+            // editor continuity. Negative/ambiguous ACKs use full old reads.
+            if(accepted && trustPositiveAck)return Result.COMPOSING;
             String after=copy(editor.before());
             if(before==null || after==null)
                 return accepted?Result.COMPOSING:Result.REJECTED;
