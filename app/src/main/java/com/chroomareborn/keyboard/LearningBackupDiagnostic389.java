@@ -93,15 +93,15 @@ final class LearningBackupDiagnostic389 {
         if(raw==null)return status(Status.WRONG_FILE);
         // CRLF or BOM modifications must be reported as altered Orivra
         // format/integrity, never mislabeled as an unrelated file.
-        boolean bom=raw.startsWith("\\uFEFF");
+        boolean bom=!raw.isEmpty() && raw.charAt(0)==0xFEFF;
         String headerView=bom?raw.substring(1):raw;
-        if(!headerView.startsWith("ORIVRA_LOCAL_LEARNING\\t"))
+        if(!headerView.startsWith("ORIVRA_LOCAL_LEARNING"+(char)9))
             return status(Status.WRONG_FILE);
-        if(bom || raw.indexOf('\\r')>=0)return status(Status.CHECKSUM);
-        boolean known=headerView.startsWith(LearningTransferCodec.HEADER+"\\n") ||
-                headerView.startsWith(ContextBackupFormat322.HEADER+"\\n") ||
-                headerView.startsWith(FrequencyBackupFormat330.HEADER+"\\n") ||
-                headerView.startsWith(TypedLearningV4Codec341.HEADER+"\\n");
+        if(bom || raw.indexOf((char)13)>=0)return status(Status.CHECKSUM);
+        boolean known=headerView.startsWith(LearningTransferCodec.HEADER+(char)10) ||
+                headerView.startsWith(ContextBackupFormat322.HEADER+(char)10) ||
+                headerView.startsWith(FrequencyBackupFormat330.HEADER+(char)10) ||
+                headerView.startsWith(TypedLearningV4Codec341.HEADER+(char)10);
         if(!known)return status(Status.WRONG_FILE);
         final TypedLearningV4Codec341.Data parsed;
         try{parsed=TypedLearningV4Codec341.decode(raw);}
