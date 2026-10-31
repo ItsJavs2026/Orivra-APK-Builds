@@ -33,3 +33,10 @@ Expected new package `com.chroomareborn.keyboard.build407fulltrial`, versionCode
 - Avoid touching user's original installed keyboard or data. Test only non-sensitive text.
 - Review 401 notification-memory implementation against 402–407 proposed fixes; preserve the richer 401 functionality and regressions. Add targeted fast-path/memory patch only with tests.
 - Samsung notification shade with background music, slow/fast typing, Backspace gestures, predictions, palette and learning/export tests are pending; no performance claims yet.
+
+## User-reported successful Android compilation (2026-10-31)
+- User screenshot confirms `BUILD SUCCESSFUL in 24s` for `Orivra407Full` on Samsung Android Code Studio. All 32 Gradle tasks executed, including `:app:compileDebugJavaWithJavac`, `:app:packageDebug`, and `:app:assembleDebug`.
+- Compilation displayed non-fatal Java deprecation and unchecked-operation notes concerning `RebornImeService.java`.
+- Metadata `output-metadata.json` and on-device installation have NOT yet been checked; package identity, separate IME registration, and full settings appearance remain verification gates.
+- User should run `cat app/build/outputs/apk/debug/output-metadata.json` under `/storage/emulated/0/AndroidIDEProjects/Orivra407Full`. Expected applicationId `com.chroomareborn.keyboard.build407fulltrial`, versionCode 407, name `1.0.61-build407-full-settings-recovery`.
+- The correct baseline was taken from Candidate 401 and full settings were not yet user-observed in the running APK. Avoid claims that the private Chrooma alpha 407 performance patches are incorporated; they are not.
