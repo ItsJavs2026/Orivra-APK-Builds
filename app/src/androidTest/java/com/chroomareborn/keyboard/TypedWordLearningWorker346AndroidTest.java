@@ -238,4 +238,40 @@ public final class TypedWordLearningWorker346AndroidTest {
             assertEquals(before,LearningTransferStore.exportV3(context));
         }finally{w.close();}
     }
+    @Test public void heavyTypingCannotQueueUnlimitedLearningAndRecoversNextEditor()
+            throws Exception {
+        enable();
+        TypedWordLearningWorker346 w=new TypedWordLearningWorker346(context);
+        java.util.concurrent.CountDownLatch unblock=
+                new java.util.concurrent.CountDownLatch(1);
+        try {
+            w.beginEditor(140,true);idle(w);
+            w.pauseWorkerForTest(unblock);
+            for(int i=0;i<5000;i++) {
+                // All are successful host-boundary notifications but
+                // flagged as rejected commits, so no private data persists.
+                w.committedSpace("continue",140,true,false);
+                assertTrue("optional training queue must remain capped",
+                        w.pendingSpaceUpdatesForTest()<=
+                                TypedWordLearningWorker346.MAX_PENDING_SPACE_UPDATES);
+            }
+            assertTrue("overloaded editor should stop optional training",
+                    w.overloadedForTest(140));
+            unblock.countDown();
+            idle(w);
+            assertEquals(0,w.pendingSpaceUpdatesForTest());
+            assertEquals(0,TypedWordEvidenceStore341.read(context).vocabulary());
+            w.endEditor(140);idle(w);
+            w.beginEditor(141,true);idle(w);
+            assertFalse("new editor must get fresh learning budget",
+                    w.overloadedForTest(141));
+            w.committedSpace("continue",141,true,true);idle(w);
+            assertEquals(1,TypedWordEvidenceStore341.read(context).vocabulary());
+            assertEquals(0,TypedWordEvidenceStore341.read(context).associations());
+        }finally{
+            unblock.countDown();
+            w.close();
+        }
+    }
+
 }
