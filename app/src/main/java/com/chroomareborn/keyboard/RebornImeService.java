@@ -750,9 +750,9 @@ public final class RebornImeService extends InputMethodService {
                  !idlePredictionPaint410.isQuiet(
                         android.os.SystemClock.uptimeMillis()));
     }
-    // Read at editor activation. OFF keeps key commits/composition unchanged,
-    // only skipping suggestion calculation and view updates.
-    private int predictionIsolationMode409=PredictionIsolationMode409.OFF;
+    // 410 defaults to FULL with typing-first painting. OFF and WORKER ONLY
+    // remain available as independent diagnostic modes.
+    private int predictionIsolationMode409=PredictionIsolationMode409.FULL;
     private static final String ISOLATION_TAG_409="isolation409";
     private final Runnable typingRefreshRunnable401=this::runTypingRefresh401;
     // Method reference avoids Java's illegal forward reference to the
@@ -1952,7 +1952,7 @@ public final class RebornImeService extends InputMethodService {
                 IDLE_PAINT_PREF_410,true);
         predictionIsolationMode409=PredictionIsolationMode409.normalize(
                 visualOptions370.getInt(PredictionIsolationMode409.PREF,
-                        PredictionIsolationMode409.OFF));
+                        PredictionIsolationMode409.FULL));
         if(predictionIsolationMode409==PredictionIsolationMode409.FULL)
             predictionDispatcher.warmPublicDictionary410();
         instantKeyFeedback369=visualOptions370.getBoolean(
@@ -1998,7 +1998,7 @@ public final class RebornImeService extends InputMethodService {
         predictionIsolationMode409=PredictionIsolationMode409.normalize(
                 getSharedPreferences("keyboard_feedback",MODE_PRIVATE)
                         .getInt(PredictionIsolationMode409.PREF,
-                                PredictionIsolationMode409.OFF));
+                                PredictionIsolationMode409.FULL));
         idlePredictionPaintEnabled410=getSharedPreferences(
                 "keyboard_feedback",MODE_PRIVATE)
                         .getBoolean(IDLE_PAINT_PREF_410,true);
