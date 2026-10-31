@@ -394,6 +394,8 @@ public final class RebornImeService extends InputMethodService {
         pendingStableWord329=null;
     }
     private void scheduleStableWord329() {
+        final long substageStart413=OrivraPerfAudit411.begin();
+        try {
         cancelStableWord329();
         // Some editors (including custom chat/search controls) commit each
         // keystroke instead of keeping an Android composing span. The live
@@ -432,6 +434,11 @@ public final class RebornImeService extends InputMethodService {
         long stableDelayMs=StableWordTiming334.milliseconds(expected);
         if(stableDelayMs>0)
             suggestionHandler.postDelayed(candidate,stableDelayMs);
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.IDLE_WORD_OBSERVATION_413,
+                    substageStart413);
+        }
     }
     // A synchronous InputConnection callback must not tear down the very
     // composing edit currently being verified. Selection changes initiated
@@ -439,6 +446,8 @@ public final class RebornImeService extends InputMethodService {
     private boolean composingTransaction340=false;
     private String composing = "";
     private void appendComposing340(InputConnection ic,String addition) {
+        final long substageStart413=OrivraPerfAudit411.begin();
+        try {
         final long session=inputSessionGeneration;
         final String previous=composing;
         ComposingMutation340.Result outcome;
@@ -514,6 +523,11 @@ public final class RebornImeService extends InputMethodService {
                     composingTransaction340=false;
                 }
             }
+        }
+    
+        } finally {
+            OrivraPerfAudit411.end(OrivraPerfAudit411.COMPOSE_MUTATION_413,
+                    substageStart413);
         }
     }
     private boolean sensitive, shift, symbols, capsLock;
