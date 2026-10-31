@@ -2650,7 +2650,8 @@ public final class RebornImeService extends InputMethodService {
                     }
                     final String selectedRow386=
                             LetterRowPredictionSwipe386.chosen(
-                                    rowDirection386,rowOptions386[0]);
+                                    rowDirection386,rowOptions386[0],
+                                    idleNextWord388[0]);
                     if(selectedRow386!=null && pressEditor[0]!=null) {
                         // A deliberate letter-row swipe consumes the starting
                         // letter; never type both the letter and correction.
@@ -2700,7 +2701,7 @@ public final class RebornImeService extends InputMethodService {
                                 return;
                             java.util.List<String> now386=visiblePredictionOptions372(false);
                             String choice386=LetterRowPredictionSwipe386.chosen(
-                                    committedDirection386,now386);
+                                    committedDirection386,now386,chosenIdle388);
                             if(selectedRow386.equals(choice386))
                                 acceptSuggestion(key,expected386,selectedRow386);
                         });

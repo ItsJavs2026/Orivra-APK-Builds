@@ -45,10 +45,22 @@ final class LetterRowPredictionSwipe386 {
                 chosen(Direction.DOWN,visible)!=null;
     }
     static String chosen(Direction direction,List<String> visible){
+        return chosen(direction,visible,false);
+    }
+    /**
+     * Idle strips center a SINGLE visible choice, but that chip is still at
+     * index 0. Only use that one chip for explicit DOWN when the gesture
+     * started in an idle, centered strip; active-word strips stay strict.
+     */
+    static String chosen(Direction direction,List<String> visible,
+            boolean centeredIdle) {
         if(visible==null || direction==null)return null;
         switch(direction){
             case DOWN:
-                // Strict center slot: no fallback to an adjacent candidate.
+                if(centeredIdle && visible.size()==1)
+                    return PredictionSwipe372.valid(visible.get(0))?
+                            visible.get(0):null;
+                // Strict center: never silently fall back to a side chip.
                 return visible.size()>1 && PredictionSwipe372.valid(visible.get(1))?
                         visible.get(1):null;
             case LEFT:
@@ -103,7 +115,9 @@ final class LetterRowPredictionSwipe386 {
     }
     private Direction axis(float dx,float dy){
         float ax=Math.abs(dx),ay=Math.abs(dy);
-        if(dy>=42f*density&&ay>=ax*1.55f)return Direction.DOWN;
+        // Recognize before finger must leave the physical key boundary;
+        // 32dp stays above ordinary tap drift while requiring clear intent.
+        if(dy>=32f*density&&ay>=ax*1.55f)return Direction.DOWN;
         if(ax>=46f*density&&ax>=ay*1.65f)
             return dx<0f?Direction.LEFT:Direction.RIGHT;
         return Direction.NONE;
