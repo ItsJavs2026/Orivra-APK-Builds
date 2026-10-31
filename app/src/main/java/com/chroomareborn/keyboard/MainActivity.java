@@ -30,6 +30,7 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_EXPORT_FREQUENCY=3074;
     private static final int REQUEST_EXPORT_UNIFIED_V4=3471;
     private static final int REQUEST_IMPORT_UNIFIED_V4=3472;
+    private static final int REQUEST_CHECK_UNIFIED_V4=3891;
     private TextView learningStatsView;
     private TextView dictionaryInfoView;
     private int dp(float n) { return Math.round(getResources().getDisplayMetrics().density * n); }
@@ -663,6 +664,16 @@ public final class MainActivity extends Activity {
                 REQUEST_IMPORT_UNIFIED_V4));
         root.addView(unifiedImport347);
 
+        // Research 389: explicit user-selected read-only check. The checker
+        // never writes imported data or displays personal vocabulary.
+        Button backupCheck389=new Button(this);
+        backupCheck389.setAllCaps(false);
+        backupCheck389.setText("Check my V4/V3 backup safely (read-only)");
+        backupCheck389.setOnClickListener(v->startActivityForResult(
+                LearningTransferDocumentIO.openIntent(),
+                REQUEST_CHECK_UNIFIED_V4));
+        root.addView(backupCheck389);
+
         // Build 307 research: explicit user-selected backup, never automatic.
         TextView transferNotice=new TextView(this);
         transferNotice.setText("\nPortable learning backup (experimental)\n"
@@ -1027,6 +1038,19 @@ public final class MainActivity extends Activity {
                                                 android.widget.Toast.LENGTH_LONG).show();
                                     });
                                 }))
+                        .show();
+                });
+            });
+        }else if(requestCode==REQUEST_CHECK_UNIFIED_V4) {
+            learningTransferIo.execute(()->{
+                final LearningBackupDiagnostic389.Check outcome=
+                        LearningBackupDiagnostic389.checkDocument(this,selected);
+                runOnUiThread(()->{
+                    if(isFinishing() || isDestroyed())return;
+                    new android.app.AlertDialog.Builder(this)
+                        .setTitle("Backup check (read-only)")
+                        .setMessage(outcome.message())
+                        .setPositiveButton("OK",null)
                         .show();
                 });
             });
