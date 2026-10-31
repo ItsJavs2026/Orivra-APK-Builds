@@ -74,3 +74,7 @@ bash ~/Orivra-Isolation/scripts/build_orivra409_android_code_studio.sh
 ```
 If the user has ALREADY cloned an earlier state of this 409 branch, run `cd ~/Orivra-Isolation && git pull --ff-only` first so that the helper/script and latest service corrections are present. If the destination Orivra409Isolation already contains files, the script deliberately stops rather than destroying any work; inspect existing project before deciding how to refresh it.
 APK expected at `/storage/emulated/0/AndroidIDEProjects/Orivra409Isolation/app/build/outputs/apk/debug/app-debug.apk`. Still source-only as of this note: no real Samsung APK compile yet.
+
+## User installation update — 2026-10-31
+User reported **"Installed"** after using the Android Code Studio Build 409 workflow. This supports successful installation on their Samsung Galaxy S26 Ultra, but does not itself verify the exact build metadata, active keyboard selection, or any runtime performance.
+Next device test: select Orivra 409 Isolation Test, confirm Prediction diagnosis OFF (default), reopen the ChatGPT compose field, manually type normal sentences and unfamiliar joined/misspelled text. Report whether keys have latency with no suggestion-bar processing. After that compare WORKER ONLY and FULL in the same composer, then notification quick reply with music. Gboard remains fallback. No lag fix yet verified.
