@@ -23,6 +23,15 @@ No letter, pointer position, or editor content is logged or persisted; the test 
 - The suite validates Android dispatch semantics and guards but does not prove that the candidate's `RebornImeService` wiring or UI is perfect.
 - A release must not be issued based solely on these synthetic emulator tests. First collect the user's Candidate 378 Samsung results (drift ON/OFF, edge ON/OFF, two-thumb lag, letter misses, symbol holds).
 
+
+## First CI finding and corrective test adjustment
+
+The first run, GitHub Actions `41162721408`, compiled successfully and executed **241 Android 35 emulator tests**. Only `weightedEdgeLettersOwnWiderMeasuredCells` failed: it asserted a 1000px exact rightmost edge, but Android `LinearLayout` rounded fractional child weights to x=999. The other 240 tests passed, including the new two-thumb and event-dispatch scenarios.
+
+The assertion is now **bounded to at most 1px trailing rounding residual**, and additionally requires: the first cell begins at 0, every key has positive width, and every adjacent key has continuous boundaries without internal dead zones. This does not modify the production keyboard, layout weights, user data, APK or original release.
+
+This is a test-harness correction for normal pixel rounding, not confirmation of phone ergonomics. A subsequent CI pass is required before marking Research 379 qualified.
+
 ## Preservation
 
 Branch starts from released Candidate 378 HEAD `1df1e3065e7fabe939633ec75dfdd42022481304`. Files changed are only this Android test, documentation, and the research-only Android 35 CI workflow. Candidate 376, Candidate 378, protected Preview #178, V4 backups and the scheduled top-bar design are untouched.
