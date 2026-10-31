@@ -845,6 +845,11 @@ public final class RebornImeService extends InputMethodService {
     private static final String SAFE_SAMPLE_PREF_415="orivra_safe_sample_415";
     private boolean quickPredictionWake415=true;
     private boolean safeEditorSample415=true;
+    // 416: opt-in bounded shortcut for ordinary composed word + literal Space.
+    // OFF by default: all old editor/capitalization behavior remains available.
+    private static final String FAST_SPACE_SHIFT_PREF_416=
+            "orivra_fast_space_shift_416";
+    private boolean fastSpaceShift416=false;
     private void applyFastQuietPolicy415() {
         idlePredictionPaint410.setQuietAfterKeyMs(
                 quickPredictionWake415?145L:
@@ -2107,6 +2112,8 @@ public final class RebornImeService extends InputMethodService {
                 QUICK_WAKE_PREF_415,true);
         safeEditorSample415=visualOptions370.getBoolean(
                 SAFE_SAMPLE_PREF_415,true);
+        fastSpaceShift416=visualOptions370.getBoolean(
+                FAST_SPACE_SHIFT_PREF_416,false);
         applyFastQuietPolicy415();
         reloadHaptics415(visualOptions370);
         frameUpdatesEnabled412=visualOptions370.getBoolean(
@@ -2179,6 +2186,8 @@ public final class RebornImeService extends InputMethodService {
                 QUICK_WAKE_PREF_415,true);
         safeEditorSample415=fullOptions411.getBoolean(
                 SAFE_SAMPLE_PREF_415,true);
+        fastSpaceShift416=fullOptions411.getBoolean(
+                FAST_SPACE_SHIFT_PREF_416,false);
         applyFastQuietPolicy415();
         reloadHaptics415(fullOptions411);
         riseEnabled411=fullOptions411.getBoolean(RISE_ENABLED_PREF_411,true);
@@ -3752,6 +3761,10 @@ public final class RebornImeService extends InputMethodService {
         cancelCursorReleaseSuggestions();
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
+        // 416: capture only the ephemeral composition before Space finishes it;
+        // no editor text is retained, persisted or logged by this shortcut.
+        final String preSpaceComposing416=composing;
+        final boolean wasEditingInMiddle416=editingInMiddle;
         // Detect a real word just typed through this IME, not a pasted or
         // existing editor string. Capture before finishComposingText(), and
         // keep only a short approved word pair after a successful Space.
@@ -3880,10 +3893,27 @@ public final class RebornImeService extends InputMethodService {
         final long spaceShiftStart415=OrivraPerfAudit411.begin();
         final boolean previousShift;
         try {
-            editingInMiddle=cursorHasTextAfter() || hasSelection();
+            final boolean trailingAfterSpace416=cursorHasTextAfter();
+            editingInMiddle=trailingAfterSpace416 || hasSelection();
             // The ordinary Space boundary never needs a full key rebuild.
             previousShift=shift;
-            updateSentenceShift();
+            if(fastSpaceShift416 &&
+                    SpaceShiftFastPath416.canClearShift(
+                            preSpaceComposing416,
+                            ic==getCurrentInputConnection() &&
+                                    session==inputSessionGeneration,
+                            wasEditingInMiddle416,trailingAfterSpace416,
+                            hasSelection(),sensitive,numericEditor,symbols,
+                            capsLock)) {
+                // A composed letter immediately followed by literal Space
+                // cannot be a sentence boundary. All ambiguous cases still
+                // use the existing live 160-character editor read.
+                shift=false;
+                OrivraPerfAudit411.recordFastSpaceShift416();
+            } else {
+                updateSentenceShift();
+                OrivraPerfAudit411.recordFallbackSpaceShift416();
+            }
         } finally {
             OrivraPerfAudit411.end(
                     OrivraPerfAudit411.SPACE_SHIFT_415,spaceShiftStart415);
