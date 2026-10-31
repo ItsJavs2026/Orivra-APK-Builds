@@ -271,8 +271,12 @@ public final class RebornImeService extends InputMethodService {
                         dx,dy,dp(12),!touch.rise.isEmpty());
                 String choice=PredictionSwipe372.choose(dir,touch.index,
                         touch.strip,touch.rise,touch.fromRise);
+                // Freezing the visuals cannot freeze the host editor.
+                // Recheck its actual composing/caret word before accepting.
+                String liveWord372=composing.isEmpty()?
+                        wordAtCursor():composing;
                 boolean allowed=PredictionSwipe372.safeRelease(
-                        touch.expected,latestSnapshot,
+                        touch.expected,liveWord372,
                         touch.editor==getCurrentInputConnection(),
                         touch.session==inputSessionGeneration,
                         touch.selectionStart==lastSelectionStart &&
@@ -1724,6 +1728,8 @@ public final class RebornImeService extends InputMethodService {
         return base;
     }
     @Override public void onConfigurationChanged(Configuration newConfig) {
+        clearPredictionTouch372();
+        clearSpaceHighlight372();
         endTypedWords347();
         invalidateEditingTicket();
         super.onConfigurationChanged(newConfig);
@@ -1811,6 +1817,8 @@ public final class RebornImeService extends InputMethodService {
         refreshView();
     }
     @Override public void onFinishInput() {
+        clearPredictionTouch372();
+        clearSpaceHighlight372();
         clearPendingCaretInsert364();
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
@@ -1831,6 +1839,8 @@ public final class RebornImeService extends InputMethodService {
         super.onFinishInput();
     }
     @Override public void onFinishInputView(boolean finishingInput) {
+        clearPredictionTouch372();
+        clearSpaceHighlight372();
         clearPendingCaretInsert364();
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
@@ -1848,6 +1858,8 @@ public final class RebornImeService extends InputMethodService {
     }
     @Override public void onDestroy() {
         appThemeDestroyed366=true;
+        clearPredictionTouch372();
+        clearSpaceHighlight372();
         clearPendingCaretInsert364();
         hintPressOrder353.cancelAll();
         refreshAfterHint353=false;
@@ -2648,6 +2660,7 @@ public final class RebornImeService extends InputMethodService {
         return b;
     }
     private void type(String value) {
+        clearSpaceHighlight372();
         final long keyStart340=CandidateLatencyMetrics.start(getPackageName());
         cancelStableWord329();
         // A new character changes the observed word; preserve neither
@@ -2857,6 +2870,7 @@ public final class RebornImeService extends InputMethodService {
     // the final composing letter and briefly show an empty suggestion hint.
     private boolean singleBackspaceMutation338;
     private void backspace() {
+        clearSpaceHighlight372();
         clearPendingCaretInsert364();
         clearTapSequence340();
         cancelStableWord329();
@@ -2934,6 +2948,41 @@ public final class RebornImeService extends InputMethodService {
         // The previous per-repeat refresh recreated every key ~15 times/sec.
         // Preserve the live backspace touch target until release.
         if(!deleteHeld && oldShift!=shift)refreshView();
+    }
+    private boolean tryHighlightedSpace372() {
+        if(!spaceAcceptEnabled372 || activePredictionTouch372!=null)
+            return false;
+        final String input=highlightedExpected372;
+        final String correction=highlightedCandidate372;
+        final InputConnection ic=getCurrentInputConnection();
+        if(ic==null || input==null || correction==null)return false;
+        boolean eligible=HighlightedSpace372.eligible(
+                input,composing,correction,
+                true,true,
+                highlightedSession372==inputSessionGeneration,
+                ic==highlightedEditor372,editorAllowsSuggestions,
+                sensitive,editingInMiddle,hasSelection(),
+                cursorHasTextAfter(),numericEditor,symbols,
+                splitNextWords.contains(correction));
+        if(!eligible)return false;
+        // Verify the unchanged composing span against actual editor text
+        // before treating Space as an explicit selection.
+        try {
+            CharSequence text=ic.getTextBeforeCursor(input.length(),0);
+            if(text==null || !input.contentEquals(text))return false;
+        } catch(RuntimeException detachedEditor) {return false;}
+        // Once an editor mutation is attempted, never fall through and
+        // insert a second space: a remote host can reject a commit after
+        // partially changing its own state.
+        clearSpaceHighlight372();
+        spaceAcceptInProgress372=true;
+        spaceAcceptSucceeded372=false;
+        try {
+            acceptSuggestion(null,input,correction);
+        } finally {
+            spaceAcceptInProgress372=false;
+        }
+        return true;
     }
     private void space() {
         // A settled, visibly highlighted word correction may be accepted by
