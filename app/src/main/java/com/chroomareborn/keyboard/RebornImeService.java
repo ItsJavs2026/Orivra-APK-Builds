@@ -702,7 +702,12 @@ public final class RebornImeService extends InputMethodService {
     private final Runnable typingRefreshRunnable401=()->{
         if(!typingRefresh401.consume(
                 inputSessionGeneration,getCurrentInputConnection()))return;
-        if(!sensitive && editorAllowsSuggestions && candidates!=null)showSuggestions();
+        if(!sensitive && editorAllowsSuggestions && candidates!=null) {
+            long start401=CandidateLatencyMetrics.start(getPackageName());
+            showSuggestions();
+            CandidateLatencyMetrics.recordDeferredUi401(
+                    start401,System.nanoTime());
+        }
     };
     private void cancelTypingRefresh401(){
         suggestionHandler.removeCallbacks(typingRefreshRunnable401);
