@@ -16,7 +16,7 @@ import java.util.Set;
 final class PersonalWordFrequency328 {
     static final String PREFS="orivra_confirmed_word_uses_v1";
     private static final String PREFIX="word:";
-    private static final int MAX_WORDS=320;
+    private static final int MAX_WORDS=LearningCapacity390.MAX_FREQUENCIES;
     private PersonalWordFrequency328() {}
     static void clear(Context c) {
         c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().clear().apply();

@@ -17,7 +17,7 @@ final class PersonalLearning {
     static final String PREFS = "orivra_personal_learning_v1";
     static final String ENABLED = "enabled";
     private static final String PREFIX = "accepted:";
-    private static final int MAX_ENTRIES = 300;
+    private static final int MAX_ENTRIES = LearningCapacity390.MAX_CORRECTIONS;
     private PersonalLearning() {}
 
     static boolean enabled(Context context) {

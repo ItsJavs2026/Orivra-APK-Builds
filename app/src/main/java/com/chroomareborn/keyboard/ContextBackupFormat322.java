@@ -13,7 +13,7 @@ import java.util.TreeMap;
  */
 final class ContextBackupFormat322 {
     static final String HEADER="ORIVRA_LOCAL_LEARNING\t2";
-    static final int MAX_CONTEXT=240;
+    static final int MAX_CONTEXT=LearningCapacity390.MAX_CONTEXT_KEYS;
     private ContextBackupFormat322(){}
 
     static final class Counts {

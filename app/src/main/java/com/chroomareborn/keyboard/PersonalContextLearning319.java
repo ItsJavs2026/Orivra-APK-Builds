@@ -16,7 +16,7 @@ import java.util.Map;
 final class PersonalContextLearning319 {
     static final String PREFS="orivra_explicit_context_learning_v1";
     private static final String PREFIX="pair:";
-    private static final int MAX_PAIRS=240;
+    private static final int MAX_PAIRS=LearningCapacity390.MAX_CONTEXT_KEYS;
     private PersonalContextLearning319() {}
     static void clear(Context c) {
         c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().clear().apply();

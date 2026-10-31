@@ -27,7 +27,7 @@ final class LearningTransferCodec {
     static final String HEADER="ORIVRA_LOCAL_LEARNING\t1";
     static final int MAX_UTF8_BYTES=100_000;
     static final int MAX_WORDS=PersonalDictionaryPolicy.MAX_WORDS;
-    static final int MAX_PAIRS=300;
+    static final int MAX_PAIRS=LearningCapacity390.MAX_CORRECTIONS;
     private static final String SEP="\t";
     private LearningTransferCodec(){}
 

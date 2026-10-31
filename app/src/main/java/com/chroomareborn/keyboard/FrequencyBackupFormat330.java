@@ -13,7 +13,7 @@ import java.util.TreeMap;
  */
 final class FrequencyBackupFormat330 {
     static final String HEADER="ORIVRA_LOCAL_LEARNING\t3";
-    static final int MAX_WORDS=320;
+    static final int MAX_WORDS=LearningCapacity390.MAX_FREQUENCIES;
     private FrequencyBackupFormat330(){}
     static final class Data {
         final ContextBackupFormat322.Data earlier;
