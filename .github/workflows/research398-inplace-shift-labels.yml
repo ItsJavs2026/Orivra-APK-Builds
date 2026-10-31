@@ -1,0 +1,142 @@
+name: Orivra Research 398 - in-place Shift and full regression (NO APK)
+on:
+  push:
+    branches:
+      - research/build398-inplace-shift-labels-20261031
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research398
+  cancel-in-progress: true
+jobs:
+  source-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Exact changes from qualified Research 397; protect learning and gestures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='ffecb157d117862c668ed403f88009a09eab765a'
+          changed=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          expected={
+              'app/src/main/java/com/chroomareborn/keyboard/AlphabetCaseRelabel398.java',
+              'app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/AlphabetCaseRelabel398AndroidTest.java',
+              'docs/RESEARCH398_INPLACE_SHIFT_LABELS_20261031.md',
+              '.github/workflows/research398-inplace-shift-labels.yml',
+          }
+          assert changed==expected,(changed^expected)
+          old=lambda p:subprocess.check_output(['git','show',base+':'+p],text=True)
+          for name in [
+              'app/build.gradle.kts','app/src/main/AndroidManifest.xml',
+              'app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PublicPhraseIndex397.java',
+              'app/src/main/java/com/chroomareborn/keyboard/KeyboardLayoutSpec.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java',
+              'app/src/main/java/com/chroomareborn/keyboard/CandidateLatencyMetrics.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PersonalLearning.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PersonalWordFrequency328.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PersonalContextLearning319.java',
+              'app/src/main/java/com/chroomareborn/keyboard/TypedLearningV4Codec341.java',
+              'app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java',
+              'app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java',
+          ]:
+              assert Path(name).read_text()==old(name),name
+          ime=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert ime.count('private void refreshShiftCase398()')==1
+          assert ime.count('suggestionHandler.post(this::refreshShiftCase398);')==2
+          assert ime.count('refreshShiftCase398();')==2
+          assert 'if(!AlphabetCaseRelabel398.relabel(keys,shift,capsLock))' in ime
+          assert 'keys.removeAllViews();' in ime  # original fallback intact
+          assert 'applicationId = "com.chroomareborn.keyboard.build396trial"' in Path('app/build.gradle.kts').read_text()
+          assert 'android.permission.INTERNET' not in Path('app/src/main/AndroidManifest.xml').read_text()
+          print('PASS: only Shift relabel changed; Prediction 397, gestures, V4, permissions and build identity protected')
+          PY
+  android35-full-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Restore pinned offline dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile full IME and Shift safety instrumentation
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable Android emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -e
+            adb logcat -c
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+            echo "---- R394 aggregate loaded-learning timing; fictional data only ----"
+            adb logcat -d -v brief -s OrivraPerf394:I | grep 'R394 .*p50='
+            echo "---- Same-run original vs optimized p95; synthetic learning only ----"
+            adb logcat -d -v brief -s OrivraPerf395:I | grep 'R395 .*SAME-RUN p95'
+            echo "---- End of aggregate profile ----"
+      - name: Require 294+ Android tests including DOWN, long typing and latency parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,'Missing Android test results'
+          tests=failures=errors=skips=0
+          for f in reports:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  x for x in root.iter() if x.tag.endswith('testsuite')]
+              for s in suites:
+                  tests+=int(s.attrib.get('tests','0'))
+                  failures+=int(s.attrib.get('failures','0'))
+                  errors+=int(s.attrib.get('errors','0'))
+                  skips+=int(s.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
+          assert tests>=294 and failures==0 and errors==0 and skips==0
+          PY
