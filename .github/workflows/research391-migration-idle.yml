@@ -82,7 +82,7 @@ jobs:
           assert 'LetterRowIdleMode388.start(' in ime
           assert 'LetterRowIdleMode388.finish(' in ime
           assert 'nextWordTicketCurrent340(pressEditor[0])' in ime
-          assert 'LetterRowPredictionSwipe386.hasSelectable(live)' in ime
+          assert 'LetterRowPredictionSwipe386.hasSelectable(visible)' in (root/'LetterRowIdleMode388.java').read_text()
           assert 'acceptSuggestion(key,expected386,selectedRow386)' in ime
           manifest=Path('app/src/main/AndroidManifest.xml').read_text()
           assert 'android.permission.INTERNET' not in manifest
