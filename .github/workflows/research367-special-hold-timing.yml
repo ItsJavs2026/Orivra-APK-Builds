@@ -1,0 +1,73 @@
+name: Orivra Research 367 - faster special-character long press (NO RELEASE)
+on:
+  push:
+    branches:
+      - research/build367-faster-special-character-hold-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research367
+  cancel-in-progress: true
+
+jobs:
+  scope-and-timing-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify only special-character hold path changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="313342af2faf0034b433b32c3fd45a0a01e74cbe"
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          allowed={
+              "app/src/main/java/com/chroomareborn/keyboard/SymbolHoldTiming367.java",
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/SymbolHoldTiming367Research.java",
+              ".github/workflows/research367-special-hold-timing.yml"
+          }
+          assert changed==allowed,f"Unreviewed or missing files: {changed ^ allowed}"
+          old=subprocess.check_output(["git","show",base+":app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java"],text=True)
+          new=Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          assert old.count("hintPressOrder353")==new.count("hintPressOrder353")
+          assert old.count("PredictionDispatcher")==new.count("PredictionDispatcher")
+          assert old.count("PredictionTapCaret364")==new.count("PredictionTapCaret364")
+          assert new.count("SymbolHoldTiming367.delayMs(")==1
+          assert 'getBoolean(\n                        SymbolHoldTiming367.KEY_FAST_SYMBOL_HOLD,true)' in new
+          assert "symbolHoldInProgress=true" in new
+          assert "hintPressOrder353.complete(token" in new
+          assert "DELETE_HOLD_DELAY_MS" in new
+          assert "ENTER_SEND_HOLD_MS" in new
+          assert "450L" in new  # shift long hold unchanged
+          assert "ViewConfiguration.getLongPressTimeout()" in new
+          assert "KEY_FAST_SYMBOL_HOLD" in Path("app/src/main/java/com/chroomareborn/keyboard/SymbolHoldTiming367.java").read_text()
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert "android.permission.INTERNET" not in manifest
+          gradle=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build365trial"' in gradle
+          assert "versionCode = 365" in gradle
+          print("PASS: hold timer only, Candidate 365 APK and touch-order baseline untouched")
+          PY
+      - name: Run deterministic fast-special-hold timing regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/SymbolHoldTiming367.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/SymbolHoldTiming367Research.java
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.SymbolHoldTiming367Research
