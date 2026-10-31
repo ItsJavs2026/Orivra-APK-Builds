@@ -1,0 +1,177 @@
+name: Orivra Research 396 - fix centered DOWN and deep typing (no APK)
+on:
+  push:
+    branches:
+      - research/build396-reliable-center-down-20261031
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research396
+  cancel-in-progress: true
+jobs:
+  source-and-reset-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Confirm ONLY guarded DOWN gesture and tests changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base='9557ba510298f14263309c356034da219018b64c'
+          changed=set(subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines())
+          allowed={
+              'app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java',
+              'app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386AndroidTest.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386Research.java',
+              'app/src/androidTest/java/com/chroomareborn/keyboard/LetterRowDown396AndroidTest.java',
+              'app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowDown396Research.java',
+              'docs/RESEARCH396_RELIABLE_DOWN_20261031.md',
+              '.github/workflows/research396-reliable-down.yml',
+          }
+          assert changed==allowed,(changed^allowed)
+          files=[
+              'PersonalLearning.java','PersonalWordFrequency328.java',
+              'PersonalContextLearning319.java','FastStoredLearningPolicy395.java',
+              'TypedLearningV4Transfer347.java','TypedLearningV4Codec341.java',
+              'LearningCapacity390.java','PredictionDispatcher.java',
+              'ChatComposerReset393.java','LetterRowIdleMode388.java',
+              'SentenceSuggestionCommit.java','HighlightedSpace372.java',
+          ]
+          for name in files:
+              path='app/src/main/java/com/chroomareborn/keyboard/'+name
+              old=subprocess.check_output(['git','show',base+':'+path],text=True)
+              assert Path(path).read_text()==old(path) if False else Path(path).read_text()==old,path
+          for path in ['app/build.gradle.kts','app/src/main/AndroidManifest.xml']:
+              old=subprocess.check_output(['git','show',base+':'+path],text=True)
+              assert Path(path).read_text()==old,path
+          assert 'applicationId = "com.chroomareborn.keyboard.build391trial"' in Path('app/build.gradle.kts').read_text()
+          assert 'android.permission.INTERNET' not in Path('app/src/main/AndroidManifest.xml').read_text()
+          ime=Path('app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java').read_text()
+          assert 'rowDirection386,rowOptions386[0],\n                                    idleNextWord388[0]' in ime
+          assert 'committedDirection386,now386,chosenIdle388' in ime
+          recognizer=Path('app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java').read_text()
+          assert 'if(centeredIdle && visible.size()==1)' in recognizer
+          assert 'if(dy>=32f*density' in recognizer
+          assert 'if(ax>=46f*density' in recognizer
+          print('PASS: DOWN-only correction, all learning/Space/privacy guards preserved')
+          PY
+      - name: Stress 150000 randomized send-reset and editor boundary states
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/r393"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/r393" \
+            app/src/main/java/com/chroomareborn/keyboard/ChatComposerReset393.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/ChatComposerReset393Research.java
+          java -cp "$RUNNER_TEMP/r393" com.chroomareborn.keyboard.ChatComposerReset393Research
+      - name: Run 210k strict-reference randomized learning-key cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/r395"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/r395" \
+            app/src/main/java/com/chroomareborn/keyboard/EnglishApostrophePolicy.java \
+            app/src/main/java/com/chroomareborn/keyboard/AcceptedContextPolicy319.java \
+            app/src/main/java/com/chroomareborn/keyboard/AdaptivePrefixPolicy328.java \
+            app/src/main/java/com/chroomareborn/keyboard/FastStoredLearningPolicy395.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/FastStoredLearning395Research.java
+          java -cp "$RUNNER_TEMP/r395" com.chroomareborn.keyboard.FastStoredLearning395Research
+      - name: Stress 120000 single-chip and center-only DOWN directions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/r396"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/r396" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java \
+            app/src/main/java/com/chroomareborn/keyboard/LetterRowPredictionSwipe386.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/LetterRowDown396Research.java
+          java -cp "$RUNNER_TEMP/r396" \
+            com.chroomareborn.keyboard.LetterRowDown396Research
+  android35-long-typing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Restore pinned offline dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile full IME and deep typing instrumentation
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable Android emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -e
+            adb logcat -c
+            gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+            echo "---- R394 aggregate loaded-learning timing; fictional data only ----"
+            adb logcat -d -v brief -s OrivraPerf394:I | grep 'R394 .*p50='
+            echo "---- Same-run original vs optimized p95; synthetic learning only ----"
+            adb logcat -d -v brief -s OrivraPerf395:I | grep 'R395 .*SAME-RUN p95'
+            echo "---- End of aggregate profile ----"
+      - name: Require 287+ Android tests including DOWN, long typing and latency parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,'Missing Android test results'
+          tests=failures=errors=skips=0
+          for f in reports:
+              root=ET.parse(f).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  x for x in root.iter() if x.tag.endswith('testsuite')]
+              for s in suites:
+                  tests+=int(s.attrib.get('tests','0'))
+                  failures+=int(s.attrib.get('failures','0'))
+                  errors+=int(s.attrib.get('errors','0'))
+                  skips+=int(s.attrib.get('skipped','0'))
+          print(f'Android 35 emulator: {tests} tests, {failures} failures, {errors} errors, {skips} skipped')
+          assert tests>=287 and failures==0 and errors==0 and skips==0
+          PY
