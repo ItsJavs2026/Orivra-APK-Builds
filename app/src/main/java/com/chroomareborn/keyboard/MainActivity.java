@@ -85,32 +85,27 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 413 Keypress Fast Path");
+        title.setText("Orivra — Build 414 Faster Typing + Live Suggestions");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nBuild 413 — Measured typing-path performance experiment\n"+
-                "Your Galaxy S26 Ultra audit measured 21.09ms average letter "+
-                "handling and 40.71ms average Space handling. Rise, theme "+
-                "and individual prediction-chip binding were much faster. "+
-                "We need to fix the cost of typing, not hide predictions.\n"+
-                "\nBuild 413 preserves the full Orivra settings, SentenceFlow, "+
-                "learning, backups and Build 412 stable prediction bar. "+
-                "It adds a reversible fast composing acknowledgment, "+
-                "moves approved Space learning writes to a bounded "+
-                "Android-background-priority worker, and avoids a full "+
-                "keyboard rebuild after ordinary Backspace gestures.\n"+
-                "\nUse the independent ON/OFF controls for Fast verified "+
-                "composing ACK and Background approved Space learning to "+
-                "compare correctness and responsiveness. The local audit "+
-                "now separates pre/post Space work, composing/edit IPC, "+
-                "layout updates and background learning. No typed text "+
-                "is included in timing reports.\n"+
-                "\nThis is an experimental, separate installation. "+
-                "Keep Gboard and previous Orivra versions installed. "+
-                "Test non-sensitive text first.\n");
+        notes.setText("\nBuild 414 — Faster typing and responsive prediction chips\n"+
+                "Your Samsung Build 413 audit showed letters averaging 14.15ms, "+
+                "with idle-word observation alone taking 11.64ms per letter. "+
+                "Space averaged 29.44ms. Rise and suggestion-chip binding "+
+                "were much quicker. This version targets the measured cost.\n"+
+                "\nWhen enabled, verified idle-word learning waits until "+
+                "typing stops instead of reading the editor on every key. "+
+                "The old method is available with a reversible switch.\n"+
+                "\nOld, unclickable side predictions are now hidden rather "+
+                "than shown as if active. A dropped outdated display frame "+
+                "can request one bounded, editor-checked refresh. Current "+
+                "suggestions still require safe editor verification on tap.\n"+
+                "\nThe full Orivra settings, SentenceFlow, backups and "+
+                "personal learning remain. This is a separate experimental "+
+                "APK. Keep your existing Orivra versions and Gboard.\n");
         notes.setTextColor(0xFF303846);
         notes.setTextSize(15);
         root.addView(notes);
@@ -316,6 +311,34 @@ public final class MainActivity extends Activity {
         });
         root.addView(learningWorkerButton413);
 
+        TextView deferredInfo414=new TextView(this);
+        deferredInfo414.setText("\nBuild 414 stable-word learning: ON "+
+                "delays cursor checks until typing has paused, so keypresses "+
+                "aren't blocked by repeated word-at-cursor reads. OFF uses "+
+                "the previous Build 413 per-key observer. Reopen the "+
+                "keyboard after switching, then compare the letter timing "+
+                "and learning behavior.");
+        deferredInfo414.setTextSize(15);
+        deferredInfo414.setTextColor(0xFF303846);
+        root.addView(deferredInfo414);
+        final String deferredPref414="orivra_deferred_stable_word_414";
+        final android.content.SharedPreferences deferredPrefs414=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        Button deferredButton414=new Button(this);
+        deferredButton414.setAllCaps(false);
+        deferredButton414.setText("Deferred idle-word learning: "+
+                (deferredPrefs414.getBoolean(deferredPref414,true)?"ON":"OFF"));
+        deferredButton414.setOnClickListener(v->{
+            boolean next=!deferredPrefs414.getBoolean(deferredPref414,true);
+            deferredPrefs414.edit().putBoolean(deferredPref414,next).apply();
+            deferredButton414.setText("Deferred idle-word learning: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen the text field to apply",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(deferredButton414);
+
         TextView auditHelp411=new TextView(this);
         auditHelp411.setText("\nBUILD 411 • Local performance audit (OFF by default). "+
                 "Measures letter, Space, Backspace, suggestion processing, "+
@@ -389,6 +412,9 @@ public final class MainActivity extends Activity {
                     " | Background Space learning: "+
                             currentFeedback411.getBoolean(
                             "orivra_background_space_learning_413",true)+
+                    " | Deferred idle word: "+
+                            currentFeedback411.getBoolean(
+                            "orivra_deferred_stable_word_414",true)+
                     " | Theme: "+AppPalette.modeName(theme411);
             return OrivraPerfAudit411.report(settings411);
         };
@@ -464,7 +490,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra 413 Fast Key Test keyboard");
+        picker.setText("2. Choose Orivra 414 Live Test keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
