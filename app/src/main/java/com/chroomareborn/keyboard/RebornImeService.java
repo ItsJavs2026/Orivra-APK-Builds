@@ -3877,21 +3877,32 @@ public final class RebornImeService extends InputMethodService {
         stableWordSession329=-1L;
         // A normal space typed after repositioning must not switch back to
         // end-of-document composition when content remains after the cursor.
-        editingInMiddle=cursorHasTextAfter() || hasSelection();
-        // Previously every space destroyed and rebuilt the full key layout.
-        // A normal word boundary does not change any key labels. Only a
-        // sentence-boundary Shift change needs in-place case relabeling.
-        boolean previousShift=shift;
-        updateSentenceShift();
-        if(TypingRefreshGate401.safeToCoalesce(
-                sensitive,editorAllowsSuggestions,numericEditor,symbols,
-                hasSelection())) scheduleTypingRefresh401();
-        else {
-            cancelTypingRefresh401();
-            showSuggestions();
+        final long spaceShiftStart415=OrivraPerfAudit411.begin();
+        final boolean previousShift;
+        try {
+            editingInMiddle=cursorHasTextAfter() || hasSelection();
+            // The ordinary Space boundary never needs a full key rebuild.
+            previousShift=shift;
+            updateSentenceShift();
+        } finally {
+            OrivraPerfAudit411.end(
+                    OrivraPerfAudit411.SPACE_SHIFT_415,spaceShiftStart415);
         }
-        if(previousShift!=shift && !capsLock && !symbols)
-            suggestionHandler.post(this::refreshShiftCase398);
+        final long spaceRefreshStart415=OrivraPerfAudit411.begin();
+        try {
+            if(TypingRefreshGate401.safeToCoalesce(
+                    sensitive,editorAllowsSuggestions,numericEditor,symbols,
+                    hasSelection())) scheduleTypingRefresh401();
+            else {
+                cancelTypingRefresh401();
+                showSuggestions();
+            }
+            if(previousShift!=shift && !capsLock && !symbols)
+                suggestionHandler.post(this::refreshShiftCase398);
+        } finally {
+            OrivraPerfAudit411.end(
+                    OrivraPerfAudit411.SPACE_REFRESH_415,spaceRefreshStart415);
+        }
     
         } finally {
             OrivraPerfAudit411.end(OrivraPerfAudit411.SPACE,auditStart411);
