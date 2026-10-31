@@ -82,13 +82,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 409 Prediction Isolation");
+        title.setText("Orivra — Build 410 Idle Prediction Paint");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
 
         TextView notes = new TextView(this);
-        notes.setText("\nBuild 409 — Find the real typing lag (full Orivra settings preserved)\n"+
+        notes.setText("\nBuild 410 — Typing-first prediction display (full settings preserved)\n"+
                 "Uses the complete Orivra settings and learning baseline, not the old Alpha 1.0 prototype. Calm prediction paint reduces repeated UI refreshes while you type and suppresses automatic suggestion panel expansion for uncertain text. It is experimental and needs Samsung testing.\n"+
                 "Targets the real S26 Ultra freezes reported in WhatsApp "+
                 "notification replies while music plays. Rapid letters and "+
@@ -176,6 +176,35 @@ public final class MainActivity extends Activity {
         });
         root.addView(isolationButton409);
 
+        TextView idlePaintInfo410=new TextView(this);
+        idlePaintInfo410.setText("\nBuild 410 typing-first experiment. "+
+                "In FULL prediction mode, heavy suggestion chip updates wait "+
+                "210 ms after your last key instead of interrupting a "+
+                "continuous typing burst. The prediction engine, personal "+
+                "learning and one-tap candidate actions remain available "+
+                "when typing pauses. OFF returns to the Build 409 behavior. "+
+                "Reopen the text field after changing the option.");
+        idlePaintInfo410.setTextColor(0xFF303846);
+        idlePaintInfo410.setTextSize(15);
+        root.addView(idlePaintInfo410);
+        final String idlePref410="orivra_idle_paint_410";
+        final android.content.SharedPreferences idlePrefs410=
+                getSharedPreferences("keyboard_feedback",MODE_PRIVATE);
+        Button idlePaintButton410=new Button(this);
+        idlePaintButton410.setAllCaps(false);
+        idlePaintButton410.setText("Typing-first suggestion display: "+
+                (idlePrefs410.getBoolean(idlePref410,true)?"ON":"OFF"));
+        idlePaintButton410.setOnClickListener(v->{
+            boolean next=!idlePrefs410.getBoolean(idlePref410,true);
+            idlePrefs410.edit().putBoolean(idlePref410,next).apply();
+            idlePaintButton410.setText("Typing-first suggestion display: "+
+                    (next?"ON":"OFF"));
+            android.widget.Toast.makeText(this,
+                    "Reopen a text field to apply the setting",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        root.addView(idlePaintButton410);
+
         // Build 303 research, default OFF. Explicit opt-in and app-local only.
         // Never reads notes or keyboard input; changing this preference takes
         // effect when a text field is reopened and onStartInput runs again.
@@ -213,7 +242,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra 409 Isolation keyboard");
+        picker.setText("2. Choose Orivra 410 Idle Test keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
