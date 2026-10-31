@@ -20,8 +20,9 @@ final class OrivraPerfAudit411 {
             SPLIT_ON_UI=11, CHIP_BIND=12, SPLIT_WORKER_412=13,
             KEY_INITIAL_EDITOR_READ_413=14, COMPOSE_MUTATION_413=15,
             IDLE_WORD_OBSERVATION_413=16, SPACE_APPROVED_LEARNING_413=17,
-            SPACE_EDITOR_COMMIT_413=18, LEARNING_WORKER_413=19;
-    static final int SIZE=20;
+            SPACE_EDITOR_COMMIT_413=18, LEARNING_WORKER_413=19,
+            SPACE_PRECOMMIT_CHECKS_413=20, SPACE_POSTCOMMIT_413=21;
+    static final int SIZE=22;
     private static final String[] NAMES={
         "Letter key handler", "Space handler", "Backspace handler",
         "Suggestion scheduling", "Suggestion rendering", "Rise panel UI",
@@ -31,7 +32,8 @@ final class OrivraPerfAudit411 {
         "Split-phrase calculations on worker",
         "Key initial editor read", "Verified composing edit",
         "Idle word observation", "Space learning dispatch",
-        "Space finish/commit IPC", "Approved learning background worker"
+        "Space finish/commit IPC", "Approved learning background worker",
+        "Space boundary checks before commit", "Space processing after commit"
     };
     private static volatile boolean enabled;
     private static final long[] count=new long[SIZE];
