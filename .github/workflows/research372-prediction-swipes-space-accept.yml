@@ -1,0 +1,181 @@
+name: Orivra Research 372 - prediction slide and highlighted Space (NO APK)
+on:
+  push:
+    branches:
+      - research/build372-prediction-swipes-space-accept-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research372
+  cancel-in-progress: true
+jobs:
+  source-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Validate isolated changes, privacy and untouched Candidate 371 baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="b762b1b845df327381546b9adef6c6c768b83e9e"
+          changed=set(subprocess.check_output(["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          allowed={
+            "app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java",
+            "app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java",
+            "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+            "app/src/main/java/com/chroomareborn/keyboard/MainActivity.java",
+            "app/src/testsupport/java/com/chroomareborn/keyboard/PredictionSwipe372Research.java",
+            "app/src/testsupport/java/com/chroomareborn/keyboard/HighlightedSpace372Research.java",
+            "app/src/androidTest/java/com/chroomareborn/keyboard/PredictionGestures372AndroidTest.java",
+            ".github/workflows/research372-prediction-swipes-space-accept.yml"
+          }
+          assert changed==allowed,f"Unreviewed/missing files: {changed ^ allowed}"
+          for p in [
+            "app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java",
+            "app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java",
+            "app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java",
+            "app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java",
+            "app/src/main/java/com/chroomareborn/keyboard/AppPalette.java",
+            "app/src/main/java/com/chroomareborn/keyboard/AppIconHueCache366.java",
+            "app/src/main/java/com/chroomareborn/keyboard/SymbolHoldTiming367.java",
+            "app/src/main/java/com/chroomareborn/keyboard/KeyPressVisualPolicy369.java",
+            "app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java",
+            "app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java",
+            "app/src/main/java/com/chroomareborn/keyboard/BackspaceSwipePolicy.java"
+          ]:
+            old=subprocess.check_output(["git","show",base+":"+p],text=True)
+            assert old==Path(p).read_text(),f"Protected baseline drift: {p}"
+          service=Path("app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java").read_text()
+          original=subprocess.check_output(["git","show",base+":app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java"],text=True)
+          assert service.count("hintPressOrder353")==original.count("hintPressOrder353")
+          assert service.count("SpacebarCursorGesture")==original.count("SpacebarCursorGesture")
+          assert service.count("SymbolHoldTiming367.delayMs(")==original.count("SymbolHoldTiming367.delayMs(")
+          assert service.count("PredictionTapCaret364.arm(")==original.count("PredictionTapCaret364.arm(")
+          assert 'ic.commitText(insertLeftBoundary364?" "+value:value, 1)' in service
+          assert 'if(instantKeyFeedback369)return;' in service
+          assert 'PredictionSwipe372.direction(' in service
+          assert 'PredictionSwipe372.safeRelease(' in service
+          assert 'if(tryHighlightedSpace372())return;' in service
+          assert 'if(spaceAcceptInProgress372)spaceAcceptSucceeded372=true;' in service
+          assert 'option.setOnTouchListener((v,event)->' in service
+          assert 'item.setOnTouchListener((v,event)->' in service
+          assert 'clearSpaceHighlight372();' in service
+          assert 'getCurrentInputConnection()' in service
+          main=Path("app/src/main/java/com/chroomareborn/keyboard/MainActivity.java").read_text()
+          assert "Swipe prediction selection:" in main
+          assert "Space accepts highlighted correction:" in main
+          assert "Instant key visual feedback:" in main
+          assert "Special character hold:" in main
+          for p in ["app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java",
+                    "app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java"]:
+            content=Path(p).read_text()
+            assert "android." not in content and "getSharedPreferences" not in content
+            assert "commitText(" not in content and "setComposingText(" not in content
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          for forbidden in ["android.permission.INTERNET",
+                  "android.permission.QUERY_ALL_PACKAGES",
+                  "android.permission.BIND_ACCESSIBILITY_SERVICE"]:
+            assert forbidden not in manifest
+          assert 'android:allowBackup="false"' in manifest
+          gradle=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build371trial"' in gradle
+          assert "versionCode = 371" in gradle
+          print("PASS: source scope, no change to 371 APK, learning, letter/spacebar gestures or privacy")
+          PY
+      - name: Run 140k+ deterministic prediction gesture and Space acceptance regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/PredictionSwipe372.java \
+            app/src/main/java/com/chroomareborn/keyboard/HighlightedSpace372.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/PredictionSwipe372Research.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/HighlightedSpace372Research.java
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.PredictionSwipe372Research
+          java -cp "$RUNNER_TEMP/classes" com.chroomareborn.keyboard.HighlightedSpace372Research
+
+  android35-emulator:
+    needs: source-and-synthetic
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Rebuild verified pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Compile research app and Android instrumentation APKs (no release)
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Require 217 Android tests all passed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports,"No Android emulator test results"
+          total=failed=errors=skipped=0
+          for p in reports:
+            root=ET.parse(p).getroot()
+            suites=[root] if root.tag.endswith('testsuite') else [
+                n for n in root.iter() if n.tag.endswith('testsuite')]
+            for suite in suites:
+              total+=int(suite.attrib.get('tests',0))
+              failed+=int(suite.attrib.get('failures',0))
+              errors+=int(suite.attrib.get('errors',0))
+              skipped+=int(suite.attrib.get('skipped',0))
+          print(f"Android35: {total} tests, {failed} failures, {errors} errors, {skipped} skipped")
+          assert total>=217 and failed==0 and errors==0 and skipped==0
+          assert Path("app/src/androidTest/java/com/chroomareborn/keyboard/PredictionGestures372AndroidTest.java").read_text().count("@Test")==6
+          PY
+          echo "PASS emulator only. No APK published; Samsung Android 17 gesture feel awaits phone test."
