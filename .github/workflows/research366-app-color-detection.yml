@@ -1,0 +1,177 @@
+name: Orivra Research 366 - app icon color matching and safe background cache (NO RELEASE)
+on:
+  push:
+    branches:
+      - research/build366-app-icon-color-detection-20261030
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orivra-research366
+  cancel-in-progress: true
+
+jobs:
+  scope-and-color-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify protection of Candidate 365 typing and no screen capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          base="313342af2faf0034b433b32c3fd45a0a01e74cbe"
+          changed=set(subprocess.check_output(
+              ["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          expected={
+              "app/src/main/java/com/chroomareborn/keyboard/AppIconColorSignature366.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppIconHueCache366.java",
+              "app/src/main/java/com/chroomareborn/keyboard/AppPalette.java",
+              "app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java",
+              "app/src/testsupport/java/com/chroomareborn/keyboard/AppIconColorSignature366Research.java",
+              "app/src/androidTest/java/com/chroomareborn/keyboard/AppIconColor366AndroidTest.java",
+              ".github/workflows/research366-app-color-detection.yml"
+          }
+          assert changed==expected,f"Unexpected/missing research files: {changed ^ expected}"
+          old=lambda path: subprocess.check_output(["git","show",base+":"+path],text=True)
+          for path in [
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionLite.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionDispatcher.java",
+              "app/src/main/java/com/chroomareborn/keyboard/HintKeyPressOrder353.java",
+              "app/src/main/java/com/chroomareborn/keyboard/CursorWordCorrectionPolicy.java",
+              "app/src/main/java/com/chroomareborn/keyboard/PredictionTapCaret364.java",
+              "app/src/main/java/com/chroomareborn/keyboard/TypedWordLearningWorker346.java",
+              "app/src/main/java/com/chroomareborn/keyboard/SentenceSuggestionCommit.java",
+          ]:
+              assert old(path)==Path(path).read_text(),f"Stable typing/source drift: {path}"
+          servicepath="app/src/main/java/com/chroomareborn/keyboard/RebornImeService.java"
+          oldservice=old(servicepath)
+          service=Path(servicepath).read_text()
+          start="    private void type(String value) {"
+          end="    private void deleteSwipeWords("
+          assert oldservice.split(start,1)[1].split(end,1)[0] == service.split(start,1)[1].split(end,1)[0], "Typing hot path changed"
+          assert service.count("hintPressOrder353")==oldservice.count("hintPressOrder353")
+          assert service.count("PredictionTapCaret364")==oldservice.count("PredictionTapCaret364")
+          assert "requestAppIconHue366(editor);" in service
+          assert "applyAppIconHueWhenIdle366(" in service
+          assert "hintPressOrder353.hasOpenPresses()" in service
+          assert "time-lastTypingTime<420L" in service
+          palette=Path("app/src/main/java/com/chroomareborn/keyboard/AppPalette.java").read_text()
+          assert "AppIconHueCache366.cachedHue(packageName)" in palette
+          assert "getApplicationIcon(" not in palette
+          assert "Bitmap.createBitmap" not in palette
+          assert "mode==MATERIAL_AUTO" in palette
+          assert "if(mode==CLEAN_NEUTRAL)" in palette
+          provider=Path("app/src/main/java/com/chroomareborn/keyboard/AppIconHueCache366.java").read_text()
+          assert "Executors.newSingleThreadExecutor" in provider
+          assert "getApplicationIcon(pkg)" in provider
+          assert "CACHE.put(pkg" in provider
+          assert "MAX=40" in provider
+          assert "getSharedPreferences" not in provider
+          assert "MediaProjection" not in provider
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert "android.permission.INTERNET" not in manifest
+          assert "android.permission.QUERY_ALL_PACKAGES" not in manifest
+          assert "android.permission.BIND_ACCESSIBILITY_SERVICE" not in manifest
+          assert 'android:allowBackup="false"' in manifest
+          gradle=Path("app/build.gradle.kts").read_text()
+          assert 'applicationId = "com.chroomareborn.keyboard.build365trial"' in gradle
+          assert "versionCode = 365" in gradle
+          print("PASS: protected Candidate 365 typing, no screenshot/permissions/storage, colour sampling off-thread")
+          PY
+      - name: Compile and run hue confidence/ambiguity synthetic tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/chroomareborn/keyboard/AppIconColorSignature366.java \
+            app/src/testsupport/java/com/chroomareborn/keyboard/AppIconColorSignature366Research.java
+          java -cp "$RUNNER_TEMP/classes" \
+            com.chroomareborn.keyboard.AppIconColorSignature366Research
+
+  android35-emulator:
+    needs: scope-and-color-model
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - uses: actions/checkout@v4
+        with:
+          repository: en-wl/wordlist
+          ref: 1e5b7d3a72f47a71da5d28686c1dd4b397178485
+          path: official-esdb
+          persist-credentials: false
+      - name: Rebuild and verify pinned offline English dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s official-esdb/Copyright
+          test -s app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt
+          make -C official-esdb
+          (cd official-esdb && ./scowl word-list 60 A 1 --categories=) > "$RUNNER_TEMP/esdb-en.txt"
+          printf '%s  %s\n' a5d2f75b95d3530485e539352dc01f9dd9079e03fdaca37466292bf1a360c600 "$RUNNER_TEMP/esdb-en.txt" | sha256sum --check
+          mkdir -p app/src/main/assets/dictionaries
+          gzip -n -9 < "$RUNNER_TEMP/esdb-en.txt" > app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack
+      - name: Build Android 35 research app and test APKs (not published)
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest
+      - name: Require 207+ Android tests green, no skips
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          reports=list(Path('app/build/outputs/androidTest-results/connected').rglob('*.xml'))
+          assert reports, "No Android emulator test report"
+          tests=failed=errors=skipped=0
+          for p in reports:
+              root=ET.parse(p).getroot()
+              suites=[root] if root.tag.endswith('testsuite') else [
+                  x for x in root.iter() if x.tag.endswith('testsuite')]
+              for suite in suites:
+                  tests+=int(suite.attrib.get("tests","0"))
+                  failed+=int(suite.attrib.get("failures","0"))
+                  errors+=int(suite.attrib.get("errors","0"))
+                  skipped+=int(suite.attrib.get("skipped","0"))
+          print(f"Android35: {tests} tests, {failed} failures, {errors} errors, {skipped} skipped")
+          assert tests>=207 and failed==0 and errors==0 and skipped==0
+          assert Path("app/src/androidTest/java/com/chroomareborn/keyboard/AppIconColor366AndroidTest.java").read_text().count("@Test")==5
+          PY
+          echo "PASS API35 emulator only; Samsung Android 17 appearance must be tested on-device."
