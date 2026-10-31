@@ -409,9 +409,9 @@ public final class RebornImeService extends InputMethodService {
                     editingInMiddle || hasSelection() || symbols ||
                     numericEditor || !PersonalLearning.enabled(this))return;
             final long session=inputSessionGeneration;
-            final String localWord=composing.isEmpty()?
-                    (lastTappedSession340==session?lastTappedWord340:""):
-                    composing;
+            final String localWord=IdleWordCandidate414.current(
+                    composing,lastTappedWord340,
+                    lastTappedSession340==session,true);
             if(localWord.isEmpty())return;
             final long delay=StableWordTiming334.milliseconds(localWord);
             if(delay<=0)return;
