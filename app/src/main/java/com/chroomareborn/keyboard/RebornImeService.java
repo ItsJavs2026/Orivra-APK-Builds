@@ -1903,7 +1903,15 @@ public final class RebornImeService extends InputMethodService {
             // The previous early return made the preview path unreachable.
             if(newSelStart!=oldSelStart || newSelEnd!=oldSelEnd) {
                 predictionDispatcher.cancel();
-                editingInMiddle=cursorHasTextAfter() || !wordAtCursor().isEmpty();
+                // A word to the LEFT at document end is not mid-document
+                // editing. A late selection echo can otherwise keep this
+                // flag stuck through the rest of a long message, forcing
+                // future letters down the committed-word-only pathway.
+                // No extra editor read: the suffix/selection guards are
+                // already used throughout this service.
+                editingInMiddle=LongDraftCaretState375
+                        .editingWithoutComposition(
+                                hasSelection(),cursorHasTextAfter());
                 showSuggestions();
             }
             return;
@@ -1924,7 +1932,13 @@ public final class RebornImeService extends InputMethodService {
                     .finishBeforeTypedReplacement(newSelStart!=newSelEnd))
                 ic.finishComposingText();
             composing="";
-            editingInMiddle=true;
+            // Respect the host's ended composition; never resurrect an
+            // invalid composing span. But end-of-document must not acquire
+            // a sticky middle-edit flag merely from missing candidate
+            // boundaries (-1) or late selection callbacks.
+            editingInMiddle=LongDraftCaretState375
+                    .afterHostEndedComposition(
+                            hasSelection(),cursorHasTextAfter());
             showSuggestions();
         }
     }
