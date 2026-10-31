@@ -146,7 +146,8 @@ public final class MainActivity extends Activity {
                 "WORKER ONLY: predictions compute privately in the background "+
                 "but the result is never painted. FULL: normal Orivra 408 "+
                 "predictions and chips. Switch modes, then reopen a text "+
-                "field before comparing notification replies with music. "+
+                "field before comparing the same text here in ChatGPT, "+
+                "then a notification reply with music playing. "+
                 "No private text is logged by this diagnostic.");
         isolationHelp409.setTextColor(0xFF303846);
         isolationHelp409.setTextSize(15);
