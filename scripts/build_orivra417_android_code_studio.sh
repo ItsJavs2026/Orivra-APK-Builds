@@ -24,7 +24,7 @@ if [[ ! -d "$SOURCE/.git" ]] ||
   exit 1
 fi
 echo "Source commit: $(git -C "$SOURCE" rev-parse --short HEAD)"
-for cmd in git tar gzip sha256sum wc make python3 javac java unzip cmp; do
+for cmd in git tar gzip sha256sum wc python3 javac java unzip cmp; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "ERROR: Missing $cmd in Android Code Studio terminal." >&2
     exit 1
@@ -83,7 +83,7 @@ git -C "$SOURCE" archive HEAD | tar -xf - -C "$STAGING"
 cp -r "$WRAPPER_SOURCE/gradle" "$STAGING/"
 cp "$WRAPPER_SOURCE/gradlew" "$STAGING/"
 
-echo "Generating exact source-verified dictionary outside Gradle..."
+echo "Generating exact source-verified dictionary using Python (make not required)..."
 bash "$STAGING/scripts/build-esdb-wordpack.sh" "$ESDB_SOURCE"
 ASSET="$STAGING/$PACK_REL"
 test -s "$ASSET"
