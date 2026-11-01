@@ -64,10 +64,10 @@ final class OfflineDictionaryStatus417 {
     static String label(Context context,boolean optedIn){
         boolean packaged=assetBundled(context);
         StringBuilder b=new StringBuilder();
-        b.append("Pack in APK: ").append(packaged?"YES":"MISSING");
-        b.append("\nWords in verified pack: ")
+        b.append("Pack asset header: ").append(packaged?"PRESENT":"MISSING");
+        b.append("\nExpected word count: ")
                 .append(CompressedLanguagePack.EXPECTED_WORDS);
-        b.append(" (exact English recognition, not fuzzy prediction)");
+        b.append(" (checked after background load; not fuzzy prediction)");
         if(!optedIn) {
             b.append("\nActivation: OFF (requires opt-in)");
             return b.toString();
