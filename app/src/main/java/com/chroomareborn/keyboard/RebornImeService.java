@@ -652,6 +652,7 @@ public final class RebornImeService extends InputMethodService {
         optionalDictionaryAttempted=false;
         readyOptionalDictionary=null;
         PredictionLite.setResearchExactOnlyPack(null);
+        OfflineDictionaryStatus417.disabled();
     }
     private void reconcileOptionalDictionary() {
         boolean optedIn=optionalDictionaryEnabled();
@@ -663,10 +664,12 @@ public final class RebornImeService extends InputMethodService {
                 !OfflineDictionaryActivationPolicy.usable(optedIn,sensitive)){
             // Protected fields NEVER use the supplemental dictionary.
             PredictionLite.setResearchExactOnlyPack(null);
+            OfflineDictionaryStatus417.protectedField();
             return;
         }
         if(readyOptionalDictionary!=null){
             PredictionLite.setResearchExactOnlyPack(readyOptionalDictionary);
+            OfflineDictionaryStatus417.resumedWithLoadedPack();
             return;
         }
         // Always retain the old predictor until a verified asset loads.
@@ -674,6 +677,7 @@ public final class RebornImeService extends InputMethodService {
         if(!OfflineDictionaryActivationPolicy.startWorker(optedIn,sensitive,
                 optionalDictionaryAttempted,readyOptionalDictionary!=null))return;
         optionalDictionaryAttempted=true;
+        OfflineDictionaryStatus417.loading();
         final OfflineLanguagePackWorker loader=new OfflineLanguagePackWorker();
         optionalDictionaryLoader=loader;
         if(!loader.start(this,result->{
@@ -685,10 +689,13 @@ public final class RebornImeService extends InputMethodService {
             if(eligible){
                 readyOptionalDictionary=result.pack;
                 PredictionLite.setResearchExactOnlyPack(result.pack);
+                OfflineDictionaryStatus417.ready(
+                        result.pack.size(),result.nanos);
                 // No editor reads or direct UI refresh: next ordinary
                 // prediction request safely uses the newly ready pack.
             }else{
                 PredictionLite.setResearchExactOnlyPack(null);
+                OfflineDictionaryStatus417.failed();
                 // This worker cannot be reused; permit retry on a later
                 // normal field if a private editor interrupted its result.
                 optionalDictionaryLoader=null;
@@ -698,6 +705,8 @@ public final class RebornImeService extends InputMethodService {
         })){
             loader.close();
             if(optionalDictionaryLoader==loader)optionalDictionaryLoader=null;
+            optionalDictionaryAttempted=false;
+            OfflineDictionaryStatus417.failed();
         }
     }
     // Prevent detaching a pressed letter key while its long-press symbol
@@ -2237,6 +2246,10 @@ public final class RebornImeService extends InputMethodService {
         // AFTER the session-generation bump. Explicit permission is OFF
         // by default; opening a text field activates newly changed settings.
         startTypedWords347();
+        // 417: settings may change while IME view is hidden, without a new
+        // onStartInput(). Re-evaluate the opt-in/private gates on every reopen.
+        // A verified wordpack is reused, never parsed from a key handler.
+        reconcileOptionalDictionary();
         updateSentenceShift();
         refreshView();
     }
