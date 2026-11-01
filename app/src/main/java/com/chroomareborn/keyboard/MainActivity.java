@@ -85,7 +85,7 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(0xFFF6F7FA);
 
         TextView title = new TextView(this);
-        title.setText("Orivra — Build 416C Cursor Prediction Tap Fix");
+        title.setText("Orivra — Build 417 Offline English Pack Trial");
         title.setTextColor(Color.BLACK);
         title.setTextSize(22);
         root.addView(title);
@@ -573,13 +573,27 @@ public final class MainActivity extends Activity {
         // Never reads notes or keyboard input; changing this preference takes
         // effect when a text field is reopened and onStartInput runs again.
         TextView dictionaryResearchInfo=new TextView(this);
-        dictionaryResearchInfo.setText("\nExperimental offline vocabulary: 78,942 extra exact English words. "
-                +"It helps recognize intact words, but does not add new fuzzy typo candidates. "
-                +"Uses about 280 KB APK storage plus runtime memory. "
-                +"Default OFF. Do not enable in production-critical typing.");
+        dictionaryResearchInfo.setText("\nBuild 417 English dictionary trial: "
+                +"78,942 attributed ESDB spellings for exact recognition "
+                +"and conservative word segmentation. This does not provide "
+                +"79k fuzzy correction candidates or broaden Spanish. "
+                +"Background-loaded, opt-in OFF by default; compare typing "
+                +"latency and memory before leaving it enabled.");
         dictionaryResearchInfo.setTextColor(0xFF303846);
         dictionaryResearchInfo.setTextSize(14);
         root.addView(dictionaryResearchInfo);
+        TextView dictionaryStatus417=new TextView(this);
+        dictionaryStatus417.setTextColor(0xFF303846);
+        dictionaryStatus417.setTextSize(14);
+        java.lang.Runnable refreshDictionaryStatus417=()->{
+            boolean optedIn=getSharedPreferences(
+                    OfflineDictionaryActivationPolicy.PREFS,MODE_PRIVATE)
+                    .getBoolean(OfflineDictionaryActivationPolicy.KEY,false);
+            dictionaryStatus417.setText(
+                    OfflineDictionaryStatus417.label(this,optedIn));
+        };
+        refreshDictionaryStatus417.run();
+        root.addView(dictionaryStatus417);
         Button offlineExactDictionary=new Button(this);
         offlineExactDictionary.setAllCaps(false);
         boolean exactEnabled=getSharedPreferences(
@@ -594,11 +608,18 @@ public final class MainActivity extends Activity {
             prefs.edit().putBoolean(OfflineDictionaryActivationPolicy.KEY,enabled).apply();
             offlineExactDictionary.setText("Experimental offline English dictionary: "+
                     (enabled?"ON":"OFF")+" (tap to change)");
+            refreshDictionaryStatus417.run();
             android.widget.Toast.makeText(this,
                     "Reopen a text field to apply. Password/privacy protection is unchanged.",
                     android.widget.Toast.LENGTH_LONG).show();
         });
         root.addView(offlineExactDictionary);
+        Button dictionaryStatusButton417=new Button(this);
+        dictionaryStatusButton417.setAllCaps(false);
+        dictionaryStatusButton417.setText("Refresh offline dictionary status");
+        dictionaryStatusButton417.setOnClickListener(v->
+                refreshDictionaryStatus417.run());
+        root.addView(dictionaryStatusButton417);
 
         Button settings = new Button(this);
         settings.setText("1. Enable keyboard in Android settings");
@@ -606,7 +627,7 @@ public final class MainActivity extends Activity {
         root.addView(settings);
 
         Button picker = new Button(this);
-        picker.setText("2. Choose Orivra 415 Speed Test keyboard");
+        picker.setText("2. Choose Orivra 417 Offline English Trial keyboard");
         picker.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();
