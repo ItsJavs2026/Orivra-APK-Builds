@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build 302 experimental only — reproduce offline language asset from locally
+# Build 417 pinned on-device source — reproduce offline language asset from locally
 # checked-out, pinned ESDB source. Does not download anything or build an APK.
 set -euo pipefail
 if [[ $# -ne 1 ]]; then
@@ -16,6 +16,8 @@ if [[ "$(git -C "$source_dir" rev-parse HEAD)" != "$expected_commit" ]]; then
 fi
 test -s "$source_dir/Copyright"
 test -s "$root/app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt"
+grep -Fq 'Copyright 2000-2026 by Kevin Atkinson' "$source_dir/Copyright"
+grep -Fq 'Copyright 2000-2026 by Kevin Atkinson' "$root/app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt"
 temporary="$(mktemp)"
 trap 'rm -f "$temporary"' EXIT
 make -C "$source_dir"
@@ -26,7 +28,11 @@ asset="$root/app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack"
 mkdir -p "$(dirname "$asset")"
 gzip -n -9 < "$temporary" > "$asset"
 gzip -t < "$asset"
+roundtrip="$(mktemp)"
+trap 'rm -f "$temporary" "$roundtrip"' EXIT
+gzip -dc "$asset" > "$roundtrip"
+printf '%s  %s\n' "$expected_sha" "$roundtrip" | sha256sum --check
 printf "Generated exact-only research asset: %s\n" "$asset"
 wc -c "$asset"
 sha256sum "$asset"
-echo "Keep this asset research-only until Android, licensing and Samsung QA."
+echo "Next: verify archive bytes and license inside the final Android APK."
