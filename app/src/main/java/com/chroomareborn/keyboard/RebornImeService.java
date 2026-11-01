@@ -4669,6 +4669,16 @@ public final class RebornImeService extends InputMethodService {
                         return;
                     }
                 }
+                if(!cursorWord.isEmpty()) {
+                    // 416C: when the caret is on a committed word but a
+                    // trustworthy edit ticket cannot be created, do NOT
+                    // fall through to next-word choices. Those require a
+                    // whitespace boundary and would be visible but dead.
+                    visibleEditingTicket=null;
+                    OrivraPerfAudit411.recordMissingCursorTicket416C();
+                    renderSuggestions("",java.util.Collections.emptyList());
+                    return;
+                }
             }
             if(editingInMiddle || cursorHasTextAfter() || hasSelection()) {
                 final String word=wordAtCursor();
@@ -4680,11 +4690,18 @@ public final class RebornImeService extends InputMethodService {
                 // Show a safe exact-word/contraction alternative immediately,
                 // even if the debounced fuzzy predictor has not returned yet.
                 final CursorEditSnapshotGuard.Ticket editTicket=captureEditingTicket(word);
+                if(editTicket==null) {
+                    // Never draw misleading tappable correction chips with
+                    // no verified range on this host editor.
+                    visibleEditingTicket=null;
+                    OrivraPerfAudit411.recordMissingCursorTicket416C();
+                    renderSuggestions("",java.util.Collections.emptyList());
+                    return;
+                }
                 java.util.List<String> immediately=
                         CursorWordCorrectionPolicy.safeOptions(word,
                                 EnglishApostrophePolicy.suggestions(word));
                 renderImmediateSuggestions345(word,immediately);
-                if(editTicket==null)return; // No trustworthy editor snapshot.
                 visibleEditingTicket=editTicket;
                 final long startedAt=CandidateLatencyMetrics.start(getPackageName());
                 predictionDispatcher.scheduleEditing(word,(id,input,options)->{
@@ -5065,6 +5082,16 @@ public final class RebornImeService extends InputMethodService {
             } catch(RuntimeException detachedEditor) {
                 idleWordTicket340=null;
             }
+        }
+        if(input.isEmpty() && options!=null && !options.isEmpty() &&
+                idleWordTicket340==null && !sensitive &&
+                editorAllowsSuggestions) {
+            // Idle next-word chips may insert text only with a verified
+            // trailing-whitespace ticket. If capture failed (e.g., cursor
+            // was on an unfinished word after reopen), hide rather than
+            // display visible but inoperable chips.
+            OrivraPerfAudit411.recordMissingNextWordTicket416C();
+            options=java.util.Collections.emptyList();
         }
         if(manuallyCollapsedPredictions && !input.equals(manualCollapseSnapshot))
             manuallyCollapsedPredictions=false;
