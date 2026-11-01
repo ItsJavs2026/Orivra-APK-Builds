@@ -4638,8 +4638,10 @@ public final class RebornImeService extends InputMethodService {
                                     initial,personalizedPrefix340(cursorWord),
                                     PredictionLite.publicWordForContext(
                                             cursorWord.toLowerCase(java.util.Locale.ROOT)));
-                        renderImmediateSuggestions345(cursorWord,initial);
+                        // Publish the validation ticket BEFORE frame dispatch:
+                        // with frame updates OFF, rendering can run inline.
                         visibleEditingTicket=ticket;
+                        renderImmediateSuggestions345(cursorWord,initial);
                         final long startedAt=CandidateLatencyMetrics.start(getPackageName());
                         predictionDispatcher.scheduleEditing(cursorWord,(id,input,options)->{
                             final long computedAt=startedAt==0L?0L:System.nanoTime();
@@ -4659,8 +4661,8 @@ public final class RebornImeService extends InputMethodService {
                                             personalizedPrefix340(input),
                                             PredictionLite.publicWordForContext(
                                                     input.toLowerCase(java.util.Locale.ROOT)));
-                                renderSuggestions(input,merged);
                                 visibleEditingTicket=ticket;
+                                renderSuggestions(input,merged);
                                 if(CandidateLatencyMetrics.recordReady(
                                         startedAt,computedAt,System.nanoTime()))
                                     recordNextCandidateFrame(id,startedAt);
@@ -4701,8 +4703,8 @@ public final class RebornImeService extends InputMethodService {
                 java.util.List<String> immediately=
                         CursorWordCorrectionPolicy.safeOptions(word,
                                 EnglishApostrophePolicy.suggestions(word));
-                renderImmediateSuggestions345(word,immediately);
                 visibleEditingTicket=editTicket;
+                renderImmediateSuggestions345(word,immediately);
                 final long startedAt=CandidateLatencyMetrics.start(getPackageName());
                 predictionDispatcher.scheduleEditing(word,(id,input,options)->{
                     final long computedAt=startedAt==0L?0L:System.nanoTime();
@@ -4731,8 +4733,8 @@ public final class RebornImeService extends InputMethodService {
                             // declines the optional contextual snapshot.
                         }
                         // The view and the click use the same captured editor.
-                        renderSuggestions(input,wordOptions);
                         visibleEditingTicket=editTicket;
+                        renderSuggestions(input,wordOptions);
                         if(CandidateLatencyMetrics.recordReady(
                                 startedAt,computedAt,System.nanoTime()))
                             recordNextCandidateFrame(id,startedAt);
