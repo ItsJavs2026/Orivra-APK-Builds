@@ -20,8 +20,14 @@ grep -Fq 'Copyright 2000-2026 by Kevin Atkinson' "$source_dir/Copyright"
 grep -Fq 'Copyright 2000-2026 by Kevin Atkinson' "$root/app/src/main/assets/dictionaries/ESDB_COPYRIGHT.txt"
 temporary="$(mktemp)"
 trap 'rm -f "$temporary"' EXIT
-make -C "$source_dir"
-(cd "$source_dir" && ./scowl word-list 60 A 1 --categories=) > "$temporary"
+# Upstream Makefile does only: ./combine.py create-db scowl.db.
+# Running the same Python generator directly avoids requiring `make` on Android.
+# It needs Python 3 and SQLite 3.33+, already checked by the 417 builder.
+(
+  cd "$source_dir"
+  python3 combine.py create-db scowl.db
+  ./scowl word-list 60 A 1 --categories=
+) > "$temporary"
 printf '%s  %s\n' "$expected_sha" "$temporary" | sha256sum --check
 test "$(wc -c < "$temporary")" -eq 1022018
 asset="$root/app/src/main/assets/dictionaries/esdb-en-US-60.esdbpack"
