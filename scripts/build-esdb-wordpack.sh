@@ -25,7 +25,7 @@ trap 'rm -f "$temporary"' EXIT
 # It needs Python 3 and SQLite 3.33+, already checked by the 417 builder.
 (
   cd "$source_dir"
-  python3 combine.py create-db scowl.db
+  python3 combine.py create-db scowl.db >/dev/null
   ./scowl word-list 60 A 1 --categories=
 ) > "$temporary"
 printf '%s  %s\n' "$expected_sha" "$temporary" | sha256sum --check
