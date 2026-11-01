@@ -66,3 +66,14 @@ Only if **script finishes successfully**, output APK: `/storage/emulated/0/Andro
 
 ## Next stages (not done)
 A frequency-weighted next-word model, better typo candidate generation and a Unicode Spanish/English bilingual pack require their own provenance, offline RAM/latency budgets and real-world evaluation. Current per-user manual dictionary cap 250 is separate; do not silently alter backup/migration without tests.
+
+## Live Android Code Studio troubleshooting — missing make
+User cloned the 417 branch successfully on their Samsung; original script stopped immediately with `ERROR: Missing make in Android Code Studio terminal.` No APK was built and no installed keyboard was touched. Verified official pinned upstream Makefile's `scowl.db` rule invokes only `./combine.py create-db scowl.db`, a Python script. **Both** `scripts/build-esdb-wordpack.sh` and `scripts/build_orivra417_android_code_studio.sh` now avoid `make`: the generator runs `python3 combine.py create-db scowl.db` directly from the pinned upstream checkout. Expected byte-count/SHA check and APK verification are unchanged.
+
+In already cloned 417 source, update first:
+```bash
+cd ~/Orivra-Dictionary417
+git pull --ff-only
+bash scripts/build_orivra417_android_code_studio.sh
+```
+Do not reclone or install make. If next preflight fails (Python/SQLite/tools) or generation fails, request the terminal's last lines and resolve next prerequisite without claiming a successful APK. Source change is not phone-tested yet.
