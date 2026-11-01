@@ -6,7 +6,7 @@ set -euo pipefail
 SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKSPACE="/storage/emulated/0/AndroidIDEProjects"
 PROJECT="$WORKSPACE/Orivra417OfflineEnglish"
-WRAPPER_SOURCE="$WORKSPACE/Orivra414Live"
+WRAPPER_SOURCE="$WORKSPACE/Orivra416Space"
 AAPT2="$HOME/.androidide/aapt2"
 BRANCH="candidate/build417-offline-esdb-onphone-20261031"
 EXPECTED_ID="com.chroomareborn.keyboard.build417dictionarytrial"
@@ -40,7 +40,7 @@ PY
 if [[ ! -f "$WRAPPER_SOURCE/gradlew" ]] ||
    [[ ! -f "$WRAPPER_SOURCE/gradle/wrapper/gradle-wrapper.jar" ]] ||
    ! grep -q 'gradle-8.9-bin.zip' "$WRAPPER_SOURCE/gradle/wrapper/gradle-wrapper.properties"; then
-   echo "ERROR: Working Orivra414Live Gradle 8.9 wrapper not found." >&2
+   echo "ERROR: Verified Orivra416Space Gradle 8.9 wrapper not found." >&2
    exit 1
 fi
 if [[ ! -x "$AAPT2" ]]; then
