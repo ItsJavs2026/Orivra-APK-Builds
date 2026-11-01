@@ -61,7 +61,8 @@ final class OrivraPerfAudit411 {
     // 416C: no words, source app, tap positions or private editor snapshots.
     private static long cursorTicketRetained416C,cursorTicketCleared416C,
             cursorTapRejected416C,cursorTapApplied416C,
-            swipeTapRejected416C;
+            swipeTapRejected416C,missingCursorTicket416C,
+            missingNextWordTicket416C;
 
     private OrivraPerfAudit411(){}
 
@@ -135,9 +136,16 @@ final class OrivraPerfAudit411 {
     static synchronized void recordSwipeTapRejected416C(){
         if(enabled)swipeTapRejected416C++;
     }
+    static synchronized void recordMissingCursorTicket416C(){
+        if(enabled)missingCursorTicket416C++;
+    }
+    static synchronized void recordMissingNextWordTicket416C(){
+        if(enabled)missingNextWordTicket416C++;
+    }
     static synchronized void reset(){
         cursorTicketRetained416C=cursorTicketCleared416C=0;
         cursorTapRejected416C=cursorTapApplied416C=swipeTapRejected416C=0;
+        missingCursorTicket416C=missingNextWordTicket416C=0;
         spaceFastShift416=spaceFallbackShift416=0;
         selectedBackspaceApplied416B=selectedBackspaceUncertain416B=
                 selectedBackspaceStale416B=0;
@@ -210,6 +218,10 @@ final class OrivraPerfAudit411 {
                 .append(cursorTapRejected416C).append('\n');
         b.append("Suggestion-swipe touch release rejected: ")
                 .append(swipeTapRejected416C).append('\n');
+        b.append("Cursor-word option rows suppressed (missing edit ticket): ")
+                .append(missingCursorTicket416C).append('\n');
+        b.append("Next-word option rows suppressed (missing caret ticket): ")
+                .append(missingNextWordTicket416C).append('\n');
         b.append("Note: render/panel timings overlap with suggestion "+
                 "entry; don't add their times together.\n");
         b.append("Slow handlers do not establish physical touch-to-frame "+
